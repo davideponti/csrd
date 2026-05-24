@@ -1,0 +1,13 @@
+"""CSRD Comply — API Router aggregation."""
+from fastapi import APIRouter
+from app.api import auth, companies, assessment, emissions, reports, ai, subscriptions
+
+router = APIRouter()
+
+router.include_router(auth.router, prefix="/auth", tags=["auth"])
+router.include_router(companies.router, prefix="/companies", tags=["companies"])
+router.include_router(assessment.router, prefix="/assessment", tags=["assessment"])
+router.include_router(emissions.router, prefix="/emissions", tags=["emissions"])
+router.include_router(reports.router, prefix="/reports", tags=["reports"])
+router.include_router(ai.router, prefix="/ai", tags=["ai"])
+router.include_router(subscriptions.router, prefix="/subscriptions", tags=["subscriptions"])
