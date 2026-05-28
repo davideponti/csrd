@@ -3,7 +3,8 @@ import os
 import logging
 from pydantic_settings import BaseSettings
 from typing import List, Optional
-from pydantic import model_validator
+from pydantic import model_validator, field_validator
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +54,36 @@ class Settings(BaseSettings):
     # CORS — only specific origins, no wildcards
     CORS_ORIGINS: List[str] = ["http://localhost:3000"]
     CORS_ALLOW_HEADERS: List[str] = ["Authorization", "Content-Type", "X-Tenant-ID"]
+
+    @field_validator("CORS_ORIGINS", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, v):
+        """Allow CORS_ORIGINS as JSON array, comma-separated string, or single URL."""
+        if isinstance(v, str):
+            v = v.strip()
+            if v.startswith("["):
+                try:
+                    return json.loads(v)
+                except json.JSONDecodeError:
+                    pass
+            return [origin.strip() for origin in v.split(",") if origin.strip()]
+        if isinstance(v, list):
+            return v
+        return ["http://localhost:3000"]
+
+    @field_validator("CORS_ALLOW_HEADERS", mode="before")
+    @classmethod
+    def parse_list_strings(cls, v):
+        """Allow list fields as JSON array or comma-separated string."""
+        if isinstance(v, str):
+            v = v.strip()
+            if v.startswith("["):
+                try:
+                    return json.loads(v)
+                except json.JSONDecodeError:
+                    pass
+            return [item.strip() for item in v.split(",") if item.strip()]
+        return v
 
     # Environment
     ENVIRONMENT: str = "development"
