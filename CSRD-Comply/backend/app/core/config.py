@@ -2,8 +2,8 @@
 import os
 import logging
 from pydantic_settings import BaseSettings
-from typing import List, Optional, Any
-from pydantic import model_validator, field_validator
+from typing import List, Optional
+from pydantic import model_validator
 import json
 
 logger = logging.getLogger(__name__)
@@ -52,7 +52,8 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: str = ""
 
     # CORS — only specific origins, no wildcards
-    CORS_ORIGINS: List[str] = []
+    # Usiamo str per evitare errori di parsing con pydantic-settings su Render
+    CORS_ORIGINS: str = "http://localhost:3000"
     CORS_ALLOW_HEADERS: List[str] = ["Authorization", "Content-Type", "X-Tenant-ID"]
 
     # Environment
@@ -98,25 +99,17 @@ class Settings(BaseSettings):
     STRIPE_PRICE_TEAM: str = ""
     STRIPE_PRICE_ENTERPRISE: str = ""
 
-    @field_validator("CORS_ORIGINS", mode="before")
-    @classmethod
-    def parse_cors_origins(cls, v: Any) -> Any:
-        """Allow CORS_ORIGINS env var as: JSON array, comma-separated, single URL, or empty."""
-        if v is None or v == "":
+    def _parse_origins(self) -> List[str]:
+        """Parse CORS_ORIGINS into a list."""
+        v = self.CORS_ORIGINS.strip()
+        if not v:
             return ["http://localhost:3000"]
-        if isinstance(v, list):
-            return v
-        if isinstance(v, str):
-            v = v.strip()
-            if not v:
-                return ["http://localhost:3000"]
-            if v.startswith("["):
-                try:
-                    return json.loads(v)
-                except json.JSONDecodeError:
-                    pass
-            return [origin.strip() for origin in v.split(",") if origin.strip()]
-        return ["http://localhost:3000"]
+        if v.startswith("["):
+            try:
+                return json.loads(v)
+            except json.JSONDecodeError:
+                pass
+        return [origin.strip() for origin in v.split(",") if origin.strip()]
 
     @model_validator(mode="after")
     def resolve_file_secrets(self):
