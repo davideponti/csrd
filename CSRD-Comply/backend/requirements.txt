@@ -19,6 +19,9 @@ xhtml2pdf>=0.2.13
 python-docx>=1.1.0
 reportlab>=4.1.0
 
+# Password hashing (used by python-jose/bcrypt and security)
+bcrypt>=4.1.0
+
 # Rate Limiting
 slowapi>=0.1.9
 
