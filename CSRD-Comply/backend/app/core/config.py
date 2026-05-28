@@ -2,7 +2,7 @@
 import os
 import logging
 from pydantic_settings import BaseSettings
-from typing import List, Optional
+from typing import List, Optional, Any
 from pydantic import model_validator, field_validator
 import json
 
@@ -52,38 +52,8 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: str = ""
 
     # CORS — only specific origins, no wildcards
-    CORS_ORIGINS: List[str] = ["http://localhost:3000"]
+    CORS_ORIGINS: List[str] = []
     CORS_ALLOW_HEADERS: List[str] = ["Authorization", "Content-Type", "X-Tenant-ID"]
-
-    @field_validator("CORS_ORIGINS", mode="before")
-    @classmethod
-    def parse_cors_origins(cls, v):
-        """Allow CORS_ORIGINS as JSON array, comma-separated string, or single URL."""
-        if isinstance(v, str):
-            v = v.strip()
-            if v.startswith("["):
-                try:
-                    return json.loads(v)
-                except json.JSONDecodeError:
-                    pass
-            return [origin.strip() for origin in v.split(",") if origin.strip()]
-        if isinstance(v, list):
-            return v
-        return ["http://localhost:3000"]
-
-    @field_validator("CORS_ALLOW_HEADERS", mode="before")
-    @classmethod
-    def parse_list_strings(cls, v):
-        """Allow list fields as JSON array or comma-separated string."""
-        if isinstance(v, str):
-            v = v.strip()
-            if v.startswith("["):
-                try:
-                    return json.loads(v)
-                except json.JSONDecodeError:
-                    pass
-            return [item.strip() for item in v.split(",") if item.strip()]
-        return v
 
     # Environment
     ENVIRONMENT: str = "development"
@@ -127,6 +97,26 @@ class Settings(BaseSettings):
     STRIPE_PRICE_PRO: str = ""
     STRIPE_PRICE_TEAM: str = ""
     STRIPE_PRICE_ENTERPRISE: str = ""
+
+    @field_validator("CORS_ORIGINS", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, v: Any) -> Any:
+        """Allow CORS_ORIGINS env var as: JSON array, comma-separated, single URL, or empty."""
+        if v is None or v == "":
+            return ["http://localhost:3000"]
+        if isinstance(v, list):
+            return v
+        if isinstance(v, str):
+            v = v.strip()
+            if not v:
+                return ["http://localhost:3000"]
+            if v.startswith("["):
+                try:
+                    return json.loads(v)
+                except json.JSONDecodeError:
+                    pass
+            return [origin.strip() for origin in v.split(",") if origin.strip()]
+        return ["http://localhost:3000"]
 
     @model_validator(mode="after")
     def resolve_file_secrets(self):
