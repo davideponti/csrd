@@ -1,7 +1,11 @@
 'use client'
 
-import { LayoutDashboard, ClipboardCheck, Leaf, FileText, Settings, Bell, User } from 'lucide-react'
+import { LayoutDashboard, ClipboardCheck, Leaf, FileText, Settings, Bell, User, LogOut } from 'lucide-react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { useAuth } from '@/hooks/useAuth'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
+import { OnboardingWizard, useOnboarding } from '@/components/OnboardingWizard'
 
 const navItems = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -12,8 +16,26 @@ const navItems = [
 ]
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
+  const router = useRouter()
+  const { logout } = useAuth()
+  const { showOnboarding, setShowOnboarding } = useOnboarding()
+
+  const handleLogout = async () => {
+    logout()
+    router.push('/auth/login')
+  }
+
   return (
+    <ErrorBoundary>
     <div className="flex h-screen">
+      {/* Onboarding Wizard — shown for new users */}
+      {showOnboarding && (
+        <OnboardingWizard
+          isNewUser={true}
+          onComplete={() => setShowOnboarding(false)}
+        />
+      )}
+
       {/* Sidebar */}
       <aside className="w-64 bg-white border-r border-border p-4 flex flex-col">
         <Link href="/" className="text-xl font-bold text-primary mb-8 px-3">
@@ -21,16 +43,25 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </Link>
         <nav className="flex flex-col gap-1 flex-1">
           {navItems.map((item) => (
-            <a
+            <Link
               key={item.href}
               href={item.href}
               className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors text-sm font-medium"
             >
               <item.icon className="h-4 w-4" />
               <span>{item.label}</span>
-            </a>
+            </Link>
           ))}
         </nav>
+
+        {/* Logout button at bottom of sidebar */}
+        <button
+          onClick={handleLogout}
+          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors text-sm font-medium mt-auto"
+        >
+          <LogOut className="h-4 w-4" />
+          <span>Logout</span>
+        </button>
       </aside>
 
       {/* Main content */}
@@ -51,7 +82,25 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <div className="p-6">
           {children}
         </div>
+
+        {/* Footer */}
+        <footer className="bg-white border-t border-border px-6 py-4">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-muted-foreground">
+            <div>
+              &copy; {new Date().getFullYear()} CSRD Comply. Tutti i diritti riservati.
+            </div>
+            <div className="flex items-center gap-4">
+              <Link href="/privacy" className="hover:text-emerald-600 transition-colors">
+                Privacy Policy
+              </Link>
+              <Link href="/terms" className="hover:text-emerald-600 transition-colors">
+                Termini di Servizio
+              </Link>
+            </div>
+          </div>
+        </footer>
       </main>
     </div>
+    </ErrorBoundary>
   )
 }

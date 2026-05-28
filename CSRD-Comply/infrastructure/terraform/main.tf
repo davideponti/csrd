@@ -147,7 +147,7 @@ resource "digitalocean_app" "app" {
       instance_size_slug = var.app_plan
 
       git {
-        repo_clone_url = "https://github.com/example/csrd-comply.git"
+        repo_clone_url = var.repo_clone_url
         branch         = "main"
       }
 
@@ -204,7 +204,7 @@ resource "digitalocean_app" "app" {
       instance_size_slug = var.app_plan
 
       git {
-        repo_clone_url = "https://github.com/example/csrd-comply.git"
+        repo_clone_url = var.repo_clone_url
         branch         = "main"
       }
 

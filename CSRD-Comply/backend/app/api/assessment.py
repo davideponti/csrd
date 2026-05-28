@@ -87,17 +87,44 @@ class ScoreCreate(BaseModel):
     rationale: Optional[str] = None
 
 
+# ── Helper ────────────────────────────────────────────────────────
+
+def _get_company_or_404(current_user: User, db: Session) -> Company:
+    """Helper to get the user's company or 404."""
+
+    company = db.query(Company).filter(
+        Company.company_id == current_user.company_id
+    ).first()
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+    return company
+
+
+def _get_assessment_or_404(assessment_id: str, company_id: uuid.UUID, db: Session) -> MaterialityAssessment:
+    """Helper to get an assessment verifying company ownership."""
+
+    assessment = db.query(MaterialityAssessment).filter(
+        MaterialityAssessment.id == assessment_id,
+        MaterialityAssessment.company_id == company_id,
+    ).first()
+    if not assessment:
+        raise HTTPException(status_code=404, detail="Assessment not found")
+    return assessment
+
+
 # ── Endpoints ────────────────────────────────────────────────────
 
 @router.get("/", response_model=list[AssessmentResponse])
 def list_assessments(
+    skip: int = 0,
+    limit: int = 100,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """List all materiality assessments for the user's company."""
+    """List materiality assessments for the user's company with pagination."""
     return db.query(MaterialityAssessment).filter(
         MaterialityAssessment.company_id == current_user.company_id
-    ).all()
+    ).offset(skip).limit(limit).all()
 
 
 @router.post("/", response_model=AssessmentResponse, status_code=201)
@@ -124,13 +151,7 @@ def get_assessment(
     db: Session = Depends(get_db),
 ):
     """Get a specific materiality assessment."""
-    assessment = db.query(MaterialityAssessment).filter(
-        MaterialityAssessment.id == assessment_id,
-        MaterialityAssessment.company_id == current_user.company_id,
-    ).first()
-    if not assessment:
-        raise HTTPException(status_code=404, detail="Assessment not found")
-    return assessment
+    return _get_assessment_or_404(assessment_id, current_user.company_id, db)
 
 
 @router.get("/{assessment_id}/context", response_model=ContextResponse)
@@ -176,12 +197,7 @@ def get_questionnaire(
     db: Session = Depends(get_db),
 ):
     """Get the AI-adaptive questionnaire for the company's sector."""
-    company = db.query(Company).filter(
-        Company.company_id == current_user.company_id
-    ).first()
-    if not company:
-        raise HTTPException(status_code=404, detail="Company not found")
-
+    company = _get_company_or_404(current_user, db)
     questions = ContextQuestionnaireService.get_all_questions(company.sector)
     return {"phases": questions, "sector": company.sector}
 
@@ -193,11 +209,7 @@ def get_generated_iros(
     db: Session = Depends(get_db),
 ):
     """Get generated IROs for the company (read-only)."""
-    company = db.query(Company).filter(
-        Company.company_id == current_user.company_id
-    ).first()
-    if not company:
-        raise HTTPException(status_code=404, detail="Company not found")
+    company = _get_company_or_404(current_user, db)
 
     context = db.query(CompanyContext).filter(
         CompanyContext.company_id == current_user.company_id
@@ -232,14 +244,11 @@ def generate_new_iros(
     db: Session = Depends(get_db),
 ):
     """
-    Genera IRO con scoring iniziale automatico.
-    Se use_ai=True, tenta generazione LLM per IRO custom.
+    Generate IROs with automatic initial scoring.
+    If use_ai=True, attempts LLM generation for custom IROs.
+
     """
-    company = db.query(Company).filter(
-        Company.company_id == current_user.company_id
-    ).first()
-    if not company:
-        raise HTTPException(status_code=404, detail="Company not found")
+    company = _get_company_or_404(current_user, db)
 
     context = db.query(CompanyContext).filter(
         CompanyContext.company_id == current_user.company_id
@@ -292,18 +301,9 @@ def generate_score_entries(
     Generate MaterialityScore entries for each ESRS datapoint
     based on the generated IROs.
     """
-    assessment = db.query(MaterialityAssessment).filter(
-        MaterialityAssessment.id == assessment_id,
-        MaterialityAssessment.company_id == current_user.company_id,
-    ).first()
-    if not assessment:
-        raise HTTPException(status_code=404, detail="Assessment not found")
-
-    company = db.query(Company).filter(
-        Company.company_id == current_user.company_id
-    ).first()
-    if not company:
-        raise HTTPException(status_code=404, detail="Company not found")
+    # ⚠️ SECURITY FIX: verify assessment belongs to user's company
+    assessment = _get_assessment_or_404(assessment_id, current_user.company_id, db)
+    company = _get_company_or_404(current_user, db)
 
     context = db.query(CompanyContext).filter(
         CompanyContext.company_id == current_user.company_id
@@ -341,7 +341,8 @@ def generate_score_entries(
             ).first()
 
             if not existing:
-                # Converti initial_impact_score (1-5) in dimensioni
+                # Convert initial_impact_score (1-5) into dimensions
+
                 impact_val = int(round(iro.get("initial_impact_score") or 3))
                 financial_val = int(round(iro.get("initial_financial_score") or 2))
                 score = MaterialityScore(
@@ -376,12 +377,8 @@ def list_scores(
     db: Session = Depends(get_db),
 ):
     """List all scores for an assessment (Step 10)."""
-    assessment = db.query(MaterialityAssessment).filter(
-        MaterialityAssessment.id == assessment_id,
-        MaterialityAssessment.company_id == current_user.company_id,
-    ).first()
-    if not assessment:
-        raise HTTPException(status_code=404, detail="Assessment not found")
+    # ⚠️ SECURITY FIX: verify assessment belongs to user's company
+    assessment = _get_assessment_or_404(assessment_id, current_user.company_id, db)
 
     scores = db.query(MaterialityScore).filter(
         MaterialityScore.assessment_id == assessment_id,
@@ -421,11 +418,15 @@ def update_score(
     db: Session = Depends(get_db),
 ):
     """
-    Aggiorna un singolo score con le valutazioni dell'utente (Step 10).
-    Le dimensioni valutate sono: impact_scale, impact_scope, impact_irremediability,
+    Update a single score with user assessments (Step 10).
+    The evaluated dimensions are: impact_scale, impact_scope, impact_irremediability,
     impact_likelihood, financial_magnitude, financial_likelihood.
-    Il calcolo del Double Materiality Score è automatico.
+    The Double Materiality Score calculation is automatic.
+
     """
+    # ⚠️ SECURITY FIX: verify assessment belongs to user's company FIRST
+    assessment = _get_assessment_or_404(assessment_id, current_user.company_id, db)
+
     score = db.query(MaterialityScore).filter(
         MaterialityScore.id == score_id,
         MaterialityScore.assessment_id == assessment_id,
@@ -471,10 +472,12 @@ def get_ai_followup(
     db: Session = Depends(get_db),
 ):
     """
-    Genera domande AI di approfondimento basate sulle valutazioni correnti (Step 10).
-    Se l'utente ha valutato Scale=5, l'AI chiede se ha considerato la value chain.
-    Se l'utente ha dato punteggi bassi, l'AI suggerisce benchmark di settore.
+    Generate AI follow-up questions based on current assessments (Step 10).
+
     """
+    # ⚠️ SECURITY FIX: verify assessment belongs to user's company
+    assessment = _get_assessment_or_404(assessment_id, current_user.company_id, db)
+
     score = db.query(MaterialityScore).filter(
         MaterialityScore.id == score_id,
         MaterialityScore.assessment_id == assessment_id,
@@ -486,61 +489,69 @@ def get_ai_followup(
         EsrsDatapoint.id == score.datapoint_id
     ).first()
 
-    # Genera follow-up basati sui punteggi correnti
+    # Generate follow-ups based on current scores
+
     followups = []
     context_info = {
         "standard": datapoint.standard_ref if datapoint else "Unknown",
         "requirement": datapoint.disclosure_requirement if datapoint else "",
     }
 
-    # Se Scale è alto, chiedi conferma e approfondimento value chain
+    # When Scale is high, ask for confirmation and value chain deep dive
+
     if score.impact_scale and score.impact_scale >= 4:
         followups.append({
             "type": "deep_dive",
-            "question": f"Hai considerato l'impatto sull'intera catena del valore? "
-                        f"Per '{context_info['requirement']}', l'impatto potrebbe estendersi "
-                        f"anche a fornitori e clienti.",
-            "suggestion": "Considera se l'impatto si estende oltre l'operatività diretta.",
+            "question": f"Have you considered the impact on the entire value chain? "
+
+                        f"For '{context_info['requirement']}', the impact could extend "
+                        f"to suppliers and customers.",
+            "suggestion": "Consider whether the impact extends beyond direct operations.",
+
         })
 
-    # Se Scope è basso ma Scale è alto, chiedi revisione
+    # When Scope is low but Scale is high, ask for revision
     if score.impact_scale and score.impact_scope and score.impact_scale >= 4 and score.impact_scope <= 2:
         followups.append({
             "type": "inconsistency",
-            "question": f"Hai valutato Scale={score.impact_scale} ma Scope={score.impact_scope}. "
-                        f"Un impatto di questa portata tipicamente ha uno scope più ampio. "
-                        f"Confermi la valutazione?",
-            "suggestion": "Considera se l'impatto potrebbe interessare un'area geografica più vasta.",
+            "question": f"You rated Scale={score.impact_scale} but Scope={score.impact_scope}. "
+                        f"An impact of this magnitude typically has a broader scope. "
+                        f"Would you like to review your assessment?",
+            "suggestion": "Consider whether the impact could affect a wider geographical area.",
+
         })
 
-    # Se tutti i punteggi sono bassi, suggerisci benchmark
+    # When all scores are low, suggest benchmark
     if score.impact_scale and score.financial_magnitude and score.impact_scale <= 2 and score.financial_magnitude <= 2:
         followups.append({
             "type": "benchmark_check",
-            "question": f"Tutti i punteggi sono bassi per '{context_info['requirement']}'. "
-                        f"I dati di settore suggeriscono una rilevanza maggiore per aziende comparabili. "
-                        f"Confermi la valutazione?",
-            "suggestion": "Verifica con dati di benchmark di settore prima di confermare.",
+            "question": f"All scores are low for '{context_info['requirement']}'. "
+                        f"Sector data suggests higher relevance for comparable companies. "
+                        f"Do you confirm your assessment?",
+            "suggestion": "Verify with sector benchmark data before confirming.",
+
         })
 
-    # Pattern analysis dopo valutazioni estreme
+    # Pattern analysis after extreme assessments
     if score.impact_scale == 5 or score.financial_magnitude == 5:
         followups.append({
             "type": "pattern_analysis",
-            "question": f"Hai assegnato il punteggio massimo. "
-                        f"Quali evidenze supportano questa valutazione? "
-                        f"Documentazione, dati misurati, o stime?",
-            "suggestion": "Documenta le evidenze a supporto del punteggio massimo.",
+            "question": f"You assigned the maximum score. "
+                        f"What evidence supports this assessment? "
+                        f"Documentation, measured data, or estimates?",
+            "suggestion": "Document the evidence supporting the maximum score.",
+
         })
 
-    # Se likelihood finanziaria è alta, chiedi dettagli
+    # When financial likelihood is high, ask for details
     if score.financial_likelihood and score.financial_likelihood >= 4:
         followups.append({
             "type": "financial_detail",
-            "question": f"Alta probabilità finanziaria rilevata. "
-                        f"Quale impatto economico stimi? (es. aumento costi del 10-20%, "
-                        f"sanzioni, perdita clienti)",
-            "suggestion": "Quantifica l'impatto finanziario atteso in EUR dove possibile.",
+            "question": f"High financial likelihood detected. "
+                        f"What economic impact do you estimate? (e.g., 10-20% cost increase, "
+                        f"penalties, customer loss)",
+            "suggestion": "Quantify the expected financial impact in EUR where possible.",
+
         })
 
     return {
@@ -558,6 +569,9 @@ def calculate_all_scores(
     db: Session = Depends(get_db),
 ):
     """Calculate all materiality scores for the assessment."""
+    # ⚠️ SECURITY FIX: verify assessment belongs to user's company
+    assessment = _get_assessment_or_404(assessment_id, current_user.company_id, db)
+
     # First recalculate individual datapoint scores
     scores = db.query(MaterialityScore).filter(
         MaterialityScore.assessment_id == assessment_id,
@@ -588,6 +602,9 @@ def get_materiality_matrix(
     db: Session = Depends(get_db),
 ):
     """Get materiality matrix data (scatter plot)."""
+    # ⚠️ SECURITY FIX: verify assessment belongs to user's company
+    assessment = _get_assessment_or_404(assessment_id, current_user.company_id, db)
+
     matrix = ScoringEngine.get_materiality_matrix(db, assessment_id)
     return {
         "matrix": matrix,
@@ -602,22 +619,14 @@ def generate_materiality_report(
     db: Session = Depends(get_db),
 ):
     """Generate the full double materiality report."""
-    company = db.query(Company).filter(
-        Company.company_id == current_user.company_id
-    ).first()
-    if not company:
-        raise HTTPException(status_code=404, detail="Company not found")
+    company = _get_company_or_404(current_user, db)
 
     context = db.query(CompanyContext).filter(
         CompanyContext.company_id == current_user.company_id
     ).first()
 
-    assessment = db.query(MaterialityAssessment).filter(
-        MaterialityAssessment.id == assessment_id,
-        MaterialityAssessment.company_id == current_user.company_id,
-    ).first()
-    if not assessment:
-        raise HTTPException(status_code=404, detail="Assessment not found")
+    # ⚠️ SECURITY FIX: verify assessment belongs to user's company
+    assessment = _get_assessment_or_404(assessment_id, current_user.company_id, db)
 
     report = MaterialityReportGenerator.generate_full_materiality_report(
         company, context, assessment, db,
@@ -632,11 +641,7 @@ def get_gap_analysis(
     db: Session = Depends(get_db),
 ):
     """Run gap analysis and return results comparing ESRS requirements vs company data."""
-    company = db.query(Company).filter(
-        Company.company_id == current_user.company_id
-    ).first()
-    if not company:
-        raise HTTPException(status_code=404, detail="Company not found")
+    company = _get_company_or_404(current_user, db)
 
     gap_analyzer = GapAnalyzer(db)
     result = gap_analyzer.get_summary(str(company.company_id))

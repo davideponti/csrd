@@ -1,18 +1,68 @@
-node_modules/
-__pycache__/
+# ── Database ────────────────────────────────────────────────────
+test.db
+backend/test.db
+*.sqlite3
+
+# ── Secrets ──────────────────────────────────────────────────────
 .env
-*.pyc
-.venv/
+backend/.env
+frontend/.env
+*.key
+*.pem
+*.cert
+secrets/
+
+# ── Python ───────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
 venv/
+.venv/
+*.egg-info/
+.eggs/
 dist/
 build/
-.next/
-*.egg-info/
+*.egg
 .pytest_cache/
-.coverage
-htmlcov/
-*.log
+.mypy_cache/
+.ruff_cache/
+
+# ── Node / Frontend ──────────────────────────────────────────────
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
+
+# ── IDE ───────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
 .DS_Store
+
+# ── Terraform ────────────────────────────────────────────────────
+*.tfstate
+*.tfstate.*
+*.tfvars
+.crash.log
+crash.log
+override.tf
+terraform.rc
+.terraform/
+
+# ── Docker ───────────────────────────────────────────────────────
+docker-compose.override.yml
+
+# ── Testing ──────────────────────────────────────────────────────
+coverage/
+htmlcov/
+.coverage
+
+# ── OS ────────────────────────────────────────────────────────────
 Thumbs.db
-*.xlsx
-*.csv
+desktop.ini

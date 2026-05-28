@@ -545,6 +545,10 @@ La piattaforma implementa diversi livelli di sicurezza:
 - **Multi-tenancy** — Isolamento dati per tenant attraverso schema PostgreSQL dedicato
 - **Anti-hallucination** — Layer di validazione per contenuti generati dall'AI (narrative, dati emissioni)
 - **SSL/TLS** — Terminazione TLSv1.2/1.3 in produzione
+- **Token Rotation** — JWT refresh invalida il token precedente (`token_version` incrementale)
+- **User Enumeration Prevention** — Messaggi d'errore generici su registrazione/login
+- **HttpOnly Cookies** — JWT salvato in cookie HttpOnly (XSS-safe), con fallback Authorization header
+- **CSP Headers** — Content-Security-Policy configurato lato backend
 
 ---
 
@@ -601,6 +605,19 @@ asyncio_mode = auto
 - [ ] Pipeline CI/CD (GitHub Actions)
 - [ ] Monitoraggio performance con Sentry/Datadog
 - [ ] App mobile (React Native)
+
+### 🛡️ Security Audit (Maggio 2026)
+
+- ✅ **C1 — API Keys rimosse dal repository**: `.env` aggiunto a `.gitignore`
+- ✅ **C2 — SECRET_KEY malformata**: Sostituita con chiave singola valida
+- ✅ **C3 — --reload rimosso dal Dockerfile**: Ora usa `--workers 4`
+- ✅ **C4 — JWT in localStorage**: Migrato a HttpOnly cookie, frontend aggiornato
+- ✅ **C5 — Cache in-memory**: Redis per AI mapper cache con TTL configurabile
+- ✅ **C6 — User Enumeration**: Messaggi d'errore generici su registrazione
+- ✅ **C7 — JWT Token Rotation**: Refresh token invalida il precedente
+- ✅ **C8 — Subscription Model**: Colonne mancanti aggiunte al DB + alias `plan`/`tier`
+- ✅ **C9 — Rate Limiting**: SlowAPI integrato nel backend
+- ✅ **C10 — CSP Headers**: Content-Security-Policy lato backend
 
 ---
 

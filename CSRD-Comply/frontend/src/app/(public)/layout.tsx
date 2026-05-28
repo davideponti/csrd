@@ -6,6 +6,7 @@ import { Button } from '@/components/ui'
 import { useState } from 'react'
 import { useLanguage } from '@/i18n/LanguageContext'
 import { LanguageSwitcher } from '@/components/LanguageSwitcher'
+import CookieBanner from '@/components/CookieBanner'
 
 export default function PublicLayout({ children }: { children: React.ReactNode }) {
   const { t } = useLanguage()
@@ -122,8 +123,8 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
             <div>
               <h3 className="text-sm font-semibold text-white mb-4">{t('footer.legal')}</h3>
               <ul className="space-y-2 flex flex-col items-end">
-                <li><span className="text-sm text-gray-400">{t('footer.privacy')}</span></li>
-                <li><span className="text-sm text-gray-400">{t('footer.terms')}</span></li>
+                <li><Link href="/privacy" className="text-sm text-gray-400 hover:text-emerald-400 transition-colors">{t('footer.privacy')}</Link></li>
+                <li><Link href="/terms" className="text-sm text-gray-400 hover:text-emerald-400 transition-colors">{t('footer.terms')}</Link></li>
               </ul>
             </div>
           </div>
@@ -137,6 +138,9 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
           </div>
         </div>
       </footer>
+
+      {/* Cookie Banner */}
+      <CookieBanner />
     </div>
   )
 }

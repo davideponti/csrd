@@ -63,6 +63,7 @@ class User(TimestampMixin, Base):
     role = Column(SAEnum(UserRole), default=UserRole.contributor, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
     last_login = Column(DateTime, nullable=True)
+    token_version = Column(Integer, default=0, nullable=False)
 
     company = relationship("Company", back_populates="users")
 
@@ -239,8 +240,44 @@ class Subscription(TimestampMixin, Base):
     expires_at = Column(DateTime, nullable=True)
     stripe_customer_id = Column(String(100), nullable=True)
     stripe_subscription_id = Column(String(100), nullable=True)
+    # ── NEW: Subscription metadata columns (previously in-memory only) ──
+    billing_cycle = Column(String(20), default="monthly", nullable=False)
+    current_period_start = Column(Date, nullable=True)
+    current_period_end = Column(Date, nullable=True)
+    trial_end = Column(Date, nullable=True)
+    canceled_at = Column(DateTime, nullable=True)
+    auto_renew = Column(Boolean, default=True, nullable=False)
 
     company = relationship("Company")
+
+    # ── Compatibility alias: API uses `plan`, DB stores `tier` ──
+    @property
+    def plan(self) -> SubscriptionTier:
+        return self.tier
+
+    @plan.setter
+    def plan(self, value: SubscriptionTier) -> None:
+        self.tier = value
+
+    @property
+    def billing_cycle_enum(self) -> str:
+        return self.billing_cycle
+
+    @billing_cycle_enum.setter
+    def billing_cycle_enum(self, value: str) -> None:
+        self.billing_cycle = value
+
+    @property
+    def status(self) -> str:
+        return 'active' if self.is_active else 'inactive'
+
+    @status.setter
+    def status(self, value) -> None:
+        if isinstance(value, str):
+            self.is_active = (value == 'active' or value == 'trialing')
+        else:
+            # Handle SubscriptionStatus enum
+            self.is_active = (value.value in ('active', 'trialing'))
 
 # Alias per compatibilità
 Assessment = MaterialityAssessment

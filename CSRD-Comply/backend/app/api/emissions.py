@@ -151,10 +151,12 @@ class ValidationInput(BaseModel):
 def list_emissions(
     scope: Optional[str] = None,
     year: Optional[int] = None,
+    skip: int = 0,
+    limit: int = 100,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """List emissions data for the user's company."""
+    """List emissions data for the user's company with pagination."""
     query = db.query(EmissionsData).filter(
         EmissionsData.company_id == current_user.company_id
     )
@@ -162,7 +164,7 @@ def list_emissions(
         query = query.filter(EmissionsData.scope == scope)
     if year:
         query = query.filter(EmissionsData.reporting_year == year)
-    return query.all()
+    return query.offset(skip).limit(limit).all()
 
 
 @router.post("/", response_model=EmissionResponse, status_code=201)

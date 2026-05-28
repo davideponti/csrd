@@ -1,15 +1,15 @@
 """CSRD Comply — Subscription & Billing API Endpoints.
 
-Permette di:
-- Listare piani disponibili
-- Ottenere info del proprio abbonamento
-- Cambiare piano (upgrade/downgrade)
-- Visualizzare limiti di utilizzo
+Allows:
+- Listing available plans
+- Getting current subscription info
+- Changing plan (upgrade/downgrade)
+- Viewing usage limits
 """
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
 from app.core.database import get_db
@@ -64,7 +64,7 @@ def get_current_subscription(
         raise HTTPException(status_code=404, detail="Company not found")
 
     subscription = db.query(Subscription).filter(
-        Subscription.company_id == company.id
+        Subscription.company_id == company.company_id
     ).first()
 
     if not subscription:
@@ -72,7 +72,7 @@ def get_current_subscription(
         today = date.today()
         return SubscriptionInfo(
             id="free",
-            company_id=str(company.id),
+            company_id=str(company.company_id),
             plan=PlanTier.FREE,
             status=SubscriptionStatus.ACTIVE,
             billing_cycle=BillingCycle.MONTHLY,
@@ -86,7 +86,7 @@ def get_current_subscription(
         id=str(subscription.id),
         company_id=str(subscription.company_id),
         plan=subscription.plan,
-        status=subscription.status,
+        status=SubscriptionStatus(subscription.status) if isinstance(subscription.status, str) else subscription.status,
         billing_cycle=subscription.billing_cycle,
         current_period_start=subscription.current_period_start,
         current_period_end=subscription.current_period_end,
@@ -109,7 +109,7 @@ def create_subscription(
 
     # Check existing subscription
     existing = db.query(Subscription).filter(
-        Subscription.company_id == company.id
+        Subscription.company_id == company.company_id
     ).first()
 
     if existing:
@@ -126,8 +126,8 @@ def create_subscription(
             raise HTTPException(status_code=400, detail=f"Invalid plan: {data.plan}")
 
         existing.plan = data.plan
-        existing.billing_cycle = data.billing_cycle
-        existing.status = SubscriptionStatus.ACTIVE
+        existing.billing_cycle = data.billing_cycle.value if hasattr(data.billing_cycle, 'value') else data.billing_cycle
+        existing.is_active = True
         
         # Calculate new period
         period_start, period_end, _ = SubscriptionService.get_subscription_dates(
@@ -143,7 +143,7 @@ def create_subscription(
             id=str(existing.id),
             company_id=str(existing.company_id),
             plan=existing.plan,
-            status=existing.status,
+            status=SubscriptionStatus.ACTIVE,
             billing_cycle=existing.billing_cycle,
             current_period_start=existing.current_period_start,
             current_period_end=existing.current_period_end,
@@ -158,10 +158,10 @@ def create_subscription(
     )
 
     subscription = Subscription(
-        company_id=company.id,
+        company_id=company.company_id,
         plan=data.plan,
-        status=SubscriptionStatus.TRIALING if trial_end else SubscriptionStatus.ACTIVE,
-        billing_cycle=data.billing_cycle,
+        is_active=True,
+        billing_cycle=data.billing_cycle.value if hasattr(data.billing_cycle, 'value') else data.billing_cycle,
         current_period_start=period_start,
         current_period_end=period_end,
         trial_end=trial_end,
@@ -176,7 +176,7 @@ def create_subscription(
         id=str(subscription.id),
         company_id=str(subscription.company_id),
         plan=subscription.plan,
-        status=subscription.status,
+        status=SubscriptionStatus.ACTIVE if subscription.is_active else SubscriptionStatus.PENDING,
         billing_cycle=subscription.billing_cycle,
         current_period_start=subscription.current_period_start,
         current_period_end=subscription.current_period_end,
@@ -198,7 +198,7 @@ def update_subscription(
         raise HTTPException(status_code=404, detail="Company not found")
 
     subscription = db.query(Subscription).filter(
-        Subscription.company_id == company.id
+        Subscription.company_id == company.company_id
     ).first()
 
     if not subscription:
@@ -208,7 +208,7 @@ def update_subscription(
     if data.plan is not None:
         subscription.plan = data.plan
     if data.billing_cycle is not None:
-        subscription.billing_cycle = data.billing_cycle
+        subscription.billing_cycle = data.billing_cycle.value if hasattr(data.billing_cycle, 'value') else data.billing_cycle
     if data.auto_renew is not None:
         subscription.auto_renew = data.auto_renew
 
@@ -219,7 +219,7 @@ def update_subscription(
         id=str(subscription.id),
         company_id=str(subscription.company_id),
         plan=subscription.plan,
-        status=subscription.status,
+        status=SubscriptionStatus.ACTIVE if subscription.is_active else SubscriptionStatus.PENDING,
         billing_cycle=subscription.billing_cycle,
         current_period_start=subscription.current_period_start,
         current_period_end=subscription.current_period_end,
@@ -240,22 +240,21 @@ def cancel_subscription(
         raise HTTPException(status_code=404, detail="Company not found")
 
     subscription = db.query(Subscription).filter(
-        Subscription.company_id == company.id
+        Subscription.company_id == company.company_id
     ).first()
 
     if not subscription:
         raise HTTPException(status_code=404, detail="No active subscription found")
 
-    subscription.status = SubscriptionStatus.CANCELED
+    subscription.is_active = False
     subscription.auto_renew = False
-    from datetime import datetime
     subscription.canceled_at = datetime.utcnow()
 
     db.commit()
 
     return {
         "message": "Subscription canceled successfully. Access remains until period end.",
-        "access_until": subscription.current_period_end.isoformat(),
+        "access_until": subscription.current_period_end.isoformat() if subscription.current_period_end else None,
     }
 
 
@@ -270,16 +269,16 @@ def reactivate_subscription(
         raise HTTPException(status_code=404, detail="Company not found")
 
     subscription = db.query(Subscription).filter(
-        Subscription.company_id == company.id
+        Subscription.company_id == company.company_id
     ).first()
 
     if not subscription:
         raise HTTPException(status_code=404, detail="No subscription found")
 
-    if subscription.status != SubscriptionStatus.CANCELED:
+    if subscription.is_active:
         raise HTTPException(status_code=400, detail="Subscription is not canceled")
 
-    subscription.status = SubscriptionStatus.ACTIVE
+    subscription.is_active = True
     subscription.auto_renew = True
     subscription.canceled_at = None
 
@@ -299,7 +298,7 @@ def get_usage_limits(
         raise HTTPException(status_code=404, detail="Company not found")
 
     subscription = db.query(Subscription).filter(
-        Subscription.company_id == company.id
+        Subscription.company_id == company.company_id
     ).first()
 
     plan = subscription.plan if subscription else PlanTier.FREE
@@ -309,9 +308,9 @@ def get_usage_limits(
     
     current_year = date.today().year
     
-    report_count = tracker.get_report_count(str(company.id), current_year)
-    user_count = tracker.get_user_count(str(company.id))
-    storage_mb = tracker.get_storage_usage(str(company.id))
+    report_count = tracker.get_report_count(str(company.company_id), current_year)
+    user_count = tracker.get_user_count(str(company.company_id))
+    storage_mb = tracker.get_storage_usage(str(company.company_id))
 
     limits = plan_config["limits"]
     max_reports = plan_config["max_reports_per_year"]
@@ -359,7 +358,7 @@ def check_features(
         raise HTTPException(status_code=404, detail="Company not found")
 
     subscription = db.query(Subscription).filter(
-        Subscription.company_id == company.id
+        Subscription.company_id == company.company_id
     ).first()
 
     plan = subscription.plan if subscription else PlanTier.FREE

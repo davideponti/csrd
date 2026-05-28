@@ -1,18 +1,19 @@
 """CSRD Comply — Multitenancy Middleware & Utilities.
 
-Gestisce l'isolamento dei dati tra tenant (aziende) tramite:
-- Middleware che estrae il tenant_id dal token JWT
-- Iniezione automatica del filtro company_id nelle query
-- Schema-based isolation (opzionale, per deployment enterprise)
+Manages data isolation between tenants (companies) via:
+- Middleware that extracts tenant_id from JWT token
+- Automatic injection of company_id filter in queries
+- Schema-based isolation (optional, for enterprise deployment)
 """
 from fastapi import Request, HTTPException, Depends
 from fastapi.responses import JSONResponse
-from sqlalchemy import event
+from sqlalchemy import event, text
 from sqlalchemy.orm import Session, joinedload
 from starlette.middleware.base import BaseHTTPMiddleware
 from typing import Optional, Callable, Awaitable
 import logging
 import time
+import re
 
 from app.core.config import settings
 from app.core.database import get_db, SessionLocal
@@ -25,8 +26,8 @@ logger = logging.getLogger(__name__)
 class TenantContext:
     """Thread-safe tenant context storage.
     
-    Popolato dal middleware per ogni richiesta.
-    Usato dai filtri automatici delle query SQLAlchemy.
+    Populated by middleware for each request.
+    Used by automatic SQLAlchemy query filters.
     """
     _tenant_id: Optional[str] = None
     _schema: Optional[str] = None
@@ -50,17 +51,24 @@ class TenantContext:
         cls._schema = None
 
 
+_VALID_SCHEMA_RE = re.compile(r'^[a-zA-Z][a-zA-Z0-9_]*$')
+
+def _validate_schema_name(schema: str) -> bool:
+    """Validate that a schema name contains only safe characters."""
+    return bool(_VALID_SCHEMA_RE.match(schema))
+
+
 # ── Middleware ──────────────────────────────────────────────────
 
 class MultitenancyMiddleware(BaseHTTPMiddleware):
-    """Middleware che estrae il tenant context dal token JWT.
+    """Middleware that extracts tenant context from JWT token.
     
-    Per ogni richiesta:
-    1. Estrae il token Bearer dall'Authorization header
-    2. Decodifica il token per ottenere company_id e schema
-    3. Imposta il TenantContext
-    4. Logga la richiesta con tenant info
-    5. Pulisce il contesto dopo la risposta
+    For each request:
+    1. Extracts Bearer token from Authorization header
+    2. Decodes the token to get company_id and schema
+    3. Sets the TenantContext
+    4. Logs request with tenant info
+    5. Cleans up context after response
     """
 
     async def dispatch(
@@ -91,8 +99,9 @@ class MultitenancyMiddleware(BaseHTTPMiddleware):
                     tenant_id = payload.get("company_id")
                     schema = payload.get("schema", "public")
             except Exception as e:
-                logger.warning(f"Failed to decode token for tenant: {e}")
-                # Non blocchiamo la richiesta, lascia contesto vuoto
+                # Do not log error content that might contain token parts
+                logger.warning(f"Failed to decode token: {type(e).__name__}")
+                # Do not block the request, leave context empty
 
         # Set tenant context for this request
         TenantContext.set(tenant_id, schema)
@@ -165,8 +174,15 @@ def get_tenant_db() -> Session:
         tenant_id = TenantContext.get_tenant_id()
         if tenant_id and tenant_id != "public":
             # Set PostgreSQL schema/search_path for schema-based isolation
+            # ⚠️ SECURITY FIX: validate schema name to prevent SQL injection
             schema = TenantContext.get_schema() or f"tenant_{tenant_id[:8].replace('-', '_')}"
-            db.execute(f"SET search_path TO {schema}, public")
+            if not _validate_schema_name(schema):
+                logger.warning(f"Invalid schema name rejected: {schema[:30]}")
+                schema = "public"
+            db.execute(
+                text("SET search_path TO :schema, public"),
+                {"schema": schema}
+            )
         yield db
     finally:
         db.close()

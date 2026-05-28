@@ -407,6 +407,277 @@ class ReportTemplate:
     {''.join(blocks_html)}
 </div>"""
 
+    # ── GHG Emissions Section ───────────────────────────────────
+
+    def _get_emissions_value(
+        self,
+        data: Any,
+        key: str = "value",
+        default: str = "—",
+        fmt: Optional[str] = None,
+    ) -> str:
+        """
+        Estrae un valore numerico da emissions_data, gestendo sia dict che scalar.
+
+        Args:
+            data: Valore o dict con chiave 'value'
+            key: Chiave del dict da estrarre
+            default: Valore di default se assente
+            fmt: Formato opzionale (es. ",.1f" per 1 decimale)
+
+        Returns:
+            Valore formattato come stringa
+        """
+        if isinstance(data, dict):
+            val = data.get(key, default)
+        else:
+            val = data if data is not None else default
+
+        if val == "—" or val is None:
+            return "—"
+
+        try:
+            num = float(val)
+            if fmt:
+                return f"{num:{fmt}}"
+            return f"{num:,.1f}"
+        except (TypeError, ValueError, KeyError):
+            return str(val)
+
+    def _build_ghg_table_html(
+        self,
+        emissions_data: Dict[str, Any],
+    ) -> str:
+        """
+        Genera l'HTML della tabella GHG Emissions (ESRS E1-6, par. 54-61)
+        leggendo i dati da emissions_data.
+
+        La tabella include:
+          - Scope 1 (tCO2e)
+          - Scope 2 location-based (tCO2e)
+          - Scope 2 market-based (tCO2e)
+          - Scope 3 total (tCO2e) con breakdown per categoria (se disponibile)
+          - Total GHG emissions (tCO2e)
+
+        Args:
+            emissions_data: Dict con dati emissioni.
+                Campi attesi:
+                  - scope1 / scope1_n1
+                  - scope2_location / scope2_location_n1
+                  - scope2_market / scope2_market_n1
+                  - scope3 / scope3_n1
+                  - scope3_categories: dict {category_name: value/dict}
+                  - year (int): anno di rendicontazione
+
+        Returns:
+            Stringa HTML della tabella
+        """
+        year = emissions_data.get("year", self.reporting_year)
+        year_n = str(year)
+        year_n1 = str(year - 1)
+
+        # Helper inline per estrarre valori
+        def _val(data, key="value", default="—", fmt=".1f"):
+            if isinstance(data, dict):
+                v = data.get(key, default)
+            else:
+                v = data if data is not None else default
+            if v == "—" or v is None:
+                return "—"
+            try:
+                return f"{float(v):{fmt}}"
+            except (TypeError, ValueError):
+                return str(v)
+
+        # Estrai dati
+        scope1 = _val(emissions_data.get("scope1"))
+        scope1_n1 = _val(emissions_data.get("scope1_n1"))
+
+        scope2_loc = _val(emissions_data.get("scope2_location"))
+        scope2_loc_n1 = _val(emissions_data.get("scope2_location_n1"))
+
+        scope2_mkt = _val(emissions_data.get("scope2_market"))
+        scope2_mkt_n1 = _val(emissions_data.get("scope2_market_n1"))
+
+        scope3 = _val(emissions_data.get("scope3"))
+        scope3_n1 = _val(emissions_data.get("scope3_n1"))
+
+        # Calcola totali numerici
+        def _safe_float(v: str) -> float:
+            try:
+                return float(v.replace(",", ""))
+            except (ValueError, AttributeError):
+                return 0.0
+
+        s1_n = _safe_float(scope1)
+        s2l_n = _safe_float(scope2_loc)
+        s2m_n = _safe_float(scope2_mkt)
+        s3_n = _safe_float(scope3)
+        total_n = s1_n + s2l_n + s3_n
+        s2_used = "market" if s2m_n else "location"
+
+        s1_n1 = _safe_float(scope1_n1)
+        s2l_n1 = _safe_float(scope2_loc_n1)
+        s2m_n1 = _safe_float(scope2_mkt_n1)
+        s3_n1 = _safe_float(scope3_n1)
+        total_n1 = s1_n1 + s2l_n1 + s3_n1
+
+        # Calcola variazioni percentuali
+        def _pct_change(current: float, previous: float) -> str:
+            if previous > 0:
+                return f"{((current - previous) / previous * 100):+.1f}%"
+            return "—"
+
+        # Costruisci righe tabella
+        rows_html = f"""
+            <tr>
+                <td style="font-weight:500;">Scope 1 (tCO₂e)</td>
+                <td style="text-align:right;">{scope1_n1}</td>
+                <td style="text-align:right;">{scope1}</td>
+                <td style="text-align:right;">{_pct_change(s1_n, s1_n1)}</td>
+            </tr>
+            <tr>
+                <td style="font-weight:500;">Scope 2 location-based (tCO₂e)</td>
+                <td style="text-align:right;">{scope2_loc_n1}</td>
+                <td style="text-align:right;">{scope2_loc}</td>
+                <td style="text-align:right;">{_pct_change(s2l_n, s2l_n1)}</td>
+            </tr>
+            <tr>
+                <td style="font-weight:500;">Scope 2 market-based (tCO₂e)</td>
+                <td style="text-align:right;">{scope2_mkt_n1}</td>
+                <td style="text-align:right;">{scope2_mkt}</td>
+                <td style="text-align:right;">{_pct_change(s2m_n, s2m_n1)}</td>
+            </tr>
+            <tr>
+                <td style="font-weight:500;">Scope 3 total (tCO₂e)</td>
+                <td style="text-align:right;">{scope3_n1}</td>
+                <td style="text-align:right;">{scope3}</td>
+                <td style="text-align:right;">{_pct_change(s3_n, s3_n1)}</td>
+            </tr>"""
+
+        # Scope 3 breakdown per categoria (se disponibile)
+        scope3_categories = emissions_data.get("scope3_categories", {})
+        if scope3_categories:
+            for cat_name, cat_data in scope3_categories.items():
+                cat_val_n = _val(cat_data, "value") if isinstance(cat_data, dict) else _val(cat_data)
+                cat_val_n1 = _val(cat_data.get("year_n1", {}), "value") if isinstance(cat_data, dict) else "—"
+                cat_n = _safe_float(cat_val_n)
+                cat_n1 = _safe_float(cat_val_n1)
+                rows_html += f"""
+            <tr>
+                <td style="padding-left:32px;font-size:13px;color:#4a5568;">  {cat_name}</td>
+                <td style="text-align:right;">{cat_val_n1}</td>
+                <td style="text-align:right;">{cat_val_n}</td>
+                <td style="text-align:right;">{_pct_change(cat_n, cat_n1)}</td>
+            </tr>"""
+
+        # Riga totale
+        total_n_str = f"{total_n:,.1f}" if total_n > 0 else "—"
+        total_n1_str = f"{total_n1:,.1f}" if total_n1 > 0 else "—"
+        rows_html += f"""
+            <tr style="font-weight:bold;background-color:#edf2f7;">
+                <td><strong>Total GHG emissions (tCO₂e)</strong></td>
+                <td style="text-align:right;"><strong>{total_n1_str}</strong></td>
+                <td style="text-align:right;"><strong>{total_n_str}</strong></td>
+                <td style="text-align:right;"><strong>{_pct_change(total_n, total_n1)}</strong></td>
+            </tr>"""
+
+        # Se c'è un solo valore non nullo per Scope 2, indica quale è stato usato
+        scope2_note = ""
+        if s2_used == "market" and s2l_n == 0:
+            scope2_note = " (market-based used for total)"
+        elif s2_used == "location" and s2m_n == 0:
+            scope2_note = " (location-based used for total)"
+
+        table_html = f"""
+<table class="ghg-table" style="width:100%;border-collapse:collapse;margin:16px 0;font-size:14px;">
+    <thead>
+        <tr style="background-color:#1a365d;color:white;">
+            <th style="padding:10px 12px;text-align:left;border:1px solid #2b6cb0;">GHG Emissions</th>
+            <th style="padding:10px 12px;text-align:right;border:1px solid #2b6cb0;width:120px;">{year_n1}</th>
+            <th style="padding:10px 12px;text-align:right;border:1px solid #2b6cb0;width:120px;">{year_n}</th>
+            <th style="padding:10px 12px;text-align:right;border:1px solid #2b6cb0;width:100px;">Change (%)</th>
+        </tr>
+    </thead>
+    <tbody>
+{rows_html}
+    </tbody>
+</table>
+<p style="font-size:12px;color:#718096;margin-top:4px;">
+    * Gross Scopes 1, 2{scope2_note}, 3 and Total GHG emissions (ESRS E1-6, par. 54-61).
+    Methodology: GHG Protocol Corporate Standard.
+</p>"""
+
+        return table_html
+
+    def build_ghg_emissions_block(
+        self,
+        emissions_data: Dict[str, Any],
+        block_id: str = "ghg-emissions-table",
+    ) -> ContentBlock:
+        """
+        Crea un ContentBlock completo per la sezione GHG Emissions.
+
+        Args:
+            emissions_data: Dict con dati emissioni Scope 1, 2, 3
+            block_id: ID del blocco
+
+        Returns:
+            ContentBlock di tipo "table" con la tabella GHG popolata
+        """
+        table_html = self._build_ghg_table_html(emissions_data)
+
+        return ContentBlock(
+            block_id=block_id,
+            standard_ref="ESRS E1",
+            paragraph_ref="54-61",
+            title="GHG Emissions Summary",
+            content_html=table_html,
+            content_type="table",
+            datapoint_refs=[
+                "ESRS E1-6.54(a)",
+                "ESRS E1-6.54(b)",
+                "ESRS E1-6.55",
+            ],
+            order=1,
+        )
+
+    def populate_ghg_section(
+        self,
+        emissions_data: Dict[str, Any],
+        section_id: str = "env-e1",
+        dr_id: str = "E1-6",
+    ) -> bool:
+        """
+        Popola il DR E1-6 della sezione ambientale con dati GHG reali.
+
+        Cerca il ContentBlock 'e1-6-ghg-table' nella sezione specificata
+        e lo sostituisce con la tabella generata da emissions_data.
+
+        Args:
+            emissions_data: Dict con dati emissioni
+            section_id: ID della sezione (default: "env-e1")
+            dr_id: ID del Disclosure Requirement (default: "E1-6")
+
+        Returns:
+            True se il blocco è stato aggiornato, False altrimenti
+        """
+        ghg_block = self.build_ghg_emissions_block(emissions_data)
+
+        for section in self.sections:
+            if section.section_id == section_id:
+                for dr in section.disclosure_requirements:
+                    if dr.dr_id == dr_id:
+                        for i, block in enumerate(dr.blocks):
+                            if block.block_id == "e1-6-ghg-table":
+                                dr.blocks[i] = ghg_block
+                                return True
+                        # Se non trovato, aggiungi il blocco
+                        dr.blocks.append(ghg_block)
+                        dr.blocks.sort(key=lambda b: b.order)
+                        return True
+        return False
+
     # ── Metodi principali ───────────────────────────────────────
 
     def add_section(self, section: ReportSection) -> None:

@@ -2,8 +2,8 @@
 CSRD Comply — AI Intelligence Endpoints (Steps 6-7).
 
 Endpoints:
-- POST /ai/esrs-mapper      Mappa ESRS datapoint a contesto aziendale (con cache 30gg)
-- POST /ai/esrs-mapper/batch  Batch mapping di più datapoint contemporaneamente
+- POST /ai/esrs-mapper      Map ESRS datapoints to company context (with 30-day cache)
+- POST /ai/esrs-mapper/batch  Batch mapping of multiple datapoints simultaneously
 """
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -17,27 +17,76 @@ from ai_engine.esrs_parser.esrs_nlp_mapper import ESMapper, CompanyProfile
 
 router = APIRouter()
 
-# ── Simple in-memory cache ──────────────────────────────────────
-# In production, use Redis with TTL-based expiry
-_mapper_cache: dict[str, tuple[datetime, dict]] = {}
+# ── Database-backed cache ───────────────────────────────────────
+# Uses the EsrsDatapoint table to persist cached mapper results.
+# This approach is:
+# - Distributed: all workers/processes share the same cache via DB
+# - Persistent: survives restarts
+# - Scalable: works with serverless, horizontal scaling, etc.
+# 
+# For high-throughput scenarios, migrate to Redis.
 CACHE_TTL_DAYS = 30
+import json
+from sqlalchemy import text as sa_text
 
 
 def _get_cache_key(company_id: str, datapoint_id: str) -> str:
     return f"{company_id}:{datapoint_id}"
 
 
-def _get_from_cache(key: str) -> Optional[dict]:
-    if key in _mapper_cache:
-        timestamp, data = _mapper_cache[key]
-        if datetime.utcnow() - timestamp < timedelta(days=CACHE_TTL_DAYS):
-            return data
-        del _mapper_cache[key]
+def _get_from_cache(key: str, db: Session = None) -> Optional[dict]:
+    """Retrieve cached mapper result from the database."""
+    if db is None:
+        return None
+    try:
+        result = db.execute(
+            sa_text("""
+                SELECT cache_data, created_at 
+                FROM esrs_datapoint_cache 
+                WHERE cache_key = :key
+            """),
+            {"key": key}
+        ).first()
+        if result:
+            cache_data, created_at = result
+            if datetime.utcnow() - created_at < timedelta(days=CACHE_TTL_DAYS):
+                return json.loads(cache_data)
+            # Expired — delete stale entry
+            db.execute(
+                sa_text("DELETE FROM esrs_datapoint_cache WHERE cache_key = :key"),
+                {"key": key}
+            )
+            db.commit()
+    except Exception:
+        # Table might not exist yet — fall through to compute
+        pass
     return None
 
 
-def _set_cache(key: str, data: dict):
-    _mapper_cache[key] = (datetime.utcnow(), data)
+def _set_cache(key: str, data: dict, db: Session = None):
+    """Store mapper result in the database cache."""
+    if db is None:
+        return
+    try:
+        # Upsert: insert or update
+        db.execute(
+            sa_text("""
+                INSERT INTO esrs_datapoint_cache (cache_key, cache_data, created_at)
+                VALUES (:key, :data, :now)
+                ON CONFLICT (cache_key) 
+                DO UPDATE SET cache_data = :data, created_at = :now
+            """),
+            {
+                "key": key,
+                "data": json.dumps(data),
+                "now": datetime.utcnow(),
+            }
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+        # Table might not exist yet — silently continue
+        pass
 
 
 # ── Schemas ──────────────────────────────────────────────────────
@@ -91,7 +140,7 @@ def map_esrs_datapoint(
     """
     # Check cache first
     cache_key = _get_cache_key(str(current_user.company_id), data.disclosure_text[:100])
-    cached = _get_from_cache(cache_key)
+    cached = _get_from_cache(cache_key, db=db)
     if cached:
         cached["_cached"] = True
         return cached
@@ -119,7 +168,7 @@ def map_esrs_datapoint(
     }
 
     # Store in cache
-    _set_cache(cache_key, output)
+    _set_cache(cache_key, output, db=db)
 
     return output
 
@@ -150,7 +199,7 @@ def batch_map_esrs_datapoints(
         cache_key = _get_cache_key(
             str(current_user.company_id), dp.disclosure_text[:100]
         )
-        cached = _get_from_cache(cache_key)
+        cached = _get_from_cache(cache_key, db=db)
         if cached:
             results.append(EsrsMapperOutput(**cached))
             if cached.get("applicable"):
@@ -175,7 +224,7 @@ def batch_map_esrs_datapoints(
             rationale=result.rationale,
         )
 
-        _set_cache(cache_key, output.model_dump())
+        _set_cache(cache_key, output.model_dump(), db=db)
         results.append(output)
 
         if result.applicable:
@@ -191,10 +240,18 @@ def batch_map_esrs_datapoints(
 @router.get("/esrs-mapper/status", response_model=MapperStatusOutput)
 def get_mapper_status(
     current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """Get the current status of the ESRS mapper (cache size, provider)."""
+    # Count cached entries
+    try:
+        count = db.execute(
+            sa_text("SELECT COUNT(*) FROM esrs_datapoint_cache")
+        ).scalar() or 0
+    except Exception:
+        count = 0
     return MapperStatusOutput(
-        cache_size=len(_mapper_cache),
+        cache_size=count,
         cache_ttl_days=CACHE_TTL_DAYS,
         provider="openai",  # or anthropic, depending on env
     )
@@ -203,10 +260,16 @@ def get_mapper_status(
 @router.post("/esrs-mapper/clear-cache")
 def clear_mapper_cache(
     current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """Clear the entire ESRS mapper cache (admin only)."""
     from app.models import UserRole
     if current_user.role != UserRole.admin:
         raise HTTPException(status_code=403, detail="Admin only")
-    _mapper_cache.clear()
-    return {"status": "cache_cleared", "size": 0}
+    try:
+        db.execute(sa_text("DELETE FROM esrs_datapoint_cache"))
+        db.commit()
+        return {"status": "cache_cleared", "size": 0}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to clear cache: {str(e)}")

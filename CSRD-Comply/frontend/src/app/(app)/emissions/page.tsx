@@ -614,8 +614,8 @@ export default function EmissionsPage() {
       await emissionsApi.saveCalculated({
         reporting_year: reportYear,
         scope,
-        total_tco2e: result.total_tco2e,
-        category: result.categories?.[0]?.category || result.method || result.name,
+        total_tco2e: result.total_tco2e || result.total || 0,
+        category: String(result.categories?.[0]?.name || result.method || "scope3"),
         calculation_method: result.method || 'calculator',
       })
       await loadEmissions()

@@ -1,22 +1,28 @@
 // ── API Client ──────────────────────────────────────────────────
+// Uses HttpOnly cookies for JWT authentication (XSS-safe).
+// All requests include credentials so the browser sends the cookie.
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'
+
+/**
+ * 🔒 SICUREZZA: L'autenticazione usa cookie HttpOnly (XSS-safe).
+ * Il JWT non è accessibile via JavaScript. Il browser lo invia
+ * automaticamente con ogni richiesta grazie a `credentials: 'include'`.
+ */
 
 async function request<T>(
   endpoint: string,
   options: RequestInit = {},
 ): Promise<T> {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
-
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...options.headers,
   }
 
   const res = await fetch(`${API_BASE}${endpoint}`, {
     ...options,
     headers,
+    credentials: 'include',  // ← Invia cookie HttpOnly contenente il JWT
   })
 
   if (!res.ok) {
@@ -28,18 +34,14 @@ async function request<T>(
 }
 
 // ── Generic API Client ──────────────────────────────────────────
-// Used by pages that need low-level GET/POST/PUT/DELETE access
-// with support for text responses and blob downloads.
 
 export const api = {
   get: <T = any>(endpoint: string) => {
     const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     };
-    return fetch(`${base}${endpoint}`, { headers }).then(async (res) => {
+    return fetch(`${base}${endpoint}`, { headers, credentials: 'include' }).then(async (res) => {
       if (!res.ok) {
         const error = await res.json().catch(() => ({ detail: res.statusText }));
         throw new Error(error.detail || 'API Error');
@@ -50,14 +52,13 @@ export const api = {
 
   post: <T = any>(endpoint: string, body?: any) => {
     const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     };
     return fetch(`${base}${endpoint}`, {
       method: 'POST',
       headers,
+      credentials: 'include',
       body: body ? JSON.stringify(body) : undefined,
     }).then(async (res) => {
       if (!res.ok) {
@@ -70,14 +71,13 @@ export const api = {
 
   put: <T = any>(endpoint: string, body?: any) => {
     const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     };
     return fetch(`${base}${endpoint}`, {
       method: 'PUT',
       headers,
+      credentials: 'include',
       body: body ? JSON.stringify(body) : undefined,
     }).then(async (res) => {
       if (!res.ok) {
@@ -90,14 +90,13 @@ export const api = {
 
   patch: <T = any>(endpoint: string, body?: any) => {
     const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     };
     return fetch(`${base}${endpoint}`, {
       method: 'PATCH',
       headers,
+      credentials: 'include',
       body: body ? JSON.stringify(body) : undefined,
     }).then(async (res) => {
       if (!res.ok) {
@@ -110,14 +109,13 @@ export const api = {
 
   del: <T = any>(endpoint: string) => {
     const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     };
     return fetch(`${base}${endpoint}`, {
       method: 'DELETE',
       headers,
+      credentials: 'include',
     }).then(async (res) => {
       if (!res.ok) {
         const error = await res.json().catch(() => ({ detail: res.statusText }));
@@ -129,11 +127,8 @@ export const api = {
 
   get_text: async (endpoint: string) => {
     const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-    const headers: Record<string, string> = {
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    };
-    const res = await fetch(`${base}${endpoint}`, { headers });
+    const headers: Record<string, string> = {};
+    const res = await fetch(`${base}${endpoint}`, { headers, credentials: 'include' });
     if (!res.ok) {
       throw new Error(`Failed to fetch text: ${res.statusText}`);
     }
@@ -142,11 +137,8 @@ export const api = {
 
   get_blob: async (endpoint: string) => {
     const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-    const headers: Record<string, string> = {
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    };
-    const res = await fetch(`${base}${endpoint}`, { headers });
+    const headers: Record<string, string> = {};
+    const res = await fetch(`${base}${endpoint}`, { headers, credentials: 'include' });
     if (!res.ok) {
       throw new Error(`Failed to fetch blob: ${res.statusText}`);
     }
@@ -235,20 +227,14 @@ export const assessments = {
       method: 'POST',
     }),
 
-  // Context Questionnaire
   saveQuestionnaireResponses: (id: string, responses: Record<string, string>) =>
     request<any>(`/assessment/${id}/context`, {
       method: 'PUT',
       body: JSON.stringify({ questionnaire_responses: responses }),
     }),
 
-  // Materiality Matrix (Step 10-11)
   getMatrix: (id: string) => request<any>(`/assessment/${id}/matrix`),
-
-  // Materiality Report (Step 11)
   getReport: (id: string) => request<any>(`/assessment/${id}/report`),
-
-  // Gap Analysis
   getGapAnalysis: (id: string) => request<any>(`/assessment/${id}/gap-analysis`),
 }
 
@@ -267,7 +253,6 @@ export const emissions = {
       body: JSON.stringify(data),
     }),
 
-  // Carbon Calculator
   getFactors: () => request<any>('/emissions/factors'),
   calculateScope1: (data: any) =>
     request<any>('/emissions/calculate/scope1', {
@@ -290,7 +275,6 @@ export const emissions = {
       body: JSON.stringify(data),
     }),
 
-  // Save & Validate
   saveCalculated: (data: any) =>
     request<any>('/emissions/save-calculated', {
       method: 'POST',
@@ -302,14 +286,12 @@ export const emissions = {
       body: JSON.stringify(data),
     }),
 
-  // Utility Bill OCR
   parseBill: (text: string) =>
     request<any>('/emissions/parse-bill', {
       method: 'POST',
       body: JSON.stringify({ text }),
     }),
 
-  // Summary
   getSummary: (year?: number) =>
     request<any>(`/emissions/summary${year ? `?year=${year}` : ''}`),
 }
@@ -336,7 +318,6 @@ export const ai = {
     }),
 
   getMapperStatus: () => request<any>('/ai/esrs-mapper/status'),
-
   clearCache: () =>
     request<any>('/ai/esrs-mapper/clear-cache', {
       method: 'POST',
@@ -353,12 +334,10 @@ export const reports = {
     }),
   get: (id: string) => request<any>(`/reports/${id}`),
 
-  // Export Multi-Formato (Step 22)
   exportFormat: (id: string, format: string) =>
     `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'}/reports/${id}/export/${format}`,
 
   getFormats: () => request<any>('/reports/export/formats'),
-
   exportAll: (id: string) =>
     request<any>(`/reports/${id}/export-all`, {
       method: 'POST',

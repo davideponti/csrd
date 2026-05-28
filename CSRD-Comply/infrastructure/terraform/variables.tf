@@ -24,6 +24,12 @@ variable "spaces_secret_key" {
   sensitive   = true
 }
 
+variable "repo_clone_url" {
+  description = "Git repository clone URL for App Platform. Sovrascrivi in terraform.tfvars o via CI/CD."
+  type        = string
+  default     = "https://github.com/davideponti/csrd.git"
+}
+
 variable "openai_api_key" {
   description = "OpenAI API Key per AI engine"
   type        = string
