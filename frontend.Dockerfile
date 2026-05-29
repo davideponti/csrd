@@ -1,16 +1,18 @@
 # ── CSRD Comply — Frontend Dockerfile (per Render) ────────────
+# Questo Dockerfile si trova alla root del repository.
+# Il codice del frontend si trova nella sottodirectory CSRD-Comply/frontend/
 
 # Stage 1: Build
 FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy package files from frontend directory
-COPY frontend/package.json frontend/package-lock.json ./
+# Copy package files from frontend directory (monorepo con CSRD-Comply/)
+COPY CSRD-Comply/frontend/package.json CSRD-Comply/frontend/package-lock.json ./
 RUN npm ci
 
 # Copy frontend source
-COPY frontend/ .
+COPY CSRD-Comply/frontend/ .
 
 # Build
 ARG NEXT_PUBLIC_API_URL=https://csrdcomply.onrender.com/api/v1
