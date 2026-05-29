@@ -121,7 +121,7 @@ resource "digitalocean_spaces_bucket" "reports" {
   cors_rule {
     allowed_headers = ["*"]
     allowed_methods = ["GET", "PUT", "POST"]
-    allowed_origins = ["https://csrdcomply.io"]
+        allowed_origins = ["https://csrdcomply.com"]
     max_age_seconds = 3600
   }
 }
@@ -212,7 +212,7 @@ resource "digitalocean_app" "app" {
 
       env {
         key   = "NEXT_PUBLIC_API_URL"
-        value = "https://api.csrdcomply.io/api/v1"
+        value = "https://api.csrdcomply.com/api/v1"
       }
       env {
         key   = "NODE_ENV"
@@ -226,12 +226,12 @@ resource "digitalocean_app" "app" {
 
     # Domains
     domain {
-      name = "csrdcomply.io"
+      name = "csrdcomply.com"
       type = "DEFAULT"
     }
 
     domain {
-      name = "api.csrdcomply.io"
+      name = "api.csrdcomply.com"
     }
 
     # Ingress rules
@@ -248,12 +248,12 @@ resource "digitalocean_app" "app" {
 # ── Outputs ─────────────────────────────────────────────────────
 
 output "app_url" {
-  value       = "https://csrdcomply.io"
+  value       = "https://csrdcomply.com"
   description = "Application URL"
 }
 
 output "api_url" {
-  value       = "https://api.csrdcomply.io"
+  value       = "https://api.csrdcomply.com"
   description = "API URL"
 }
 

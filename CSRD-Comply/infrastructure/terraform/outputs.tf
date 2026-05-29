@@ -6,12 +6,12 @@ output "app_live_url" {
 }
 
 output "app_url" {
-  value       = "https://csrdcomply.io"
+  value       = "https://csrdcomply.com"
   description = "URL principale dell'applicazione"
 }
 
 output "api_url" {
-  value       = "https://api.csrdcomply.io"
+  value       = "https://api.csrdcomply.com"
   description = "URL dell'API"
 }
 

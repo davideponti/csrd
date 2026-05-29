@@ -54,7 +54,7 @@ class EmailService:
     """
 
     def __init__(self):
-        self._from_email = getattr(settings, "EMAIL_FROM", "noreply@csrdcomply.io")
+        self._from_email = getattr(settings, "EMAIL_FROM", "noreply@csrdcomply.com")
         self._from_name = getattr(settings, "EMAIL_FROM_NAME", "CSRD Comply")
         self._smtp_host = getattr(settings, "SMTP_HOST", "localhost")
         self._smtp_port = getattr(settings, "SMTP_PORT", 587)
@@ -228,7 +228,7 @@ body {{ font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 0; backg
 <p>© {datetime.now().year} CSRD Comply. Tutti i diritti riservati.</p>
 <p style="font-size:11px;color:#999;">
 <a href="{{UNSUBSCRIBE_URL}}" style="color:#999;">Disiscriviti</a> |
-<a href="mailto:support@csrdcomply.io" style="color:#999;">Contattaci</a>
+<a href="mailto:support@csrdcomply.com" style="color:#999;">Contattaci</a>
 </p>
 </div>
 </div>

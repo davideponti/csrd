@@ -25,12 +25,12 @@ services:
       context: ..
       dockerfile: backend/Dockerfile
     ports:
-      - "127.0.0.1:8000:8000"  # ← Solo localhost!
+      - "127.0.0.1:8000:8000"
     environment:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/csrd_comply
       ENVIRONMENT: production
       SECRET_KEY_FILE: /run/secrets/secret_key
-      CORS_ORIGINS: '["https://csrdcomply.io"]'
+      CORS_ORIGINS: '["https://csrdcomply.com"]'
     env_file:
       - ../.env
     depends_on:
@@ -46,7 +46,7 @@ services:
       context: ../frontend
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: https://api.csrdcomply.io/api/v1
+        NEXT_PUBLIC_API_URL: https://api.csrdcomply.com/api/v1
     ports:
       - "127.0.0.1:3000:3000"
     environment:

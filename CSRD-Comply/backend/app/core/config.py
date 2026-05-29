@@ -70,7 +70,7 @@ class Settings(BaseSettings):
     DEFAULT_SCHEMA: str = "public"
 
     # Deployment (Step 29)
-    DEPLOYMENT_DOMAIN: str = "csrdcomply.io"
+    DEPLOYMENT_DOMAIN: str = "csrdcomply.com"
     DEPLOYMENT_SSL_ENABLED: bool = True
 
     # Request limits (DoS protection)
@@ -81,7 +81,7 @@ class Settings(BaseSettings):
     SENTRY_TRACES_SAMPLE_RATE: float = 0.1
 
     # ── Email (SMTP / SendGrid / Mailgun) ──────────────────────
-    EMAIL_FROM: str = "noreply@csrdcomply.io"
+    EMAIL_FROM: str = "noreply@csrdcomply.com"
     EMAIL_FROM_NAME: str = "CSRD Comply"
     SMTP_HOST: str = "localhost"
     SMTP_PORT: int = 587

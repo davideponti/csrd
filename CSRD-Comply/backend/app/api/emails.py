@@ -99,7 +99,7 @@ def send_welcome(
         to_email=data.email,
         name=data.name,
         company_name=data.company_name,
-        login_url=data.login_url or "https://csrdcomply.io/login",
+        login_url=data.login_url or "https://csrdcomply.com/login",
     )
     
     if success:

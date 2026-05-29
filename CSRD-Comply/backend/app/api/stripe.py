@@ -136,7 +136,7 @@ def create_checkout_session(
             "message": "Stripe not configured. A manual invoice will be generated.",
             "plan": data.plan,
             "billing_cycle": data.billing_cycle,
-            "contact": "billing@csrdcomply.io",
+            "contact": "billing@csrdcomply.com",
         }
 
     # Validate plan
@@ -174,7 +174,7 @@ def create_checkout_session(
             "status": "manual_invoice",
             "message": "Unable to create Stripe customer. A manual invoice will be generated.",
             "plan": data.plan,
-            "contact": "billing@csrdcomply.io",
+            "contact": "billing@csrdcomply.com",
         }
 
     # Save Stripe customer ID
@@ -204,11 +204,11 @@ def create_checkout_session(
         plan_config = PLAN_CONFIG.get(plan_tier, {})
         return {
             "status": "manual_invoice",
-            "message": "Stripe price not configured for this plan. Contact billing@csrdcomply.io for a manual invoice.",
+            "message": "Stripe price not configured for this plan. Contact billing@csrdcomply.com for a manual invoice.",
             "plan": data.plan,
             "price_monthly": plan_config.get("price_month", 0),
             "price_yearly": plan_config.get("price_year", 0),
-            "contact": "billing@csrdcomply.io",
+            "contact": "billing@csrdcomply.com",
         }
 
     try:
@@ -256,7 +256,7 @@ def create_billing_portal(
     if not STRIPE_AVAILABLE:
         return {
             "status": "unavailable",
-            "message": "Stripe not configured. Contact billing@csrdcomply.io for billing changes.",
+            "message": "Stripe not configured. Contact billing@csrdcomply.com for billing changes.",
         }
 
     company = current_user.company
@@ -518,7 +518,7 @@ def create_manual_invoice(
         "currency": "EUR",
         "status": "pending",
         "notes": data.notes or "",
-        "contact": "billing@csrdcomply.io",
+        "contact": "billing@csrdcomply.com",
         "created_at": datetime.utcnow().isoformat(),
     }
 
@@ -544,5 +544,5 @@ def get_payment_status(
             getattr(settings, "STRIPE_PRICE_PRO", None)
         ),
         "manual_invoice": True,
-        "contact": "billing@csrdcomply.io",
+        "contact": "billing@csrdcomply.com",
     }
