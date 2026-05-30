@@ -2,7 +2,7 @@
 // Uses HttpOnly cookies for JWT authentication (XSS-safe).
 // All requests include credentials so the browser sends the cookie.
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'
+const API_BASE = ''
 
 /**
  * 🔒 SICUREZZA: L'autenticazione usa cookie HttpOnly (XSS-safe).
@@ -37,11 +37,10 @@ async function request<T>(
 
 export const api = {
   get: <T = any>(endpoint: string) => {
-    const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
-    return fetch(`${base}${endpoint}`, { headers, credentials: 'include' }).then(async (res) => {
+    return fetch(`/api/v1${endpoint}`, { headers, credentials: 'include' }).then(async (res) => {
       if (!res.ok) {
         const error = await res.json().catch(() => ({ detail: res.statusText }));
         throw new Error(error.detail || 'API Error');
@@ -51,11 +50,10 @@ export const api = {
   },
 
   post: <T = any>(endpoint: string, body?: any) => {
-    const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
-    return fetch(`${base}${endpoint}`, {
+    return fetch(`/api/v1${endpoint}`, {
       method: 'POST',
       headers,
       credentials: 'include',
@@ -70,11 +68,10 @@ export const api = {
   },
 
   put: <T = any>(endpoint: string, body?: any) => {
-    const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
-    return fetch(`${base}${endpoint}`, {
+    return fetch(`/api/v1${endpoint}`, {
       method: 'PUT',
       headers,
       credentials: 'include',
@@ -89,11 +86,10 @@ export const api = {
   },
 
   patch: <T = any>(endpoint: string, body?: any) => {
-    const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
-    return fetch(`${base}${endpoint}`, {
+    return fetch(`/api/v1${endpoint}`, {
       method: 'PATCH',
       headers,
       credentials: 'include',
@@ -108,11 +104,10 @@ export const api = {
   },
 
   del: <T = any>(endpoint: string) => {
-    const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
-    return fetch(`${base}${endpoint}`, {
+    return fetch(`/api/v1${endpoint}`, {
       method: 'DELETE',
       headers,
       credentials: 'include',
@@ -126,9 +121,8 @@ export const api = {
   },
 
   get_text: async (endpoint: string) => {
-    const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
     const headers: Record<string, string> = {};
-    const res = await fetch(`${base}${endpoint}`, { headers, credentials: 'include' });
+    const res = await fetch(`/api/v1${endpoint}`, { headers, credentials: 'include' });
     if (!res.ok) {
       throw new Error(`Failed to fetch text: ${res.statusText}`);
     }
@@ -136,9 +130,8 @@ export const api = {
   },
 
   get_blob: async (endpoint: string) => {
-    const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
     const headers: Record<string, string> = {};
-    const res = await fetch(`${base}${endpoint}`, { headers, credentials: 'include' });
+    const res = await fetch(`/api/v1${endpoint}`, { headers, credentials: 'include' });
     if (!res.ok) {
       throw new Error(`Failed to fetch blob: ${res.statusText}`);
     }
@@ -335,7 +328,7 @@ export const reports = {
   get: (id: string) => request<any>(`/reports/${id}`),
 
   exportFormat: (id: string, format: string) =>
-    `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'}/reports/${id}/export/${format}`,
+    `/api/v1/reports/${id}/export/${format}`,
 
   getFormats: () => request<any>('/reports/export/formats'),
   exportAll: (id: string) =>
