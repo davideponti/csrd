@@ -128,19 +128,10 @@ app.include_router(router, prefix="/api/v1")
 @app.on_event("startup")
 async def run_migrations():
     """Run database migrations on startup."""
-    import subprocess
-    import sys
-    try:
-        subprocess.run(
-            [sys.executable, "-m", "alembic", "upgrade", "head"],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-        logger.info("Database migrations completed successfully")
-    except subprocess.CalledProcessError as e:
-        logger.error(f"Migration failed: {e.stderr}")
-
+    from app.core.database import engine, Base
+    from app.models import user, company  # importa tutti i modelli
+    Base.metadata.create_all(bind=engine)
+    logger.info("Database tables created successfully")
 
 @app.get("/")
 @limiter.limit("30/minute")
