@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useCallback } from 'react'
 
-// API base URL
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'
+// API base URL — usa percorso relativo (Nginx proxy /api/ → backend in produzione,
+// Next.js rewrites /api/v1/* → backend in sviluppo)
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || '/api/v1'
 
 interface AuthState {
   user: { email: string; company_name: string } | null
