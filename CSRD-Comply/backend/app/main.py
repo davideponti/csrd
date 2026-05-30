@@ -127,11 +127,12 @@ app.include_router(router, prefix="/api/v1")
 
 @app.on_event("startup")
 async def run_migrations():
-    """Run database migrations on startup."""
-    from app.core.database import engine, Base
-    from app.models import user, company  # importa tutti i modelli
+    """Create database tables on startup."""
+    from app.models import Base
+    from app.core.database import engine
     Base.metadata.create_all(bind=engine)
     logger.info("Database tables created successfully")
+
 
 @app.get("/")
 @limiter.limit("30/minute")
