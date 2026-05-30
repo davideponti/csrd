@@ -53,7 +53,7 @@ class Settings(BaseSettings):
 
     # CORS — only specific origins, no wildcards
     # Usiamo str per evitare errori di parsing con pydantic-settings su Render
-    CORS_ORIGINS: str = "http://localhost:3000"
+    CORS_ORIGINS: str = "http://localhost:3000,https://csrdcomply.com,https://www.csrdcomply.com"
     CORS_ALLOW_HEADERS: List[str] = ["Authorization", "Content-Type", "X-Tenant-ID"]
 
     # Environment
