@@ -48,8 +48,7 @@ cp backend/.env.example backend/.env
 | `SENTRY_DSN` | No | Sentry error tracking (recommended in production) |
 | `OPENAI_API_KEY` | No | For AI-powered features |
 | `ANTHROPIC_API_KEY` | No | For AI-powered features (Claude) |
-| `SUPABASE_URL` | No | For Supabase Auth integration |
-| `SUPABASE_KEY` | No | For Supabase Auth integration |
+
 
 ---
 

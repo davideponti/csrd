@@ -152,9 +152,9 @@ Per qualsiasi domanda, richiesta o reclamo relativo alla presente privacy policy
 
 | Fornitore | Servizio | Località |
 |-----------|----------|----------|
-| Railway / Supabase | Cloud hosting e database | UE |
+| Render | Cloud hosting e database | UE |
 | Stripe Inc. | Pagamenti | USA (SCC) |
-| Auth0 / Supabase | Autenticazione | UE |
+| JWT (autenticazione interna) | Autenticazione | — |
 | Sentry | Error tracking | USA (SCC) |
 
 ---

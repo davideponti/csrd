@@ -452,8 +452,6 @@ Crea un file `.env` nella directory `backend/` con le seguenti variabili:
 | `ANTHROPIC_API_KEY` | `""` | API key Anthropic Claude |
 | `CORS_ORIGINS` | `["http://localhost:3000"]` | Origini CORS consentite |
 | `ENVIRONMENT` | `development` | Ambiente (development/production) |
-| `SUPABASE_URL` | `""` | URL Supabase (opzionale) |
-| `SUPABASE_KEY` | `""` | Key Supabase (opzionale) |
 | `ENABLE_MULTITENANCY` | `False` | Abilita multi-tenancy |
 | `DEPLOYMENT_DOMAIN` | `csrdcomply.io` | Dominio di deploy |
 

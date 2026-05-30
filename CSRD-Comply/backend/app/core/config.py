@@ -61,10 +61,6 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     APP_VERSION: str = "1.0.0"
 
-    # Supabase (optional)
-    SUPABASE_URL: str = ""
-    SUPABASE_KEY: str = ""
-
     # Multitenancy (Step 29)
     ENABLE_MULTITENANCY: bool = False
     DEFAULT_SCHEMA: str = "public"

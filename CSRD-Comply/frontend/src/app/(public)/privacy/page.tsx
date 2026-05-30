@@ -262,9 +262,9 @@ export default function PrivacyPolicyPage() {
                 </tr>
               </thead>
               <tbody>
-                <tr><td>Railway / Supabase</td><td>Cloud hosting e database</td><td>UE</td></tr>
+                <tr><td>Render</td><td>Cloud hosting e database</td><td>UE</td></tr>
                 <tr><td>Stripe Inc.</td><td>Pagamenti</td><td>USA (SCC)</td></tr>
-                <tr><td>Auth0 / Supabase</td><td>Autenticazione</td><td>UE</td></tr>
+                <tr><td>JWT (autenticazione interna)</td><td>Autenticazione</td><td>—</td></tr>
                 <tr><td>Sentry</td><td>Error tracking</td><td>USA (SCC)</td></tr>
               </tbody>
             </table>
