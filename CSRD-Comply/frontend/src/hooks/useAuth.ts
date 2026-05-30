@@ -70,4 +70,34 @@ export function useAuth() {
       body: JSON.stringify({ email, password, company_name }),
     })
     if (!res.ok) {
-      const err
+      const err = await res.json().catch(() => ({ detail: 'Registration failed' }))
+      throw new Error(err.detail || 'Registration failed')
+    }
+    const data = await res.json()
+    if (data.access_token) localStorage.setItem('access_token', data.access_token)
+    await checkSession()
+    return data
+  }, [checkSession])
+
+  const logout = useCallback(async () => {
+    localStorage.removeItem('access_token')
+    try {
+      const token = localStorage.getItem('access_token')
+      await fetch(`${API_BASE}/auth/logout`, {
+        method: 'POST',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+      })
+    } catch {
+      // Ignore errors
+    }
+    setState({ user: null, token: null, loading: false })
+  }, [])
+
+  return {
+    ...state,
+    isAuthenticated: !!state.token,
+    login,
+    register,
+    logout,
+  }
+}
