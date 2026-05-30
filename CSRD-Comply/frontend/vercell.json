@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/v1/:path*",
-      "destination": "https://csrd-rfb4.onrender.com/api/v1/:path*"
+      "destination": "https://api.csrdcomply.com/api/v1/:path*"
     }
   ]
 }
