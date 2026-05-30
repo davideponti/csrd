@@ -2,7 +2,7 @@
 // Uses HttpOnly cookies for JWT authentication (XSS-safe).
 // All requests include credentials so the browser sends the cookie.
 
-const API_BASE = ''
+const API_BASE = '/api/v1'
 
 /**
  * 🔒 SICUREZZA: L'autenticazione usa cookie HttpOnly (XSS-safe).
