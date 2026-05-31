@@ -263,7 +263,7 @@ body {{ font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 0; backg
 <p>© {datetime.now().year} CSRD Comply. Tutti i diritti riservati.</p>
 <p style="font-size:11px;color:#999;">
 <a href="{{UNSUBSCRIBE_URL}}" style="color:#999;">Disiscriviti</a> |
-<a href="mailto:support@csrdcomply.com" style="color:#999;">Contattaci</a>
+<a href="mailto:info@csrdcomply.com" style="color:#999;">Contattaci</a>
 </p>
 </div>
 </div>
