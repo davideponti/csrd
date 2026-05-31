@@ -302,6 +302,27 @@ body {{ font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 0; backg
             text_body=f"Il report {report_title} è pronto: {report_url}",
         )
 
+    def build_otp_email(self, name: str, otp_code: str) -> EmailMessage:
+        """Build OTP verification email."""
+        html = self._build_base_html(
+            "Verifica la tua Email 📧",
+            f"""
+            <p>Ciao <strong>{name}</strong>,</p>
+            <p>Grazie per esserti registrato a CSRD Comply! Per completare la registrazione, verifica il tuo indirizzo email con il codice qui sotto.</p>
+            <div style="background:#f0f7ff;padding:30px;border-radius:8px;margin:20px 0;text-align:center;">
+                <h2 style="margin:0;font-size:36px;letter-spacing:8px;color:#2b6cb0;font-family:monospace;">{otp_code}</h2>
+                <p style="margin:10px 0 0;font-size:13px;color:#666;">Codice valido per 10 minuti</p>
+            </div>
+            <p style="font-size:13px;color:#666;">Se non hai creato tu questo account, ignora questa email.</p>
+            """
+        )
+        return EmailMessage(
+            to=[],
+            subject=f"Codice di verifica — CSRD Comply",
+            html_body=html,
+            text_body=f"Il tuo codice di verifica CSRD Comply è: {otp_code}. Valido per 10 minuti.",
+        )
+
     def build_deadline_reminder_email(self, name: str, days_left: int, task: str) -> EmailMessage:
         """Build deadline reminder."""
         urgency_color = "#e53e3e" if days_left <= 7 else "#dd6b20" if days_left <= 14 else "#3182ce"
@@ -358,6 +379,14 @@ def send_report_ready_email(to_email: str, name: str, report_title: str, report_
     """Helper: send report ready notification."""
     service = get_email_service()
     msg = service.build_report_ready_email(name, report_title, report_url)
+    msg.to = [to_email]
+    return service.send(msg)
+
+
+def send_otp_email(to_email: str, name: str, otp_code: str) -> bool:
+    """Helper: send OTP verification email."""
+    service = get_email_service()
+    msg = service.build_otp_email(name, otp_code)
     msg.to = [to_email]
     return service.send(msg)
 

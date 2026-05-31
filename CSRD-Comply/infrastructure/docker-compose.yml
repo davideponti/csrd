@@ -45,12 +45,16 @@ services:
     build:
       context: ../frontend
       dockerfile: Dockerfile
-      args:
-        NEXT_PUBLIC_API_URL: https://csrdcomply.onrender.com/api/v1
     ports:
       - "127.0.0.1:3000:3000"
     environment:
       NODE_ENV: production
+      # ⚠️ NON impostare NEXT_PUBLIC_API_URL qui!
+      # In Docker con Nginx in fronte, frontend e backend sono sullo
+      # stesso dominio. L'API client usa il percorso relativo /api/v1
+      # come fallback, e Nginx proxy /api/ → backend.
+      # HttpOnly cookie JWT funzionano solo se browser→Nginx→Backend
+      # sono tutti sulla stessa origine.
     restart: unless-stopped
 
   nginx:

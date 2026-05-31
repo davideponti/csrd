@@ -14,8 +14,11 @@ RUN npm ci
 COPY . .
 
 # Build
-ARG NEXT_PUBLIC_API_URL=https://csrdcomply.onrender.com/api/v1
-ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+# ⚠️ NON impostare NEXT_PUBLIC_API_URL come argomento!
+# In Docker con Nginx, frontend e backend sono sulla stessa origine.
+# L'API client usa il percorso relativo /api/v1 come fallback,
+# e Nginx proxy /api/ → backend.
+# HttpOnly cookie JWT funzionano solo se sono same-origin.
 ENV NODE_ENV=production
 
 RUN npm run build

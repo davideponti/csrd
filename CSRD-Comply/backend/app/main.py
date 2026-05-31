@@ -133,6 +133,23 @@ async def run_migrations():
     Base.metadata.create_all(bind=engine)
     logger.info("Database tables created successfully")
 
+    # Auto-seed ESRS datapoints if DB is empty
+    try:
+        from app.seed_esrs_datapoints import get_all_datapoints, seed_to_db
+        from sqlalchemy.orm import Session
+        with Session(engine) as session:
+            from app.models import EsrsDatapoint
+            count = session.query(EsrsDatapoint).count()
+            if count < 10:
+                logger.info("ESRS datapoints empty — auto-seeding...")
+                datapoints = get_all_datapoints(use_excel=False)
+                created = seed_to_db(session, datapoints)
+                logger.info(f"Auto-seed completato: {created} nuovi datapoint")
+            else:
+                logger.info(f"ESRS datapoints già presenti ({count}), salto seed")
+    except Exception as e:
+        logger.warning(f"Auto-seed ESRS saltato: {e}")
+
 
 @app.get("/")
 @limiter.limit("30/minute")

@@ -26,6 +26,7 @@ export default function AssessmentPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showAiDialog, setShowAiDialog] = useState(false)
+  const [showSuccessDialog, setShowSuccessDialog] = useState<{title: string; message: string} | null>(null)
 
   useEffect(() => {
     loadAssessments()
@@ -91,7 +92,7 @@ export default function AssessmentPage() {
     setLoading(true)
     try {
       await assessments.saveQuestionnaireResponses(selectedAssessment, questionnaireResponses)
-      alert('Questionario salvato con successo!')
+      setShowSuccessDialog({ title: 'Questionario Salvato', message: 'Il questionario di contesto è stato salvato con successo.' })
     } catch (err: any) {
       setError(err.message)
     }
@@ -103,7 +104,7 @@ export default function AssessmentPage() {
     setLoading(true)
     try {
       await assessments.generateScores(selectedAssessment)
-      alert('Score entries generati con successo!')
+      setShowSuccessDialog({ title: 'Score Entries Generati', message: 'Le entries di scoring sono state generate con successo.' })
     } catch (err: any) {
       setError(err.message)
     }
@@ -116,7 +117,10 @@ export default function AssessmentPage() {
     try {
       const result = await assessments.calculateScores(selectedAssessment)
       setActiveTab('matrix')
-      alert(`Punteggi calcolati!\nDatapoint materiali: ${result.material_datapoints}\nImpact medio: ${result.average_impact_score}\nFinancial medio: ${result.average_financial_score}`)
+      setShowSuccessDialog({ 
+        title: 'Punteggi Calcolati', 
+        message: `Datapoint materiali: ${result.material_datapoints}\nImpact medio: ${result.average_impact_score}\nFinancial medio: ${result.average_financial_score}`
+      })
       // Dopo aver calcolato, carica la matrice
       setTimeout(() => handleLoadMatrix(), 500)
     } catch (err: any) {
@@ -199,8 +203,9 @@ export default function AssessmentPage() {
       </div>
 
       {error && (
-        <div className="mb-4 p-3 bg-destructive/10 text-destructive rounded-lg text-sm border border-destructive/20">
-          {error}
+        <div className="mb-4 p-4 bg-destructive/10 text-destructive rounded-lg text-sm border border-destructive/20 flex items-start gap-3">
+          <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5" />
+          <span>{error}</span>
         </div>
       )}
 
@@ -776,14 +781,46 @@ export default function AssessmentPage() {
         </TabsContent>
       </Tabs>
 
+      {/* Success Dialog */}
+      <Dialog open={showSuccessDialog !== null} onOpenChange={(open) => { if (!open) setShowSuccessDialog(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="h-12 w-12 rounded-full bg-emerald-100 flex items-center justify-center">
+                <CheckCircle2 className="h-6 w-6 text-emerald-600" />
+              </div>
+              <div>
+                <DialogTitle className="text-lg">{showSuccessDialog?.title || 'Operazione Completata'}</DialogTitle>
+              </div>
+            </div>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-muted-foreground whitespace-pre-line">{showSuccessDialog?.message}</p>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setShowSuccessDialog(null)}>
+              <CheckCircle2 className="h-4 w-4 mr-2" />
+              OK
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* AI IRO Generation Dialog */}
       <Dialog open={showAiDialog} onOpenChange={setShowAiDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Generazione IRO</DialogTitle>
-            <DialogDescription>
-              Scegli la modalità di generazione degli IRO (Impacts, Risks, Opportunities).
-            </DialogDescription>
+            <div className="flex items-center gap-3">
+              <div className="h-12 w-12 rounded-full bg-purple-100 flex items-center justify-center">
+                <Brain className="h-6 w-6 text-purple-600" />
+              </div>
+              <div>
+                <DialogTitle>Generazione IRO</DialogTitle>
+                <DialogDescription>
+                  Scegli la modalità di generazione degli IRO (Impacts, Risks, Opportunities).
+                </DialogDescription>
+              </div>
+            </div>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <button

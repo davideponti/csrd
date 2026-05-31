@@ -2,6 +2,9 @@
 Uses HttpOnly cookies for JWT storage (XSS-safe).
 Sends transactional emails on registration and password reset.
 """
+import random
+import string
+from datetime import timedelta, datetime
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr, field_validator
@@ -15,7 +18,11 @@ from app.core.security import (
 from app.models import User, Company
 from app.core.config import settings
 from app.core.deps import get_current_user
-from app.services.email_service import send_welcome_email, send_password_reset_email
+from app.services.email_service import (
+    send_welcome_email,
+    send_password_reset_email,
+    send_otp_email,
+)
 
 router = APIRouter()
 
@@ -67,6 +74,30 @@ class ResetPasswordRequest(BaseModel):
     token: str
     password: str
 
+    @field_validator("password")
+    @classmethod
+    def validate_password_strength(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters")
+        if not re.search(r"[A-Z]", v):
+            raise ValueError("Password must contain at least one uppercase letter")
+        if not re.search(r"[a-z]", v):
+            raise ValueError("Password must contain at least one lowercase letter")
+        if not re.search(r"\d", v):
+            raise ValueError("Password must contain at least one number")
+        if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", v):
+            raise ValueError("Password must contain at least one special character")
+        return v
+
+
+class SendOtpRequest(BaseModel):
+    email: str
+
+
+class VerifyOtpRequest(BaseModel):
+    email: str
+    otp: str
+
 
 # ── Endpoints ───────────────────────────────────────────────────
 @router.post("/register", status_code=status.HTTP_201_CREATED)
@@ -91,6 +122,7 @@ def register(req: RegisterRequest, db: Session = Depends(get_db)):
         email=req.email,
         hashed_password=hash_password(req.password),
         role="admin",
+        email_verified=False,
     )
     db.add(user)
     db.commit()
@@ -132,7 +164,36 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
     if not user.is_active:
         raise HTTPException(status_code=403, detail="Account is disabled")
 
-    user.last_login = None  # set programmatically
+    user.last_login = datetime.utcnow()
+
+    # Check if email is verified - if not, send OTP and require verification
+    if not user.email_verified:
+        # Generate and send OTP
+        otp = ''.join(random.choices(string.digits, k=6))
+        user.otp_code = otp
+        user.otp_expires_at = datetime.utcnow() + timedelta(minutes=10)
+        db.commit()
+
+        try:
+            send_otp_email(
+                to_email=user.email,
+                name=user.email.split("@")[0],
+                otp_code=otp,
+            )
+        except Exception:
+            pass
+
+        from fastapi.responses import JSONResponse
+        response = JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "requires_otp": True,
+                "email": user.email,
+                "message": "Email verification required. An OTP has been sent to your email.",
+            },
+        )
+        return response
+
     db.commit()
 
     token = create_access_token({
@@ -141,7 +202,82 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
         "tok_v": user.token_version,
     })
 
-    # Return token in body (for API clients) + set HttpOnly cookie (for browser)
+    from fastapi.responses import JSONResponse
+    response = JSONResponse(
+        content={"access_token": token, "token_type": "bearer"},
+    )
+    set_auth_cookie(response, token)
+    return response
+
+
+@router.post("/send-otp")
+def send_otp(req: SendOtpRequest, db: Session = Depends(get_db)):
+    """Send a new OTP code for email verification."""
+    user = db.query(User).filter(User.email == req.email).first()
+    if not user:
+        # Don't reveal if email exists
+        return {"status": "sent", "message": "If the email exists, an OTP has been sent."}
+
+    otp = ''.join(random.choices(string.digits, k=6))
+    user.otp_code = otp
+    user.otp_expires_at = datetime.utcnow() + timedelta(minutes=10)
+    db.commit()
+
+    try:
+        send_otp_email(
+            to_email=user.email,
+            name=user.email.split("@")[0],
+            otp_code=otp,
+        )
+    except Exception:
+        pass
+
+    return {"status": "sent", "message": "OTP sent successfully."}
+
+
+@router.post("/verify-email")
+def verify_email(req: VerifyOtpRequest, db: Session = Depends(get_db)):
+    """Verify email with OTP code."""
+    user = db.query(User).filter(User.email == req.email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if user.email_verified:
+        # Already verified - return token directly
+        token = create_access_token({
+            "sub": str(user.user_id),
+            "company_id": str(user.company_id),
+            "tok_v": user.token_version,
+        })
+        from fastapi.responses import JSONResponse
+        response = JSONResponse(
+            content={"access_token": token, "token_type": "bearer"},
+        )
+        set_auth_cookie(response, token)
+        return response
+
+    if not user.otp_code or not user.otp_expires_at:
+        raise HTTPException(status_code=400, detail="No OTP requested. Please request a new OTP.")
+
+    if datetime.utcnow() > user.otp_expires_at:
+        raise HTTPException(status_code=400, detail="OTP expired. Please request a new one.")
+
+    if user.otp_code != req.otp:
+        raise HTTPException(status_code=400, detail="Invalid OTP code.")
+
+    # Verify email
+    user.email_verified = True
+    user.otp_code = None
+    user.otp_expires_at = None
+    user.last_login = datetime.utcnow()
+    db.commit()
+
+    token = create_access_token({
+        "sub": str(user.user_id),
+        "company_id": str(user.company_id),
+        "tok_v": user.token_version,
+    })
+
     from fastapi.responses import JSONResponse
     response = JSONResponse(
         content={"access_token": token, "token_type": "bearer"},
@@ -211,6 +347,11 @@ def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)):
     )
     reset_url = f"https://{settings.DEPLOYMENT_DOMAIN}/auth/reset-password?token={reset_token}"
 
+    # Save reset token in DB
+    user.reset_password_token = reset_token
+    user.reset_password_expires_at = datetime.utcnow() + timedelta(minutes=60)
+    db.commit()
+
     try:
         send_password_reset_email(
             to_email=req.email,
@@ -221,6 +362,41 @@ def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)):
         pass  # Email failure should not expose anything
 
     return {"status": "sent", "message": "If the email exists, a reset link has been sent."}
+
+
+@router.post("/reset-password")
+def reset_password(req: ResetPasswordRequest, db: Session = Depends(get_db)):
+    """Reset password using a valid reset token."""
+    payload = decode_access_token(req.token)
+    if payload is None:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset token.")
+
+    purpose = payload.get("purpose")
+    if purpose != "password_reset":
+        raise HTTPException(status_code=400, detail="Invalid token purpose.")
+
+    user_id = payload.get("sub")
+    if not user_id:
+        raise HTTPException(status_code=400, detail="Invalid token payload.")
+
+    user = db.query(User).filter(User.user_id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    # Validate token from DB
+    if user.reset_password_token != req.token:
+        raise HTTPException(status_code=400, detail="Token already used or invalid.")
+    if user.reset_password_expires_at and datetime.utcnow() > user.reset_password_expires_at:
+        raise HTTPException(status_code=400, detail="Reset token expired.")
+
+    # Update password
+    user.hashed_password = hash_password(req.password)
+    user.reset_password_token = None
+    user.reset_password_expires_at = None
+    user.token_version += 1  # Invalidate all existing sessions
+    db.commit()
+
+    return {"message": "Password reset successfully. You can now log in with your new password."}
 
 
 # ── Get current user ──────────────────────────────────────────
@@ -237,6 +413,7 @@ def get_current_user_info(
         "company_id": str(current_user.company_id),
         "company_name": current_user.company.company_name if current_user.company else "",
         "role": current_user.role,
+        "email_verified": current_user.email_verified,
     }
 
 

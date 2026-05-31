@@ -64,6 +64,11 @@ class User(TimestampMixin, Base):
     is_active = Column(Boolean, default=True, nullable=False)
     last_login = Column(DateTime, nullable=True)
     token_version = Column(Integer, default=0, nullable=False)
+    email_verified = Column(Boolean, default=False, nullable=False)
+    otp_code = Column(String(6), nullable=True)
+    otp_expires_at = Column(DateTime, nullable=True)
+    reset_password_token = Column(String(255), nullable=True)
+    reset_password_expires_at = Column(DateTime, nullable=True)
 
     company = relationship("Company", back_populates="users")
 
