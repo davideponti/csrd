@@ -127,11 +127,32 @@ app.include_router(router, prefix="/api/v1")
 
 @app.on_event("startup")
 async def run_migrations():
-    """Create database tables on startup."""
+    """Create/update database tables on startup.
+    
+    Crea tabelle se non esistono, e aggiunge colonne mancanti
+    a tabelle già esistenti (es. users con email_verified, ecc.).
+    """
     from app.models import Base
     from app.core.database import engine
+    from sqlalchemy import text
+
+    # Add missing columns to existing tables (create_all doesn't do this)
+    with engine.connect() as conn:
+        for col, col_type in [
+            ("email_verified", "BOOLEAN DEFAULT FALSE"),
+            ("otp_code", "VARCHAR(10)"),
+            ("otp_expires_at", "TIMESTAMP"),
+            ("reset_password_token", "VARCHAR(255)"),
+            ("reset_password_expires_at", "TIMESTAMP"),
+        ]:
+            try:
+                conn.execute(text(f"ALTER TABLE users ADD COLUMN IF NOT EXISTS {col} {col_type}"))
+            except Exception:
+                pass
+        conn.commit()
+
     Base.metadata.create_all(bind=engine)
-    logger.info("Database tables created successfully")
+    logger.info("Database tables updated successfully")
 
     # Auto-seed ESRS datapoints if DB is empty
     try:
