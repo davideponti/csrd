@@ -86,6 +86,7 @@ class Settings(BaseSettings):
     SENDGRID_API_KEY: str = ""
     MAILGUN_API_KEY: str = ""
     MAILGUN_DOMAIN: str = ""
+    RESEND_API_KEY: str = ""
 
     # ── Stripe ─────────────────────────────────────────────────
     STRIPE_SECRET_KEY: str = ""

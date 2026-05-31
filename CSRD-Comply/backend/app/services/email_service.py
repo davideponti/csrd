@@ -21,6 +21,12 @@ from datetime import datetime
 
 from app.core.config import settings
 
+try:
+    import resend
+    _resend_available = True
+except ImportError:
+    _resend_available = False
+
 logger = logging.getLogger(__name__)
 
 
@@ -63,6 +69,7 @@ class EmailService:
         self._sendgrid_key = getattr(settings, "SENDGRID_API_KEY", "")
         self._mailgun_key = getattr(settings, "MAILGUN_API_KEY", "")
         self._mailgun_domain = getattr(settings, "MAILGUN_DOMAIN", "")
+        self._resend_api_key = getattr(settings, "RESEND_API_KEY", "")
         self._environment = settings.ENVIRONMENT
 
     def send(self, message: EmailMessage) -> bool:
@@ -82,6 +89,8 @@ class EmailService:
             return self._send_sendgrid(message)
         elif self._mailgun_key:
             return self._send_mailgun(message)
+        elif self._resend_api_key:
+            return self._send_resend(message)
         else:
             return self._send_smtp(message)
 
@@ -192,6 +201,32 @@ class EmailService:
 
         except Exception as e:
             logger.error(f"Mailgun send failed: {e}")
+            return False
+
+    def _send_resend(self, message: EmailMessage) -> bool:
+        """Send via Resend API."""
+        try:
+            if not _resend_available:
+                logger.error("Resend library not installed. Run: pip install resend")
+                return False
+
+            resend.api_key = self._resend_api_key
+
+            params = {
+                "from": f"{self._from_name} <{self._from_email}>",
+                "to": message.to,
+                "subject": message.subject,
+                "html": message.html_body,
+            }
+            if message.reply_to:
+                params["reply_to"] = message.reply_to
+
+            r = resend.Emails.send(params)
+            logger.info(f"Email sent via Resend to {', '.join(message.to)}: {r.get('id')}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Resend send failed: {e}")
             return False
 
     def _html_to_text(self, html: str) -> str:

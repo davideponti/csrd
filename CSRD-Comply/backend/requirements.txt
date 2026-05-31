@@ -37,3 +37,6 @@ sentry-sdk>=2.0.0
 
 # HTTP requests (SendGrid, Mailgun, APIs)
 requests>=2.31.0
+
+# Email (Resend)
+resend>=4.0.0
