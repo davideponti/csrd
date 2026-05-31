@@ -39,4 +39,4 @@ sentry-sdk>=2.0.0
 requests>=2.31.0
 
 # Email (Resend)
-resend>=4.0.0
+resend>=2.30.0
