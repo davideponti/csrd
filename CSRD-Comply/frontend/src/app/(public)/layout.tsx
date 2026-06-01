@@ -15,6 +15,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
   const navLinks = [
     { href: '/how-it-works', label: t('nav.how-it-works') },
     { href: '/pricing', label: t('nav.pricing') },
+    { href: '/demo', label: 'Demo' },
     { href: '/faq', label: t('nav.faq') },
   ]
 
@@ -117,6 +118,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
               <ul className="space-y-2">
                 <li><Link href="/how-it-works" className="text-sm hover:text-emerald-400 transition-colors">{t('nav.how-it-works')}</Link></li>
                 <li><Link href="/pricing" className="text-sm hover:text-emerald-400 transition-colors">{t('nav.pricing')}</Link></li>
+                <li><Link href="/demo" className="text-sm hover:text-emerald-400 transition-colors">Demo</Link></li>
                 <li><Link href="/faq" className="text-sm hover:text-emerald-400 transition-colors">{t('nav.faq')}</Link></li>
               </ul>
             </div>
