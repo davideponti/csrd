@@ -327,6 +327,20 @@ def generate_score_entries(
 
     # Create score entries for each IRO
     created_count = 0
+    skip_reason = {"no_datapoint_match": 0, "already_exists": 0}
+    
+    # If no ESRS datapoints exist yet, try to seed them first
+    esrs_count = db.query(EsrsDatapoint).count()
+    if esrs_count == 0:
+        try:
+            from app.seed_esrs_datapoints import get_all_datapoints, seed_to_db
+            logger.info("No ESRS datapoints found — auto-seeding before score generation...")
+            datapoints = get_all_datapoints(use_excel=False)
+            seeded = seed_to_db(db, datapoints)
+            logger.info(f"Auto-seeded {seeded} ESRS datapoints for score generation")
+        except Exception as e:
+            logger.warning(f"Auto-seed fallback failed: {e}, will use IRO topic as fallback")
+
     for iro in iros:
         # Find matching datapoint using topic directly (e.g. "ESRS E1" to match "ESRS E1-6")
         topic_prefix = iro['topic']
@@ -334,37 +348,43 @@ def generate_score_entries(
             EsrsDatapoint.standard_ref.like(f"{topic_prefix}%")
         ).first()
 
-        if datapoint:
-            existing = db.query(MaterialityScore).filter(
-                MaterialityScore.assessment_id == assessment.id,
-                MaterialityScore.datapoint_id == datapoint.id,
-            ).first()
+        if not datapoint:
+            skip_reason["no_datapoint_match"] += 1
+            continue
 
-            if not existing:
-                # Convert initial_impact_score (1-5) into dimensions
+        existing = db.query(MaterialityScore).filter(
+            MaterialityScore.assessment_id == assessment.id,
+            MaterialityScore.datapoint_id == datapoint.id,
+        ).first()
 
-                impact_val = int(round(iro.get("initial_impact_score") or 3))
-                financial_val = int(round(iro.get("initial_financial_score") or 2))
-                score = MaterialityScore(
-                    assessment_id=assessment.id,
-                    datapoint_id=datapoint.id,
-                    impact_scale=impact_val,
-                    impact_scope=impact_val,
-                    impact_irremediability=max(1, impact_val - 1),
-                    impact_likelihood=impact_val,
-                    financial_magnitude=financial_val,
-                    financial_likelihood=financial_val,
-                )
-                db.add(score)
-                created_count += 1
+        if existing:
+            skip_reason["already_exists"] += 1
+            continue
+
+        impact_val = int(round(iro.get("initial_impact_score") or 3))
+        financial_val = int(round(iro.get("initial_financial_score") or 2))
+        score = MaterialityScore(
+            assessment_id=assessment.id,
+            datapoint_id=datapoint.id,
+            impact_scale=impact_val,
+            impact_scope=impact_val,
+            impact_irremediability=max(1, impact_val - 1),
+            impact_likelihood=impact_val,
+            financial_magnitude=financial_val,
+            financial_likelihood=financial_val,
+        )
+        db.add(score)
+        created_count += 1
 
     if created_count > 0:
         db.commit()
+        logger.info(f"Created {created_count} MaterialityScore entries")
 
     return {
         "assessment_id": assessment_id,
         "total_iros": len(iros),
         "score_entries_created": created_count,
+        "skip_details": skip_reason,
     }
 
 

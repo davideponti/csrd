@@ -145,6 +145,11 @@ class ValidationInput(BaseModel):
     has_fleet: bool = False
 
 
+class ParseBillInput(BaseModel):
+    """Schema for parsing utility bill text."""
+    text: str
+
+
 # ── Endpoints ────────────────────────────────────────────────────
 
 @router.get("/", response_model=list[EmissionResponse])
@@ -488,11 +493,11 @@ def validate_emissions_data(
 
 @router.post("/parse-bill")
 def parse_utility_bill(
-    text: str,
+    data: ParseBillInput,
     current_user: User = Depends(get_current_user),
 ):
     """Parse utility bill text extracted via OCR."""
-    result = DataCollectorService.parse_utility_bill_pdf_text(text)
+    result = DataCollectorService.parse_utility_bill_pdf_text(data.text)
     return result
 
 
