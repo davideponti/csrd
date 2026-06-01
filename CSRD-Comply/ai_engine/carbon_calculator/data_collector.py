@@ -23,11 +23,18 @@ class DataCollectorService:
         Usato dopo OCR su PDF caricato dall'utente.
         
         Supporto multilingua: IT, EN, FR, DE, ES.
+        
+        Migliorato con estrazione context-aware:
+        - Cerca valori associati a keyword specifiche (consumo, energia attiva, totale fattura)
+        - Evita falsi positivi (potere calorifico, numeri contatore, ecc.)
+        - Supporta formato data italiano (gg/mm/aaaa)
+        - Riconosce fornitori italiani per nome diretto
         """
         result = {
             "success": False,
             "provider": None,
             "consumption_kwh": None,
+            "consumption_smc": None,
             "period_start": None,
             "period_end": None,
             "total_cost_eur": None,
@@ -43,94 +50,336 @@ class DataCollectorService:
 
         text = extracted_text.lower()
 
-        # Detect bill type (multilingual)
+        # ── Detect bill type (multilingual) ────────────────────────
         electricity_kw = ["electricità", "elettrica", "electricity", "energia elettrica",
-                         "electricité", "strom", "electrische", "electricidad"]
+                         "electricité", "strom", "electrische", "electricidad",
+                         "consumo elettrico", "fornitura elettrica"]
         gas_kw = ["gas", "gas naturale", "metano", "natural gas", "gaz naturel",
-                  "erdgas", "aardgas"]
+                  "erdgas", "aardgas", "consumo gas", "fornitura gas",
+                  "smc", "standard metri cubi"]
 
         if any(kw in text for kw in electricity_kw):
             result["bill_type"] = "electricity"
         elif any(kw in text for kw in gas_kw):
             result["bill_type"] = "gas"
 
-        # Extract consumption (kWh) - various formats
-        kwh_patterns = [
-            r'(\d+[.,]?\d*)\s*kwh',
-            r'consumo\s*[:]?\s*(\d+[.,]?\d*)\s*kwh',
-            r'energia\s*attiva\s*[:]?\s*(\d+[.,]?\d*)',
-            r'consumption\s*[:]?\s*(\d+[.,]?\d*)\s*kwh',
-            r'consommation\s*[:]?\s*(\d+[.,]?\d*)\s*kwh',
-        ]
-        for pattern in kwh_patterns:
-            match = re.search(pattern, text, re.IGNORECASE)
-            if match:
-                value = match.group(1).replace(",", ".")
-                result["consumption_kwh"] = float(value)
-                result["confidence"] += 0.3
-                break
+        # ── Extract PROVIDER (context-aware, not just "Fornitore:" prefix) ──
+        provider = DataCollectorService._extract_provider(text, extracted_text)
+        if provider:
+            result["provider"] = provider
+            result["confidence"] += 0.15
 
-        # Extract total cost (EUR)
-        cost_patterns = [
-            r'totale\s*[:]?\s*[€euro]?\s*(\d+[.,]?\d*)',
-            r'total\s*[:]?\s*[€euro]?\s*(\d+[.,]?\d*)',
-            r'importo\s*[:]?\s*[€euro]?\s*(\d+[.,]?\d*)',
-            r'€\s*(\d+[.,]?\d*)',
-            r'eur\s*(\d+[.,]?\d*)',
-        ]
-        for pattern in cost_patterns:
-            match = re.search(pattern, text, re.IGNORECASE)
-            if match:
-                value = match.group(1).replace(",", ".")
-                result["total_cost_eur"] = float(value)
-                result["confidence"] += 0.2
-                break
+        # ── Extract CONSUMPTION (prioritized, context-aware) ───────
+        consumption = DataCollectorService._extract_consumption(text, result["bill_type"])
+        if consumption is not None:
+            result["consumption_kwh"] = consumption
+            result["confidence"] += 0.35
 
-        # Extract provider name
-        provider_patterns = [
-            r'fornitore\s*[:]?\s*([A-Za-z\s.]+)',
-            r'provider\s*[:]?\s*([A-Za-z\s.]+)',
-            r'società\s*[:]?\s*([A-Za-z\s.]+)',
-            r'company\s*[:]?\s*([A-Za-z\s.]+)',
-            r'fournisseur\s*[:]?\s*([A-Za-z\s.]+)',
-        ]
-        for pattern in provider_patterns:
-            match = re.search(pattern, text)
-            if match:
-                result["provider"] = match.group(1).strip()
-                result["confidence"] += 0.1
-                break
+        # ── Extract SMC (gas bills often report Smc) ───────────────
+        smc = DataCollectorService._extract_smc(text)
+        if smc is not None:
+            result["consumption_smc"] = smc
 
-        # Extract period
-        period_patterns = [
-            r'periodo\s*dal\s*(\d{2}[/-]\d{2}[/-]\d{4})\s*al\s*(\d{2}[/-]\d{2}[/-]\d{4})',
-            r'dal\s*(\d{2}[/-]\d{2}[/-]\d{4})\s*al\s*(\d{2}[/-]\d{2}[/-]\d{4})',
-            r'from\s*(\d{2}[/-]\d{2}[/-]\d{4})\s*to\s*(\d{2}[/-]\d{2}[/-]\d{4})',
-            r'period\s*(\d{2}[/-]\d{2}[/-]\d{4})\s*-\s*(\d{2}[/-]\d{2}[/-]\d{4})',
-        ]
-        for pattern in period_patterns:
-            match = re.search(pattern, text)
-            if match:
-                result["period_start"] = match.group(1)
-                result["period_end"] = match.group(2)
-                result["confidence"] += 0.2
-                break
+        # ── Extract TOTAL COST (prioritized by relevance) ──────────
+        cost = DataCollectorService._extract_total_cost(text)
+        if cost is not None:
+            result["total_cost_eur"] = cost
+            result["confidence"] += 0.25
 
-        # Extract meter number / POD / PDR
-        meter_patterns = [
-            r'(?:pod|pdr)\s*[:]?\s*([a-z0-9]{6,})',
-            r'(?:meter|matricola)\s*[:]?\s*([a-z0-9]{5,})',
-        ]
-        for pattern in meter_patterns:
-            match = re.search(pattern, text, re.IGNORECASE)
-            if match:
-                if not result.get("pod_pdr_code"):
-                    result["pod_pdr_code"] = match.group(1).upper()
-                    result["confidence"] += 0.1
-                break
+        # ── Extract PERIOD (support dd/mm/yyyy Italian format) ─────
+        period = DataCollectorService._extract_period(text)
+        if period:
+            result["period_start"] = period[0]
+            result["period_end"] = period[1]
+            result["confidence"] += 0.2
+
+        # ── Extract POD/PDR ────────────────────────────────────────
+        meter = DataCollectorService._extract_pod_pdr(text)
+        if meter:
+            result["pod_pdr_code"] = meter
 
         result["success"] = result["confidence"] > 0.3
         return result
+
+    @staticmethod
+    def _extract_provider(text: str, original_text: str) -> Optional[str]:
+        """
+        Extract provider name using multiple strategies:
+        1. Specific Italian energy company names
+        2. "Fornitore:" / "Provider:" prefix patterns
+        3. Company/società keywords
+        """
+        # Strategy 1: Direct Italian energy company names
+        italian_providers = [
+            (r'\benel\s+energia\b', "Enel Energia"),
+            (r'\benel\b(?!\s+energia)', "Enel"),
+            (r'\b(?:ed[.]?\s*)?(?:en|n)el\b', "Enel"),
+            (r'\bacea\b', "Acea"),
+            (r'\ba[.]?2[.]?a\b', "A2A"),
+            (r'\bher\s*comm\b', "Hera Comm"),
+            (r'\bi[.]?ren\b', "Iren"),
+            (r'\bsorgenia\b', "Sorgenia"),
+            (r'\bengie\b', "Engie"),
+            (r'\bedf\b', "EDF"),
+            (r'\be[.]?on\b', "E.ON"),
+            (r'\biberdrola\b', "Iberdrola"),
+            (r'\bwekiwi\b', "Wekiwi"),
+            (r'\bneN\b', "NeN"),
+            (r'\bplenitude\b', "Plenitude"),
+            (r'\b[ée]lectricit[ée]\s+de\s+france\b', "EDF"),
+            (r'\bgas\s+natural\s+fenosa\b', "Gas Natural Fenosa"),
+            (r'\bendesa\b', "Endesa"),
+            (r'\bnaturgy\b', "Naturgy"),
+            (r'\brepsol\b', "Repsol"),
+            (r'\bcepsa\b', "Cepsa"),
+            (r'\bfactorenergia\b', "Factorenergia"),
+            (r'\btotalenergies\b', "TotalEnergies"),
+            (r'\bshell\s+energy\b', "Shell Energy"),
+            (r'\bbritish\s+gas\b', "British Gas"),
+            (r'\bovo\s+energy\b', "OVO Energy"),
+            (r'\beon\s+next\b', "E.ON Next"),
+            (r'\bscottish\s+power\b', "Scottish Power"),
+        ]
+        
+        for pattern, name in italian_providers:
+            if re.search(pattern, text, re.IGNORECASE):
+                return name
+
+        # Strategy 2: "Fornitore:" prefix (Italian)
+        match = re.search(r'fornitore\s*[:;]\s*([A-Za-zÀ-ÿ\s.]+(?:[A-Za-zÀ-ÿ][.\s][A-Za-zÀ-ÿ]+)*)', text, re.IGNORECASE)
+        if match:
+            return match.group(1).strip()
+
+        # Strategy 3: Other language provider patterns
+        provider_patterns = [
+            r'provider\s*[:;]\s*([A-Za-zÀ-ÿ\s.]+)',
+            r'societ[àa]\s*[:;]\s*([A-Za-zÀ-ÿ\s.]+)',
+            r'company\s*[:;]\s*([A-Za-zÀ-ÿ\s.]+)',
+            r'fournisseur\s*[:;]\s*([A-Za-zÀ-ÿ\s.]+)',
+            r'venditore\s*[:;]\s*([A-Za-zÀ-ÿ\s.]+)',
+        ]
+        for pattern in provider_patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                name = match.group(1).strip()
+                # Filter out generic words that aren't actual provider names
+                if name.lower() not in ['il', 'la', 'le', 'di', 'del', 'della', '-', '']:
+                    return name
+
+        return None
+
+    @staticmethod
+    def _extract_consumption(text: str, bill_type: Optional[str]) -> Optional[float]:
+        """
+        Extract consumption in kWh using context-aware strategy.
+        
+        Priority order:
+        1. "Consumo" or "Energia attiva" followed by a large number
+        2. "consumo kWh" patterns
+        3. Generic kWh patterns (only as fallback, avoid calorific value)
+        
+        Italian bills often report:
+        - "Consumo: 2.525,40 kWh" (actual consumption)
+        - "Potere calorifico: 10,35 kWh/Smc" (NOT consumption, skip this)
+        - "Energia attiva: 2.525 kWh"
+        """
+        # High-priority: "consumo" or "energia attiva" followed by kWh value
+        high_priority = [
+            r'consumo\s*(?:totale\s*)?[:=]?\s*(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d+)?)\s*kwh',
+            r'consumo\s*(?:totale\s*)?[:=]?\s*(\d+[.,]?\d*)\s*kwh',
+            r'energia\s+attiva\s*[:=]?\s*(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d+)?)',
+            r'consumo\s*(?:annuo\s*)?[:=]?\s*(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d+)?)\s*kwh',
+            r'consumption\s*[:=]?\s*(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d+)?)\s*kwh',
+            r'consommation\s*[:=]?\s*(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d+)?)\s*kwh',
+        ]
+        
+        for pattern in high_priority:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                value_str = match.group(1).replace(".", "").replace(",", ".")
+                value = float(value_str)
+                # Sanity check: consumption should be reasonable (not a tiny calorific value)
+                if value >= 100:  # Filter out small values like 10.35 (calorific power)
+                    return value
+                # If value < 100 but we got here via a specific "consumo" keyword, trust it
+                return value
+
+        # Medium-priority: blocks of text containing "consumo" with kWh numbers
+        consumo_blocks = re.finditer(r'(?:consumo|consumption|consommation|verbrauch)[^.]*?(\d+[.,]?\d*)\s*kwh', text, re.IGNORECASE)
+        values = []
+        for match in consumo_blocks:
+            value_str = match.group(1).replace(".", "").replace(",", ".")
+            values.append(float(value_str))
+        if values:
+            # Take the largest consumption value (skip small calorific values)
+            valid_values = [v for v in values if v >= 100]
+            if valid_values:
+                return max(valid_values)
+            return max(values)
+
+        # Low-priority: generic kWh pattern (potential false positive)
+        # Look for numbers with thousands separators (more likely to be real consumption)
+        generic_kwh = [
+            r'(\d{1,3}[.,]\d{3}[.,]?\d*)\s*kwh',  # e.g., 2.525,40 or 2,525.40
+            r'(\d{4,})\s*kwh',  # e.g., 2525 kWh (4+ digits)
+        ]
+        for pattern in generic_kwh:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                value_str = match.group(1).replace(".", "").replace(",", ".")
+                value = float(value_str)
+                if value >= 100:  # Sanity check
+                    return value
+
+        return None
+
+    @staticmethod
+    def _extract_smc(text: str) -> Optional[float]:
+        """Extract Smc (Standard metro cubo) from gas bills."""
+        smc_patterns = [
+            r'(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d+)?)\s*smc',
+            r'consumo\s*gas\s*[:=]?\s*(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d+)?)',
+            r'(\d+[.,]?\d*)\s*standard\s*metri\s*cubi',
+        ]
+        for pattern in smc_patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                value_str = match.group(1).replace(".", "").replace(",", ".")
+                return float(value_str)
+        return None
+
+    @staticmethod
+    def _extract_total_cost(text: str) -> Optional[float]:
+        """
+        Extract total cost in EUR using prioritized patterns.
+        
+        Priority:
+        1. "Totale fattura" / "Totale da pagare" / "Importo totale"
+        2. "Totale" followed by € amount
+        3. Last € amount in document (often the final total)
+        4. First € amount (least reliable)
+        """
+        # High priority: explicit total keywords
+        total_patterns = [
+            r'totale\s*(?:fattura|da\s*pagare|documento|complessivo|netto|finale)?\s*[:=]?\s*[€euro]?\s*(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d+)?)',
+            r'importo\s*(?:totale|complessivo|finale|da\s*pagare|dovuto)?\s*[:=]?\s*[€euro]?\s*(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d+)?)',
+            r'total\s*(?:amount|invoice|due|cost|price|payment)?\s*[:=]?\s*[€euro]?\s*(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d+)?)',
+            r'amount\s*(?:due|payable|total)?\s*[:=]?\s*[€euro]?\s*(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d+)?)',
+            r'montant\s*(?:total|à\s*payer)?\s*[:=]?\s*[€euro]?\s*(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d+)?)',
+            r'gesamtbetrag\s*[:=]?\s*[€euro]?\s*(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d+)?)',
+            r'total\s*[:=]?\s*[€euro]?\s*(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d+)?)',
+        ]
+        
+        for pattern in total_patterns:
+            matches = list(re.finditer(pattern, text, re.IGNORECASE))
+            if matches:
+                # Take the LAST match (most likely the final total)
+                match = matches[-1]
+                value_str = match.group(1).replace(".", "").replace(",", ".")
+                value = float(value_str)
+                # Sanity check: total cost should be reasonable for a utility bill
+                if 10 <= value <= 100000:
+                    return value
+
+        # Medium priority: "€" amount that looks like a total (3+ digits before decimal)
+        euro_matches = list(re.finditer(r'[€€]\s*(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{2}))', text))
+        if euro_matches:
+            # Take the LAST € amount (invoices typically end with the total)
+            last_match = euro_matches[-1]
+            value_str = last_match.group(1).replace(".", "").replace(",", ".")
+            value = float(value_str)
+            if 10 <= value <= 100000:
+                return value
+
+        # Fallback: any "euro" or "eur" pattern
+        euro_text_matches = list(re.finditer(r'(?:euro|eur)\s*(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{2}))', text, re.IGNORECASE))
+        if euro_text_matches:
+            last_match = euro_text_matches[-1]
+            value_str = last_match.group(1).replace(".", "").replace(",", ".")
+            value = float(value_str)
+            if 10 <= value <= 100000:
+                return value
+
+        return None
+
+    @staticmethod
+    def _extract_period(text: str) -> Optional[Tuple[str, str]]:
+        """
+        Extract billing period start and end dates.
+        Supports Italian date format (gg/mm/aaaa) and many language variants.
+        """
+        # Italian date formats with various prefix keywords
+        period_patterns = [
+            # "Periodo dal ... al ..." (Italian)
+            r'periodo\s*(?:di\s*)?(?:riferimento\s*)?(?:dal|dall[ae]?)\s*(\d{1,2}[/\-\.]\d{1,2}[/\-\.]\d{2,4})\s*(?:al|a\s*)\s*(\d{1,2}[/\-\.]\d{1,2}[/\-\.]\d{2,4})',
+            # "dal ... al ..." (generic Italian)
+            r'(?<!\w)(?:dal|dall[ae]?)\s*(\d{1,2}[/\-\.]\d{1,2}[/\-\.]\d{2,4})\s*(?:al|a\s*)\s*(\d{1,2}[/\-\.]\d{1,2}[/\-\.]\d{2,4})',
+            # "from ... to/until ..." (English)
+            r'(?<!\w)(?:from)\s*(\d{1,2}[/\-\.]\d{1,2}[/\-\.]\d{2,4})\s*(?:to|until|through)\s*(\d{1,2}[/\-\.]\d{1,2}[/\-\.]\d{2,4})',
+            # "du ... au ..." (French)
+            r'(?<!\w)(?:du)\s*(\d{1,2}[/\-\.]\d{1,2}[/\-\.]\d{2,4})\s*(?:au)\s*(\d{1,2}[/\-\.]\d{1,2}[/\-\.]\d{2,4})',
+            # "vom ... bis ..." (German)
+            r'(?<!\w)(?:vom)\s*(\d{1,2}[/\-\.]\d{1,2}[/\-\.]\d{2,4})\s*(?:bis)\s*(\d{1,2}[/\-\.]\d{1,2}[/\-\.]\d{2,4})',
+            # Period / date range with generic separator
+            r'period(?:o)?\s*[:=]?\s*(\d{1,2}[/\-\.]\d{1,2}[/\-\.]\d{2,4})\s*[–\-]\s*(\d{1,2}[/\-\.]\d{1,2}[/\-\.]\d{2,4})',
+            # Date range with just a dash between two dates
+            r'(\d{1,2}[/\-\.]\d{1,2}[/\-\.]\d{4})\s*[–\-]\s*(\d{1,2}[/\-\.]\d{1,2}[/\-\.]\d{4})',
+            # "Mese di riferimento" with single date
+            r'mese\s*(?:di\s*)?riferimento\s*[:=]?\s*(\d{1,2}[/\-\.]\d{1,2}[/\-\.]\d{4})',
+        ]
+
+        for pattern in period_patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                groups = match.groups()
+                start = groups[0]
+                end = groups[1] if len(groups) > 1 and groups[1] else None
+
+                # Normalize date separators to /
+                start = start.replace("-", "/").replace(".", "/")
+                
+                if end:
+                    end = end.replace("-", "/").replace(".", "/")
+                    return (start, end)
+                else:
+                    # Single date: estimate end as start + 1 month
+                    try:
+                        parts = start.split("/")
+                        if len(parts) == 3:
+                            from datetime import datetime
+                            dt = datetime(int(parts[2]) if len(parts[2]) == 4 else 2000 + int(parts[2]),
+                                          int(parts[1]), int(parts[0]))
+                            # Estimate period end as end of month
+                            import calendar
+                            last_day = calendar.monthrange(dt.year, dt.month)[1]
+                            end_str = f"{last_day:02d}/{dt.month:02d}/{dt.year}"
+                            return (start, end_str)
+                    except:
+                        pass
+                    return (start, start)
+
+        return None
+
+    @staticmethod
+    def _extract_pod_pdr(text: str) -> Optional[str]:
+        """Extract POD (electricity) or PDR (gas) code from Italian bills."""
+        # Common Italian POD/PDR formats: ITxxxE... or numbers
+        pod_pdr_patterns = [
+            r'(?:pod|pdr)\s*[:;=]?\s*([a-z0-9]{6,})',
+            r'(?:codice\s*(?:pod|pdr))\s*[:;=]?\s*([a-z0-9]{6,})',
+            r'it\d{3,}[a-z]\d+',  # Italian format IT001E12345...
+            r'(?:meter|matricola|contatore)\s*[:;=]?\s*([a-z0-9]{5,})',
+            r'n[°o]\s*(?:matricola|contatore)\s*[:;=]?\s*([a-z0-9]{5,})',
+        ]
+        for pattern in pod_pdr_patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                code = match.group(0) if match.group(0) != match.group(1) else match.group(1)
+                # For the ITxxx pattern, the whole match is the code
+                if re.match(r'it\d{3,}', code, re.IGNORECASE):
+                    return code.upper()
+                return match.group(1).upper()
+        return None
 
     @staticmethod
     def process_accounting_data(
