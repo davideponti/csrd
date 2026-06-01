@@ -184,13 +184,15 @@ class DataCollectorService:
         - "Energia attiva: 2.525 kWh"
         """
         # High-priority: "consumo" or "energia attiva" followed by kWh value
+        # IMPORTANT: exclude values followed by "/Smc" (calorific power ratio, NOT consumption)
         high_priority = [
-            r'consumo\s*(?:totale\s*)?[:=]?\s*(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d+)?)\s*kwh',
-            r'consumo\s*(?:totale\s*)?[:=]?\s*(\d+[.,]?\d*)\s*kwh',
+            r'energia\s+consumata\s*[:=]?\s*(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d+)?)\s*kwh(?!/smc)',
+            r'consumo\s*(?:totale\s*)?[:=]?\s*(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d+)?)\s*kwh(?!/smc)',
+            r'consumo\s*(?:totale\s*)?[:=]?\s*(\d+[.,]?\d*)\s*kwh(?!/smc)',
             r'energia\s+attiva\s*[:=]?\s*(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d+)?)',
-            r'consumo\s*(?:annuo\s*)?[:=]?\s*(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d+)?)\s*kwh',
-            r'consumption\s*[:=]?\s*(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d+)?)\s*kwh',
-            r'consommation\s*[:=]?\s*(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d+)?)\s*kwh',
+            r'consumo\s*(?:annuo\s*)?[:=]?\s*(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d+)?)\s*kwh(?!/smc)',
+            r'consumption\s*[:=]?\s*(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d+)?)\s*kwh(?!/smc)',
+            r'consommation\s*[:=]?\s*(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d+)?)\s*kwh(?!/smc)',
         ]
         
         for pattern in high_priority:

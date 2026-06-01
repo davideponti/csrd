@@ -730,12 +730,12 @@ export default function EmissionsPage() {
                 </div>
               </CardContent>
             </Card>
-            <Card className="bg-green-50 dark:bg-green-900 border-green-200 dark:border-green-600">
+            <Card className="bg-green-50 dark:bg-green-800 border-green-200 dark:border-green-500">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm text-green-700 dark:text-green-300">Totale</CardTitle>
+                <CardTitle className="text-sm text-green-700 dark:text-green-200">Totale</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-green-700 dark:text-green-300">
+                <div className="text-2xl font-bold text-green-700 dark:text-green-200">
                   {summary?.summary?.total?.toFixed(2) ?? '0'} <span className="text-sm">tCO₂e</span>
                 </div>
               </CardContent>
@@ -1312,7 +1312,7 @@ export default function EmissionsPage() {
 
                 {billParseResult && (
                   <div className="mt-3 space-y-2 text-sm">
-                    <div className={`p-3 rounded-lg ${billParseResult.success ? 'bg-green-50 dark:bg-green-900' : 'bg-red-50 dark:bg-red-950'}`}>
+                    <div className={`p-3 rounded-lg ${billParseResult.success ? 'bg-green-50 dark:bg-green-800' : 'bg-red-50 dark:bg-red-950'}`}>
                       <div className="flex items-center gap-2 mb-2">
                         {billParseResult.success ? (
                           <CheckCircle2 className="h-4 w-4 text-green-600" />
