@@ -1312,48 +1312,69 @@ export default function EmissionsPage() {
 
                 {billParseResult && (
                   <div className="mt-3 space-y-2 text-sm">
-                    <div className={`p-3 rounded-lg ${billParseResult.success ? 'bg-green-50 dark:bg-green-800' : 'bg-red-50 dark:bg-red-950'}`}>
-                      <div className="flex items-center gap-2 mb-2">
-                        {billParseResult.success ? (
-                          <CheckCircle2 className="h-4 w-4 text-green-600" />
-                        ) : (
-                          <AlertTriangle className="h-4 w-4 text-red-600" />
-                        )}
-                        <span className="font-medium">{billParseResult.success ? 'Dati estratti con successo' : 'Estrazione fallita'}</span>
-                      </div>
-                      <div className="space-y-1 text-xs">
-                        <div className="flex justify-between">
-                          <span>Fornitore:</span>
-                          <span className="font-medium">{billParseResult.provider || 'N/D'}</span>
+                    {/* Supporta sia formato nuovo che legacy */}
+                    {(() => {
+                      // Normalizza: nuovo formato o legacy
+                      const hasNewFormat = 'fornitore' in billParseResult
+                      const success = hasNewFormat
+                        ? (billParseResult.confidenza >= 30)
+                        : billParseResult.success
+                      const provider = hasNewFormat ? billParseResult.fornitore : billParseResult.provider
+                      const tipo = hasNewFormat ? billParseResult.tipo : billParseResult.bill_type
+                      const consumo = hasNewFormat ? billParseResult.consumo_kwh : billParseResult.consumption_kwh
+                      const costo = hasNewFormat ? billParseResult.costo_euro : billParseResult.total_cost_eur
+                      const periodoInizio = hasNewFormat ? billParseResult.periodo_inizio : billParseResult.period_start
+                      const periodoFine = hasNewFormat ? billParseResult.periodo_fine : billParseResult.period_end
+                      const podPdr = hasNewFormat ? billParseResult.pod_pdr : billParseResult.pod_pdr_code
+                      const confidenza = hasNewFormat ? billParseResult.confidenza : Math.round((billParseResult.confidence || 0) * 100)
+
+                      return (
+                        <div className={`p-3 rounded-lg ${confidenza >= 50 ? 'bg-green-50 dark:bg-green-800' : confidenza >= 30 ? 'bg-yellow-50 dark:bg-yellow-800' : 'bg-red-50 dark:bg-red-950'}`}>
+                          <div className="flex items-center gap-2 mb-2">
+                            {confidenza >= 50 ? (
+                              <CheckCircle2 className="h-4 w-4 text-green-600" />
+                            ) : (
+                              <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                            )}
+                            <span className="font-medium">
+                              {confidenza >= 50 ? 'Dati estratti' : confidenza >= 30 ? 'Estrazione parziale' : 'Estrazione incerta'}
+                            </span>
+                            <Badge variant={confidenza >= 50 ? 'default' : 'outline'} className={`ml-auto text-xs ${confidenza >= 70 ? 'bg-green-500' : confidenza >= 50 ? 'bg-yellow-500' : 'bg-red-500'}`}>
+                              {confidenza}%
+                            </Badge>
+                          </div>
+                          <div className="space-y-1 text-xs">
+                            <div className="flex justify-between">
+                              <span>Fornitore:</span>
+                              <span className="font-medium">{provider || 'N/D'}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Tipo:</span>
+                              <span className="font-medium capitalize">{tipo || 'N/D'}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Consumo:</span>
+                              <span className="font-medium">{consumo ? `${consumo} kWh` : 'N/D'}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Costo:</span>
+                              <span className="font-medium">{costo ? `€${costo.toFixed(2)}` : 'N/D'}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Periodo:</span>
+                              <span className="font-medium">{periodoInizio || '?'} → {periodoFine || '?'}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>POD/PDR:</span>
+                              <span className="font-medium">{podPdr || 'N/D'}</span>
+                            </div>
+                          </div>
                         </div>
-                        <div className="flex justify-between">
-                          <span>Tipo:</span>
-                          <span className="font-medium capitalize">{billParseResult.bill_type || 'N/D'}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Consumo:</span>
-                          <span className="font-medium">{billParseResult.consumption_kwh || 'N/D'} kWh</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Costo:</span>
-                          <span className="font-medium">{billParseResult.total_cost_eur ? `€${billParseResult.total_cost_eur}` : 'N/D'}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Periodo:</span>
-                          <span className="font-medium">{billParseResult.period_start || '?'} → {billParseResult.period_end || '?'}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>POD/PDR:</span>
-                          <span className="font-medium">{billParseResult.pod_pdr_code || 'N/D'}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Confidenza:</span>
-                          <span className="font-medium">{Math.round(billParseResult.confidence * 100)}%</span>
-                        </div>
-                      </div>
-                    </div>
+                      )
+                    })()}
                   </div>
                 )}
+
               </CardContent>
             </Card>
 
