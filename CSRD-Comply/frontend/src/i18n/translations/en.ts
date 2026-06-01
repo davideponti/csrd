@@ -189,6 +189,28 @@ const translations: Record<string, string> = {
   'how.interactive.report.emissions': 'Emissions inventory',
   'how.interactive.report.switch': 'Switch report format',
 
+  // FAQ Interactive
+  'faq.search': 'Search in frequently asked questions...',
+  'faq.noresults': 'No results found for',
+  'faq.feedback': 'Was this helpful?',
+  'faq.feedback.yes': 'Yes',
+  'faq.feedback.no': 'No',
+  'faq.results': 'results',
+  'faq.result': 'result',
+  'pricing.employee': 'employee',
+  'pricing.employees.count': 'employees',
+
+  // Pricing Interactive
+  'pricing.monthly': 'Monthly',
+  'pricing.yearly': 'Yearly',
+  'pricing.year': '/year',
+  'pricing.savings': 'Savings',
+  'pricing.saving.badge': 'Save 20%',
+  'pricing.employees': 'Number of employees',
+  'pricing.suggested': 'Recommended plan for you',
+  'pricing.annual.total': 'Annual total',
+  'pricing.annual.saving': 'Annual savings',
+
   'lang.select': 'Select language',
 }
 export default translations

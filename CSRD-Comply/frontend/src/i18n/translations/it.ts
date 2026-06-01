@@ -210,6 +210,28 @@ const translations = {
   'how.interactive.report.emissions': 'Inventario emissioni',
   'how.interactive.report.switch': 'Cambia formato report',
 
+  // FAQ Interactive
+  'faq.search': 'Cerca nelle domande frequenti...',
+  'faq.noresults': 'Nessun risultato trovato per',
+  'faq.feedback': 'È stato utile?',
+  'faq.feedback.yes': 'Sì',
+  'faq.feedback.no': 'No',
+  'faq.results': 'risultati',
+  'faq.result': 'risultato',
+  'pricing.employee': 'dipendente',
+  'pricing.employees.count': 'dipendenti',
+
+  // Pricing Interactive
+  'pricing.monthly': 'Mensile',
+  'pricing.yearly': 'Annuale',
+  'pricing.year': '/anno',
+  'pricing.savings': 'Risparmi',
+  'pricing.saving.badge': 'Risparmia il 20%',
+  'pricing.employees': 'Numero dipendenti',
+  'pricing.suggested': 'Piano consigliato per te',
+  'pricing.annual.total': 'Totale annuale',
+  'pricing.annual.saving': 'Risparmio annuale',
+
   // Lang selector
   'lang.select': 'Seleziona lingua',
 }
