@@ -5,10 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui'
 import { Button } from '@/components/ui'
 import { Input } from '@/components/ui'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui'
-import { Save, User, Building, Palette, Loader2, Eye, EyeOff } from 'lucide-react'
+import { Save, User, Building, Palette, Loader2 } from 'lucide-react'
 import { companies } from '@/lib/api'
+import { useTheme } from '@/components/ThemeProvider'
 
 export default function SettingsPage() {
+  const { theme, setTheme } = useTheme()
   const [companyName, setCompanyName] = useState('')
   const [vatId, setVatId] = useState('')
   const [country, setCountry] = useState('')
@@ -268,9 +270,24 @@ export default function SettingsPage() {
                 Il tema chiaro/scuro può essere configurato dalle preferenze di sistema.
               </p>
               <div className="flex gap-2">
-                <Button variant="outline">Tema Chiaro</Button>
-                <Button variant="outline">Tema Scuro</Button>
-                <Button variant="outline">Sistema</Button>
+                <Button
+                  variant={theme === 'light' ? 'default' : 'outline'}
+                  onClick={() => setTheme('light')}
+                >
+                  Tema Chiaro
+                </Button>
+                <Button
+                  variant={theme === 'dark' ? 'default' : 'outline'}
+                  onClick={() => setTheme('dark')}
+                >
+                  Tema Scuro
+                </Button>
+                <Button
+                  variant={theme === 'system' ? 'default' : 'outline'}
+                  onClick={() => setTheme('system')}
+                >
+                  Sistema
+                </Button>
               </div>
             </CardContent>
           </Card>
