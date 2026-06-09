@@ -92,7 +92,11 @@ export default function AssessmentPage() {
     setLoading(true)
     try {
       await assessments.saveQuestionnaireResponses(selectedAssessment, questionnaireResponses)
-      setShowSuccessDialog({ title: 'Questionario Salvato', message: 'Il questionario di contesto è stato salvato con successo.' })
+      // ⭐ FIX: Auto-redirect to IRO tab after submitting questionnaire, with AI generation dialog
+      setActiveTab('iros')
+      // Show AI dialog automatically so user can immediately generate IROs
+      setTimeout(() => setShowAiDialog(true), 300)
+      setShowSuccessDialog({ title: '✅ Questionario Completato!', message: 'Il questionario di contesto è stato salvato con successo.\n\n📋 SEI STATO REINDIRIZZATO ALLA SEZIONE IRO (tab "IRO" sopra).\n➡️ Clicca "Genera IRO" per creare gli Impatti, Rischi e Opportunità sulla base dei dati che hai appena inserito.\n\n💡 Suggerimento: usa la "Generazione AI" per IRO personalizzati basati sul tuo settore.' })
     } catch (err: any) {
       setError(err.message)
     }
@@ -369,6 +373,37 @@ export default function AssessmentPage() {
               <CardTitle className="text-lg">Questionario di Contesto Aziendale</CardTitle>
             </CardHeader>
             <CardContent>
+              {/* ╔══════════════════════════════════════════════════════╗
+                   ║  BANNER ISTRUZIONI: STEP 1 → STEP 2                ║
+                   ╚══════════════════════════════════════════════════════╝ */}
+              <div className="mb-4 p-4 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/40 dark:to-purple-950/40 rounded-lg border-2 border-blue-200 dark:border-blue-800 shadow-sm">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center shrink-0">
+                    <span className="text-lg font-bold text-blue-600 dark:text-blue-400">1</span>
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-semibold text-blue-700 dark:text-blue-300 text-sm">📋 PASSO 1: Compila il questionario</h4>
+                    <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                      Rispondi a tutte le domande sul contesto aziendale. 
+                      Al termine, premi <strong>"Salva Questionario"</strong> qui sotto.
+                    </p>
+                  </div>
+                  <div className="hidden sm:flex items-center">
+                    <span className="text-2xl text-blue-300 dark:text-blue-600">→</span>
+                  </div>
+                  <div className="w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-900 flex items-center justify-center shrink-0">
+                    <span className="text-lg font-bold text-purple-600 dark:text-purple-400">2</span>
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-semibold text-purple-700 dark:text-purple-300 text-sm">🎯 PASSO 2: Genera IRO</h4>
+                    <p className="text-xs text-purple-600 dark:text-purple-400 mt-1">
+                      Dopo aver salvato, <strong>verrai automaticamente reindirizzato</strong> alla tab 
+                      <strong> "IRO"</strong> per creare Impatti, Rischi e Opportunità!
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               {questionnaire ? (
                 <div>
                   <div className="mb-4 p-3 bg-primary/5 rounded-lg border border-primary/10">
@@ -382,6 +417,7 @@ export default function AssessmentPage() {
                       )}
                     </p>
                   </div>
+
 
                   {(Array.isArray(questionnaire.phases) ? questionnaire.phases : Object.values(questionnaire.phases || {})).map((phase: any, idx: number) => (
                     <div key={idx} className="mb-6">

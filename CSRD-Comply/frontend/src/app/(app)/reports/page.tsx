@@ -17,6 +17,7 @@ import {
 import { Progress } from "@/components/ui/progress"
 import { Input } from "@/components/ui/input"
 import { api } from "@/lib/api"
+import { FileText, Download, CheckCircle2, Send, Eye, AlertTriangle } from 'lucide-react'
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -26,6 +27,7 @@ interface Report {
   title: string
   status: "draft" | "review" | "final" | "filed"
   xbrl_validation_passed?: boolean | null
+  xhtml_content?: string | null
   filed_at?: string | null
   filed_to?: string | null
 }
@@ -47,10 +49,10 @@ interface StepStatus {
 // ── Helpers ────────────────────────────────────────────────────
 
 const statusColors: Record<string, string> = {
-  draft: "bg-yellow-100 text-yellow-800 border-yellow-200",
-  review: "bg-blue-100 text-blue-800 border-blue-200",
-  final: "bg-green-100 text-green-800 border-green-200",
-  filed: "bg-gray-100 text-gray-800 border-gray-200",
+  draft: "bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-950 dark:text-yellow-300 dark:border-yellow-800",
+  review: "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800",
+  final: "bg-green-100 text-green-800 border-green-200 dark:bg-green-950 dark:text-green-300 dark:border-green-800",
+  filed: "bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700",
 }
 
 const statusLabels: Record<string, string> = {
@@ -84,6 +86,7 @@ export default function ReportsPage() {
   const [reviewComment, setReviewComment] = useState("")
   const [reviewDialogOpen, setReviewDialogOpen] = useState(false)
   const [approving, setApproving] = useState(false)
+  const [validatingId, setValidatingId] = useState<string | null>(null)
 
   // ── Load reports ─────────────────────────────────────────────
 
@@ -154,7 +157,17 @@ export default function ReportsPage() {
 
     setGenerating(false)
     await loadReports()
+    // ⭐ Auto-fetch validation dopo la generazione riuscita
+    try {
+      const data: ValidationResult = await api.get(
+        `/reports/${reportId}/validation`
+      )
+      setValidation(data)
+    } catch (err) {
+      // silent — validation might not be available yet
+    }
   }
+
 
   // ── Preview ──────────────────────────────────────────────────
 
@@ -171,6 +184,7 @@ export default function ReportsPage() {
   // ── Validation ───────────────────────────────────────────────
 
   const fetchValidation = async (reportId: string) => {
+    setValidatingId(reportId)
     try {
       const data: ValidationResult = await api.get(
         `/reports/${reportId}/validation`
@@ -178,6 +192,8 @@ export default function ReportsPage() {
       setValidation(data)
     } catch (err) {
       console.error("Failed to fetch validation:", err)
+    } finally {
+      setValidatingId(null)
     }
   }
 
@@ -238,6 +254,11 @@ export default function ReportsPage() {
     }
   }
 
+  // ── Check if report has content ──────────────────────────────
+  const reportHasContent = (report: Report) => {
+    return report.xbrl_validation_passed !== null || report.status !== "draft"
+  }
+
   // ── Render Card ──────────────────────────────────────────────
 
   const renderReportCard = (report: Report) => {
@@ -245,6 +266,7 @@ export default function ReportsPage() {
     const isDraft = report.status === "draft"
     const isReview = report.status === "review"
     const isFinal = report.status === "final"
+    const hasContent = reportHasContent(report)
 
     return (
       <Card key={report.id} className="mb-4">
@@ -273,23 +295,21 @@ export default function ReportsPage() {
                 {generating ? `Step ${currentStep}/5...` : `Genera Report ${report.reporting_year}`}
               </Button>
             )}
-            {isFinal && (
-              <>
-                {["pdf", "ixbrl", "xlsx", "docx", "json"].map((fmt) => (
-                  <Button
-                    key={fmt}
-                    size="sm"
-                    variant="outline"
-                    onClick={() => exportReport(report.id, fmt)}
-                    disabled={exportingFormat === fmt}
-                  >
-                    {exportingFormat === fmt
-                      ? "Esportazione..."
-                      : fmt.toUpperCase()}
-                  </Button>
-                ))}
-              </>
-            )}
+            {/* Export sempre visibili per tutti gli stati */}
+            {["pdf", "ixbrl", "xlsx", "docx", "json"].map((fmt) => (
+              <Button
+                key={fmt}
+                size="sm"
+                variant="outline"
+                onClick={() => exportReport(report.id, fmt)}
+                disabled={exportingFormat === fmt}
+              >
+                {exportingFormat === fmt
+                  ? "Esportazione..."
+                  : fmt === "ixbrl" ? "iXBRL"
+                  : fmt.toUpperCase()}
+              </Button>
+            ))}
             <Button
               size="sm"
               variant="ghost"
@@ -299,9 +319,8 @@ export default function ReportsPage() {
                 } else {
                   setExpandingId(report.id)
                   fetchPreview(report.id)
-                  if (report.xbrl_validation_passed !== null) {
-                    fetchValidation(report.id)
-                  }
+                  // ⭐ FIX: Prova sempre a fetchare la validazione, non solo quando hasContent
+                  fetchValidation(report.id)
                 }
               }}
             >
@@ -360,7 +379,7 @@ export default function ReportsPage() {
                     <div className="grid grid-cols-3 gap-4">
                       <Card>
                         <CardContent className="pt-4 text-center">
-                          <p className="text-2xl font-bold text-green-600">
+                          <p className="text-2xl font-bold text-green-600 dark:text-green-400">
                             {validation.errors.length}
                           </p>
                           <p className="text-xs text-muted-foreground">Errori</p>
@@ -368,7 +387,7 @@ export default function ReportsPage() {
                       </Card>
                       <Card>
                         <CardContent className="pt-4 text-center">
-                          <p className="text-2xl font-bold text-amber-600">
+                          <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">
                             {validation.warnings.length}
                           </p>
                           <p className="text-xs text-muted-foreground">Warning</p>
@@ -376,7 +395,7 @@ export default function ReportsPage() {
                       </Card>
                       <Card>
                         <CardContent className="pt-4 text-center">
-                          <p className="text-2xl font-bold text-blue-600">
+                          <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
                             {validation.total_checks}
                           </p>
                           <p className="text-xs text-muted-foreground">Controlli</p>
@@ -390,7 +409,7 @@ export default function ReportsPage() {
                         {validation.warnings.map((w, i) => (
                           <div
                             key={i}
-                            className="flex items-start gap-2 p-2 mb-2 bg-amber-50 rounded border border-amber-200"
+                            className="flex items-start gap-2 p-2 mb-2 bg-amber-50 dark:bg-amber-950 rounded border border-amber-200 dark:border-amber-800"
                           >
                             <span className="text-amber-500 mt-0.5">⚠</span>
                             <div>
@@ -407,27 +426,66 @@ export default function ReportsPage() {
                     <p className="text-xs text-muted-foreground">
                       Esito:{ " " }
                       {validation.passed ? (
-                        <span className="text-green-600 font-medium">SUCCESSO</span>
+                        <span className="text-green-600 dark:text-green-400 font-medium">SUCCESSO</span>
                       ) : (
-                        <span className="text-red-600 font-medium">FALLITO</span>
+                        <span className="text-red-600 dark:text-red-400 font-medium">FALLITO</span>
                       )}
                     </p>
+                    
+                    {/* ⭐ FIX: Pulsante per validare manualmente anche se già generato */}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => fetchValidation(report.id)}
+                      disabled={validatingId === report.id}
+                    >
+                      {validatingId === report.id ? "Validazione..." : "Esegui Validazione"}
+                    </Button>
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground">
-                    Genera il report e poi esegui la validazione.
-                  </p>
+                  <div className="space-y-3">
+                    <p className="text-sm text-muted-foreground">
+                      Clicca "Esegui Validazione" per verificare la conformità iXBRL del report.
+                      La validazione controlla il tagging XBRL, la completezza dei datapoint 
+                      e la conformità agli standard ESRS.
+                    </p>
+                    <Button
+                      size="sm"
+                      onClick={() => fetchValidation(report.id)}
+                      disabled={validatingId === report.id}
+                    >
+                      {validatingId === report.id ? "Validazione in corso..." : "Esegui Validazione"}
+                    </Button>
+                  </div>
                 )}
               </TabsContent>
 
               {/* ── Review Tab ────────────────────────────────── */}
               <TabsContent value="review">
                 <div className="space-y-4">
+                  {/* ⭐ FIX: Spiegazione più chiara di cosa significa "Invia in Revisione" */}
+                  {isDraft && (
+                    <div className="p-3 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800 text-sm mb-3">
+                      <p className="font-medium text-blue-700 dark:text-blue-300 mb-1">
+                        📋 Cos'è "Invia in Revisione"?
+                      </p>
+                      <p className="text-blue-600 dark:text-blue-400 text-xs">
+                        Il report passerà dallo stato <strong>"Bozza"</strong> a <strong>"In Revisione"</strong>.
+                        Questo significa che il report non sarà più modificabile e verrà notificato 
+                        al revisore (es. ESG Manager, Compliance Officer o revisore esterno) per la 
+                        verifica finale. Puoi eventualmente aggiungere note per il revisore.
+                      </p>
+                    </div>
+                  )}
+
                   {/* Submit for Review */}
                   {isDraft && (
                     <Dialog open={reviewDialogOpen} onOpenChange={setReviewDialogOpen}>
                       <DialogTrigger asChild>
-                        <Button size="sm">Invia in Revisione</Button>
+                        <Button size="sm">
+                          <Send className="h-4 w-4 mr-2" />
+                          Invia in Revisione
+                        </Button>
                       </DialogTrigger>
                       <DialogContent>
                         <DialogHeader>
@@ -437,10 +495,15 @@ export default function ReportsPage() {
                             Revisione". Puoi aggiungere commenti per il revisore.
                           </DialogDescription>
                         </DialogHeader>
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium">Commenti</label>
+                        <div className="space-y-3">
+                          <div className="p-3 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800 text-xs text-blue-700 dark:text-blue-300">
+                            <strong>📌 Il report verrà inviato a:</strong> L'utente con ruolo "Revisore" 
+                            nella tua organizzazione riceverà una notifica. Se non è configurato, 
+                            il report sarà disponibile nella sezione Reports in stato "In Revisione".
+                          </div>
+                          <label className="text-sm font-medium">Commenti (opzionale)</label>
                           <textarea
-                            className="w-full min-h-[100px] p-2 border rounded-md"
+                            className="w-full min-h-[100px] p-2 border rounded-md bg-background text-foreground"
                             placeholder="Inserisci note per il revisore..."
                             value={reviewComment}
                             onChange={(e) => setReviewComment(e.target.value)}
@@ -454,6 +517,7 @@ export default function ReportsPage() {
                             Annulla
                           </Button>
                           <Button onClick={() => submitForReview(report.id)}>
+                            <Send className="h-4 w-4 mr-2" />
                             Invia in Revisione
                           </Button>
                         </DialogFooter>
@@ -473,8 +537,9 @@ export default function ReportsPage() {
                   )}
 
                   {isFinal && (
-                    <p className="text-sm text-green-600 font-medium">
-                      ✓ Report approvato e pronto per l'esportazione.
+                    <p className="text-sm text-green-600 dark:text-green-400 font-medium flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4" />
+                      Report approvato e pronto per l'esportazione.
                     </p>
                   )}
 
@@ -514,11 +579,14 @@ export default function ReportsPage() {
             Genera, visualizza e scarica i tuoi report di sostenibilità.
           </p>
         </div>
+        <div className="flex items-center gap-2">
+          <Button onClick={createReport}>Crea Report</Button>
+        </div>
       </div>
 
       {/* Generation progress indicator */}
       {generating && (
-        <Card className="bg-blue-50 border-blue-200">
+        <Card className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
           <CardContent className="pt-4">
             <div className="space-y-3">
               <div className="flex items-center justify-between">
@@ -542,11 +610,11 @@ export default function ReportsPage() {
                     <span
                       className={
                         s.status === "running"
-                          ? "font-medium text-blue-700"
+                          ? "font-medium text-blue-700 dark:text-blue-300"
                           : s.status === "done"
-                          ? "text-green-700"
+                          ? "text-green-700 dark:text-green-300"
                           : s.status === "error"
-                          ? "text-red-700"
+                          ? "text-red-700 dark:text-red-300"
                           : "text-muted-foreground"
                       }
                     >
@@ -564,8 +632,9 @@ export default function ReportsPage() {
       {reports.length === 0 ? (
         <Card>
           <CardContent className="pt-6 text-center">
+            <FileText className="h-12 w-12 mx-auto mb-3 text-muted-foreground opacity-50" />
             <p className="text-muted-foreground">
-              Nessun report ancora. Crea un assessment per iniziare.
+              Nessun report ancora. Clicca "Crea Report" per iniziare.
             </p>
             <Button className="mt-4" onClick={createReport}>Crea Primo Report</Button>
           </CardContent>

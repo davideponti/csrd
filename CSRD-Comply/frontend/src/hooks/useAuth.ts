@@ -5,32 +5,32 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || '/api/v1'
 
 interface AuthState {
   user: { email: string; company_name: string } | null
-  token: string | null
   loading: boolean
 }
 
+/**
+ * 🔒 SICUREZZA: L'autenticazione usa SOLO cookie HttpOnly (XSS-safe).
+ * Il JWT non è mai accessibile via JavaScript. Il browser lo invia
+ * automaticamente con ogni richiesta grazie a `credentials: 'include'`.
+ * 
+ * NESSUNA operazione localStorage — il token esiste solo nel cookie
+ * impostato dal backend (HttpOnly, Secure, SameSite=None).
+ */
 export function useAuth() {
   const [state, setState] = useState<AuthState>({
     user: null,
-    token: null,
     loading: true,
   })
 
   const checkSession = useCallback(async () => {
-    const token = localStorage.getItem('access_token')
-    if (!token) {
-      setState({ user: null, token: null, loading: false })
-      return false
-    }
     try {
       const res = await fetch(`${API_BASE}/auth/me`, {
-        headers: { 'Authorization': `Bearer ${token}` },
+        credentials: 'include', // ← Il browser invia automaticamente il cookie HttpOnly
       })
       if (res.ok) {
         const data = await res.json()
         setState({
           user: { email: data.email, company_name: data.company_name || '' },
-          token,
           loading: false,
         })
         return true
@@ -38,8 +38,7 @@ export function useAuth() {
     } catch {
       // Not authenticated
     }
-    localStorage.removeItem('access_token')
-    setState({ user: null, token: null, loading: false })
+    setState({ user: null, loading: false })
     return false
   }, [])
 
@@ -51,6 +50,7 @@ export function useAuth() {
     const res = await fetch(`${API_BASE}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include', // ← Il backend imposta il cookie HttpOnly nella response
       body: JSON.stringify({ email, password }),
     })
     if (!res.ok) {
@@ -58,7 +58,8 @@ export function useAuth() {
       throw new Error(err.detail || 'Login failed')
     }
     const data = await res.json()
-    if (data.access_token) localStorage.setItem('access_token', data.access_token)
+    // 🔒 Non salvare MAI il token in localStorage!
+    // Il backend imposta il cookie HttpOnly automaticamente.
     await checkSession()
     return data
   }, [checkSession])
@@ -67,6 +68,7 @@ export function useAuth() {
     const res = await fetch(`${API_BASE}/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include', // ← Il backend imposta il cookie HttpOnly nella response
       body: JSON.stringify({ email, password, company_name }),
     })
     if (!res.ok) {
@@ -74,28 +76,26 @@ export function useAuth() {
       throw new Error(err.detail || 'Registration failed')
     }
     const data = await res.json()
-    if (data.access_token) localStorage.setItem('access_token', data.access_token)
+    // 🔒 Non salvare MAI il token in localStorage!
     await checkSession()
     return data
   }, [checkSession])
 
   const logout = useCallback(async () => {
-    localStorage.removeItem('access_token')
     try {
-      const token = localStorage.getItem('access_token')
       await fetch(`${API_BASE}/auth/logout`, {
         method: 'POST',
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+        credentials: 'include',
       })
     } catch {
       // Ignore errors
     }
-    setState({ user: null, token: null, loading: false })
+    setState({ user: null, loading: false })
   }, [])
 
   return {
     ...state,
-    isAuthenticated: !!state.token,
+    isAuthenticated: !!state.user,
     login,
     register,
     logout,

@@ -138,7 +138,12 @@ def send_report_ready(
     data: SendReportRequest,
     current_user: User = Depends(get_current_user),
 ):
-    """Send a report ready notification."""
+    """Send a report ready notification. Admin-only."""
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admins can send report-ready notifications",
+        )
     success = svc_send_report(
         to_email=data.email,
         name=data.name,

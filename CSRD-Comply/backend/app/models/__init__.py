@@ -67,6 +67,7 @@ class User(TimestampMixin, Base):
     email_verified = Column(Boolean, default=False, nullable=False)
     otp_code = Column(String(6), nullable=True)
     otp_expires_at = Column(DateTime, nullable=True)
+    otp_attempts = Column(Integer, default=0, nullable=False)
     reset_password_token = Column(String(255), nullable=True)
     reset_password_expires_at = Column(DateTime, nullable=True)
 

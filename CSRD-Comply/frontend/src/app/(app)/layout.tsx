@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { OnboardingWizard, useOnboarding } from '@/components/OnboardingWizard'
+import { ThemeProvider, ThemeSwitcher } from '@/components/ThemeProvider'
 
 const navItems = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -26,6 +27,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
+    <ThemeProvider>
     <ErrorBoundary>
     <div className="flex h-screen">
       {/* Onboarding Wizard — shown for new users */}
@@ -37,7 +39,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       )}
 
       {/* Sidebar */}
-      <aside className="w-64 bg-white border-r border-border p-4 flex flex-col">
+      <aside className="w-64 bg-background border-r border-border p-4 flex flex-col">
+
         <Link href="/" className="text-xl font-bold text-primary mb-8 px-3">
           CSRD Comply
         </Link>
@@ -66,11 +69,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       {/* Main content */}
       <main className="flex-1 overflow-auto bg-background">
-        <header className="bg-white border-b border-border px-6 py-4 flex items-center justify-between">
+        <header className="bg-background border-b border-border px-6 py-4 flex items-center justify-between">
+
           <h1 className="text-xl font-semibold text-foreground">
             CSRD Comply
           </h1>
           <div className="flex items-center gap-4">
+            <ThemeSwitcher />
             <button className="p-2 rounded-full hover:bg-accent text-muted-foreground">
               <Bell className="h-5 w-5" />
             </button>
@@ -84,7 +89,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
 
         {/* Footer */}
-        <footer className="bg-white border-t border-border px-6 py-4">
+        <footer className="bg-background border-t border-border px-6 py-4">
+
           <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-muted-foreground">
             <div>
               &copy; {new Date().getFullYear()} CSRD Comply. Tutti i diritti riservati.
@@ -102,5 +108,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </main>
     </div>
     </ErrorBoundary>
+    </ThemeProvider>
   )
 }

@@ -283,7 +283,11 @@ function ResultCard({ result }: { result: any }) {
             </div>
             <div className="flex justify-between">
               <span>Market-based:</span>
-              <span className="font-semibold">{result.market_based?.total_tco2e} tCO₂e</span>
+              <span className="font-semibold">
+                {result.market_based?.has_green_tariff && result.market_based?.total_tco2e === 0
+                  ? "0.0 (coperto da GO/I-REC)"
+                  : `${result.market_based?.total_tco2e} tCO₂e`}
+              </span>
             </div>
             {result.difference_tco2e > 0 && (
               <div className="flex justify-between text-muted-foreground">
@@ -296,9 +300,15 @@ function ResultCard({ result }: { result: any }) {
               <span>{result.location_based.emission_factor_kgco2e_per_kwh} kgCO₂e/kWh</span>
             </div>
             {result.market_based?.has_green_tariff && (
-              <Badge variant="outline" className="mt-1 text-green-600 border-green-300">
-                Tariffa Verde Certificata
-              </Badge>
+              <div className="mt-2 space-y-1">
+                <Badge variant="outline" className="text-green-600 border-green-300">
+                  Tariffa Verde Certificata
+                </Badge>
+                <p className="text-xs text-green-600 dark:text-green-400">
+                  ⚡ Emissioni market-based pari a zero perché coperte da Garanzie d'Origine (GO/I-REC).
+                  ESRS E1-6 richiede dual reporting: il valore 0 è corretto per contratti certificati.
+                </p>
+              </div>
             )}
           </div>
         )}
@@ -384,13 +394,19 @@ function ValidationPanel({ result }: { result: any }) {
   )
 }
 
-// ── Main Page ───────────────────────────────────────────────────
+  // ── Main Page ───────────────────────────────────────────────────
 
-export default function EmissionsPage() {
+  export default function EmissionsPage() {
   // Active tab
   const [activeTab, setActiveTab] = useState('overview')
   // Report year
   const [reportYear, setReportYear] = useState(new Date().getFullYear())
+  // Baseline 2025
+  const [baseline2025, setBaseline2025] = useState({
+    scope1: '', scope2: '', scope3: '',
+    scope2_market_based: '',
+  })
+
   // Loading & Error
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -611,19 +627,40 @@ export default function EmissionsPage() {
   // ── Save Result ───────────────────────────────────────────────
   const handleSaveResult = async (scope: string, result: any) => {
     try {
-      await emissionsApi.saveCalculated({
-        reporting_year: reportYear,
-        scope,
-        total_tco2e: result.total_tco2e || result.total || 0,
-        category: String(result.categories?.[0]?.name || result.method || "scope3"),
-        calculation_method: result.method || 'calculator',
-      })
+      // Scope 2: salva sia location-based che market-based
+      if (scope === '2' && result.location_based && result.market_based) {
+        // Salva location-based
+        await emissionsApi.saveCalculated({
+          reporting_year: reportYear,
+          scope: '2',
+          total_tco2e: result.location_based.total_tco2e,
+          category: 'scope2_location_based',
+          calculation_method: 'location_based',
+        })
+        // Salva market-based
+        await emissionsApi.saveCalculated({
+          reporting_year: reportYear,
+          scope: '2',
+          total_tco2e: result.market_based.total_tco2e,
+          category: 'scope2_market_based',
+          calculation_method: 'market_based',
+        })
+      } else {
+        await emissionsApi.saveCalculated({
+          reporting_year: reportYear,
+          scope,
+          total_tco2e: result.total_tco2e || result.total || 0,
+          category: String(result.categories?.[0]?.name || result.method || "scope3"),
+          calculation_method: result.method || 'calculator',
+        })
+      }
       await loadEmissions()
       await loadSummary()
     } catch (e: any) {
       setError('Errore nel salvataggio: ' + e.message)
     }
   }
+
 
   // ── Reset Forms ───────────────────────────────────────────────
   const resetScope1 = () => {
@@ -746,6 +783,108 @@ export default function EmissionsPage() {
             <ValidationPanel result={summary.validation} />
           )}
 
+          {/* ═══ BASELINE 2025 ═══ */}
+          <Card className="border-blue-200 dark:border-blue-800">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <TrendingUp className="h-5 w-5 text-blue-600" />
+                Baseline 2025 — Confronto Anno Precedente
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground mb-4">
+                Inserisci i valori del 2025 come anno base. Il calcolatore mostrerà la variazione percentuale.
+                Richiesto da ESRS E1-6 e GHG Protocol per il trend analysis.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="p-3 bg-muted rounded-lg">
+                  <label className="text-xs font-medium text-muted-foreground block mb-1">Scope 1 — 2025</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      className="flex-1 px-2 py-1 text-sm border border-input rounded-md bg-background"
+                      placeholder="0"
+                      value={baseline2025.scope1}
+                      onChange={(e) => setBaseline2025({...baseline2025, scope1: e.target.value})}
+                      min="0"
+                      step="0.01"
+                    />
+                    <span className="text-xs text-muted-foreground">tCO₂e</span>
+                  </div>
+                </div>
+                <div className="p-3 bg-muted rounded-lg">
+                  <label className="text-xs font-medium text-muted-foreground block mb-1">Scope 2 — 2025</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      className="flex-1 px-2 py-1 text-sm border border-input rounded-md bg-background"
+                      placeholder="0"
+                      value={baseline2025.scope2}
+                      onChange={(e) => setBaseline2025({...baseline2025, scope2: e.target.value})}
+                      min="0"
+                      step="0.01"
+                    />
+                    <span className="text-xs text-muted-foreground">tCO₂e</span>
+                  </div>
+                </div>
+                <div className="p-3 bg-muted rounded-lg">
+                  <label className="text-xs font-medium text-muted-foreground block mb-1">Scope 3 — 2025</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      className="flex-1 px-2 py-1 text-sm border border-input rounded-md bg-background"
+                      placeholder="0"
+                      value={baseline2025.scope3}
+                      onChange={(e) => setBaseline2025({...baseline2025, scope3: e.target.value})}
+                      min="0"
+                      step="0.01"
+                    />
+                    <span className="text-xs text-muted-foreground">tCO₂e</span>
+                  </div>
+                </div>
+                <div className="p-3 bg-muted rounded-lg">
+                  <label className="text-xs font-medium text-muted-foreground block mb-1">Scope 2 Market-based — 2025</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      className="flex-1 px-2 py-1 text-sm border border-input rounded-md bg-background"
+                      placeholder="0"
+                      value={baseline2025.scope2_market_based}
+                      onChange={(e) => setBaseline2025({...baseline2025, scope2_market_based: e.target.value})}
+                      min="0"
+                      step="0.01"
+                    />
+                    <span className="text-xs text-muted-foreground">tCO₂e</span>
+                  </div>
+                </div>
+              </div>
+              {/* Variazione percentuale se ci sono dati */}
+              {(() => {
+                const curTotal = (summary?.summary?.total ?? 0)
+                const baseTotal = [baseline2025.scope1, baseline2025.scope2, baseline2025.scope3]
+                  .map(v => parseFloat(v) || 0)
+                  .reduce((a, b) => a + b, 0)
+                if (baseTotal > 0 && curTotal > 0) {
+                  const change = ((curTotal - baseTotal) / baseTotal * 100).toFixed(1)
+                  const isPositive = parseFloat(change) > 0
+                  return (
+                    <div className={`mt-3 p-2 rounded-lg text-sm flex items-center gap-2 ${
+                      isPositive ? 'bg-red-50 dark:bg-red-950 text-red-700' : 'bg-green-50 dark:bg-green-950 text-green-700'
+                    }`}>
+                      {isPositive ? '⬆' : '⬇'}
+                      <span>Variazione rispetto al 2025:</span>
+                      <strong>{isPositive ? '+' : ''}{change}%</strong>
+                      <span className="text-xs text-muted-foreground">
+                        ({curTotal.toFixed(2)} vs {baseTotal.toFixed(2)} tCO₂e)
+                      </span>
+                    </div>
+                  )
+                }
+                return null
+              })()}
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
@@ -753,6 +892,7 @@ export default function EmissionsPage() {
                 Emissioni Registrate ({reportYear})
               </CardTitle>
             </CardHeader>
+
             <CardContent>
               {savedEmissions.length === 0 ? (
                 <p className="text-muted-foreground text-sm">

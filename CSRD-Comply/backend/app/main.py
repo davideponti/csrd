@@ -99,19 +99,36 @@ async def log_requests(request: Request, call_next):
 
 # ── Request Size Limit Middleware (DoS Protection) ──────────────
 class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
-    """Limita la dimensione massima delle richieste per prevenire DoS."""
+    """Limita la dimensione massima delle richieste per prevenire DoS.
+    
+    Legge il body effettivo per bypassare lo spoofing di Content-Length
+    (es. chunked Transfer-Encoding con Content-Length falso).
+    """
     
     def __init__(self, app, max_size_mb: int = 10):
         super().__init__(app)
         self.max_size_bytes = max_size_mb * 1024 * 1024
     
     async def dispatch(self, request: Request, call_next):
+        # Check both Content-Length and actual body size
         content_length = request.headers.get("content-length")
         if content_length and int(content_length) > self.max_size_bytes:
             return JSONResponse(
                 status_code=413,
                 content={"detail": f"Request too large. Maximum size: {self.max_size_bytes // (1024*1024)}MB"},
             )
+        
+        # Read body to enforce actual size limit (catches chunked encoding bypass)
+        try:
+            body = await request.body()
+            if len(body) > self.max_size_bytes:
+                return JSONResponse(
+                    status_code=413,
+                    content={"detail": f"Request too large. Maximum size: {self.max_size_bytes // (1024*1024)}MB"},
+                )
+        except Exception:
+            pass
+        
         return await call_next(request)
 
 app.add_middleware(RequestSizeLimitMiddleware, max_size_mb=settings.MAX_REQUEST_SIZE_MB)
@@ -178,15 +195,17 @@ async def root(request: Request):
     return {
         "message": "CSRD Comply API",
         "version": "1.0.0",
-        "multitenancy_enabled": settings.ENABLE_MULTITENANCY,
-        "environment": settings.ENVIRONMENT,
     }
 
 
 @app.get("/health")
 @limiter.limit("10/minute")
 async def health(request: Request):
-    """Health endpoint with real service dependency checks."""
+    """Health endpoint with real service dependency checks.
+    
+    Note: Returns only boolean/status info, no internal details
+    that could aid infrastructure fingerprinting.
+    """
     health_status = {"status": "healthy", "checks": {}}
 
     # Check database connectivity
@@ -194,10 +213,8 @@ async def health(request: Request):
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
         health_status["checks"]["database"] = "ok"
-    except Exception as e:
+    except Exception:
         health_status["status"] = "degraded"
-        health_status["checks"]["database"] = f"error: {str(e)}"
-
-    health_status["multitenancy"] = settings.ENABLE_MULTITENANCY
+        health_status["checks"]["database"] = "error"
 
     return health_status

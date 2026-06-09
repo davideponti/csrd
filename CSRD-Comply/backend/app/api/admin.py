@@ -16,9 +16,19 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def require_admin(user: User = Depends(get_current_user)) -> User:
+    """Dependency che verifica che l'utente sia admin."""
+    if user.role != "admin":
+        raise HTTPException(
+            status_code=403,
+            detail="Admin access required. Only administrators can perform this operation.",
+        )
+    return user
+
+
 @router.post("/seed-datapoints")
 def seed_esrs_datapoints(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
     """
@@ -27,7 +37,7 @@ def seed_esrs_datapoints(
     Legge il file EFRAG IG 3 (data/efrag_ig3_datapoints.xlsx) o usa fallback JSON/minimal.
     Crea solo datapoint mancanti, non duplica.
     
-    Richiede: utente autenticato (qualsiasi ruolo)
+    Richiede: utente admin
     """
     try:
         # Ottieni datapoint (prima Excel, poi fallback JSON, poi minimali)

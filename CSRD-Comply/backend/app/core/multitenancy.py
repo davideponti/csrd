@@ -5,6 +5,7 @@ Manages data isolation between tenants (companies) via:
 - Automatic injection of company_id filter in queries
 - Schema-based isolation (optional, for enterprise deployment)
 """
+from contextvars import ContextVar
 from fastapi import Request, HTTPException, Depends
 from fastapi.responses import JSONResponse
 from sqlalchemy import event, text
@@ -23,32 +24,36 @@ logger = logging.getLogger(__name__)
 
 # ── Tenant Context ──────────────────────────────────────────────
 
+# ContextVar per tenant context thread-safe (ASGI-compatible)
+_tenant_id_var: ContextVar[Optional[str]] = ContextVar("tenant_id", default=None)
+_schema_var: ContextVar[Optional[str]] = ContextVar("schema", default=None)
+
+
 class TenantContext:
-    """Thread-safe tenant context storage.
+    """Thread/async-safe tenant context storage.
     
+    Uses contextvars for proper isolation in ASGI/async contexts.
     Populated by middleware for each request.
     Used by automatic SQLAlchemy query filters.
     """
-    _tenant_id: Optional[str] = None
-    _schema: Optional[str] = None
 
     @classmethod
     def set(cls, tenant_id: Optional[str], schema: Optional[str] = None):
-        cls._tenant_id = tenant_id
-        cls._schema = schema
+        _tenant_id_var.set(tenant_id)
+        _schema_var.set(schema)
 
     @classmethod
     def get_tenant_id(cls) -> Optional[str]:
-        return cls._tenant_id
+        return _tenant_id_var.get()
 
     @classmethod
     def get_schema(cls) -> Optional[str]:
-        return cls._schema
+        return _schema_var.get()
 
     @classmethod
     def clear(cls):
-        cls._tenant_id = None
-        cls._schema = None
+        _tenant_id_var.set(None)
+        _schema_var.set(None)
 
 
 _VALID_SCHEMA_RE = re.compile(r'^[a-zA-Z][a-zA-Z0-9_]*$')
@@ -68,7 +73,7 @@ class MultitenancyMiddleware(BaseHTTPMiddleware):
     2. Decodes the token to get company_id and schema
     3. Sets the TenantContext
     4. Logs request with tenant info
-    5. Cleans up context after response
+    5. Cleans up context after request
     """
 
     async def dispatch(
@@ -174,7 +179,7 @@ def get_tenant_db() -> Session:
         tenant_id = TenantContext.get_tenant_id()
         if tenant_id and tenant_id != "public":
             # Set PostgreSQL schema/search_path for schema-based isolation
-            # ⚠️ SECURITY FIX: validate schema name to prevent SQL injection
+            # ⚠️ SECURITY: validate schema name to prevent SQL injection
             schema = TenantContext.get_schema() or f"tenant_{tenant_id[:8].replace('-', '_')}"
             if not _validate_schema_name(schema):
                 logger.warning(f"Invalid schema name rejected: {schema[:30]}")

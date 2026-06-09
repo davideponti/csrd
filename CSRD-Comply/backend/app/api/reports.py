@@ -1,7 +1,7 @@
 """CSRD Comply — Report endpoints, including export (Step 22) and generation pipeline (Step 28)."""
 import logging
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Dict, Any, List
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -233,8 +233,13 @@ def generate_report_step(
 
 
 def _compile_esrs_data(report, db):
-    """Step 1: Compile ESRS data from existing assessment data and generate a full CSRD report."""
-    from app.models import Assessment, EmissionData, Company
+    """Step 1: Compile ESRS data from existing assessment data and generate a full CSRD report.
+
+    Filtra i datapoint/materialità per includere SOLO quelli marcati come materiali,
+    in modo che il report contenga solo le sezioni ESRS rilevanti (circa 4-8 topic,
+    non tutti i 320+ datapoint).
+    """
+    from app.models import Assessment, EmissionData, Company, MaterialityScore, EsrsDatapoint
     from ai_engine.report_generator.template_engine import ReportTemplate
 
     company = db.query(Company).filter(
@@ -296,15 +301,37 @@ def _compile_esrs_data(report, db):
     if scope3_n1 > 0:
         emissions_data["scope3_n1"] = scope3_n1
 
-    material_standards = ["ESRS E1"] if (scope1_total + scope2_location_total + scope3_total) > 0 else []
+    # ── Determina standard materiali dal materiality assessment ──
+    material_standards = set()
+
+    # E1 è materiale se ci sono emissioni
+    if (scope1_total + scope2_location_total + scope3_total) > 0:
+        material_standards.add("ESRS E1")
+
     if assessment:
-        from app.models import MaterialityScore
-        material_scores = db.query(MaterialityScore).filter(
-            MaterialityScore.assessment_id == assessment.id,
-            MaterialityScore.is_material == True,
-        ).count()
-        if material_scores > 0:
-            material_standards.append("ESRS E1")
+        # Query tutti gli score materiali per trovare gli standard associati
+        material_scores = (
+            db.query(MaterialityScore)
+            .filter(
+                MaterialityScore.assessment_id == assessment.id,
+                MaterialityScore.is_material == True,
+            )
+            .all()
+        )
+
+        for score in material_scores:
+            datapoint = db.query(EsrsDatapoint).filter(
+                EsrsDatapoint.id == score.datapoint_id
+            ).first()
+            if datapoint:
+                # Estrai lo standard ESRS (es. "ESRS E1" da "ESRS E1-6.54")
+                std_ref = datapoint.standard_ref
+                std_parts = std_ref.split("-")
+                if std_parts:
+                    base_std = std_parts[0].strip()
+                    material_standards.add(base_std)
+
+    material_standards_list = sorted(material_standards)
 
     template = ReportTemplate.create_default_template(
         company_name=company_name,
@@ -314,7 +341,10 @@ def _compile_esrs_data(report, db):
     template.company_country = company.country if company else ""
     template.employee_count = company.employee_count or 0
 
-    template.set_materiality(material_standards)
+    template.set_materiality(material_standards_list)
+
+    # Rimuovi le sezioni non materiali dal template
+    template.remove_non_material_sections(material_standards_list)
 
     if emissions_data:
         template.populate_ghg_section(emissions_data)
@@ -514,7 +544,7 @@ def approve_report(
         )
 
     report.status = ReportStatus.FINAL
-    report.approved_at = datetime.utcnow()
+    report.approved_at = datetime.now(timezone.utc)
     report.approved_by = current_user.id
     db.commit()
 
@@ -545,7 +575,19 @@ def preview_report(
     return HTMLResponse(content=safe_html)
 
 
+def _calc_change(current: float, baseline: float) -> str:
+    """Calculate percentage change between current and baseline values."""
+    if current == 0 and baseline == 0:
+        return "—"
+    if baseline == 0 or baseline is None:
+        return "N/A (no baseline)"
+    change = ((current - baseline) / baseline) * 100
+    sign = "+" if change > 0 else ""
+    return f"{sign}{change:.1f}%"
+
+
 def _generate_preview_html(report) -> str:
+
     """Generate a preview HTML from report data when no XHTML exists yet."""
     gap = report.gap_analysis_results or {}
     tables = report.table_data or {}
@@ -567,15 +609,51 @@ th {{ background: #2b6cb0; color: white; }}
 <hr/>
 <h2>ESRS 2 — General Information</h2>
 <p>{narratives.get('esrs2_general', 'Report generated via CSRD Comply pipeline.')}</p>
-<h2>ESRS E1 — Climate Change</h2>
-<h3>E1-6 — Gross GHG Emissions</h3>
-<table>
-<tr><th>Emission Category</th><th>tCO2e</th></tr>
-<tr><td>Scope 1</td><td>{tables.get('ghg_emissions', {}).get('scope1', 'N/A')}</td></tr>
-<tr><td>Scope 2 (Location-based)</td><td>{tables.get('ghg_emissions', {}).get('scope2_location', 'N/A')}</td></tr>
-<tr><td>Scope 3</td><td>{tables.get('ghg_emissions', {}).get('scope3', 'N/A')}</td></tr>
-<tr><td><strong>Total</strong></td><td><strong>{tables.get('ghg_emissions', {}).get('total', 'N/A')}</strong></td></tr>
-</table>
+    <h2>ESRS E1 — Climate Change</h2>
+    <h3>E1-6 — Gross GHG Emissions (Dual Reporting: Location-based & Market-based)</h3>
+    <table>
+    <tr><th>Emission Category</th><th>2026 (tCO2e)</th><th>2025 Baseline (tCO2e)</th><th>Change (%)</th></tr>
+    <tr>
+      <td>Scope 1</td>
+      <td>{tables.get('ghg_emissions', {}).get('scope1', 'N/A')}</td>
+      <td>{tables.get('ghg_emissions', {}).get('scope1_baseline', '—')}</td>
+      <td>{_calc_change(tables.get('ghg_emissions', {}).get('scope1', 0), tables.get('ghg_emissions', {}).get('scope1_baseline', 0))}</td>
+    </tr>
+    <tr>
+      <td>Scope 2 (Location-based)</td>
+      <td>{tables.get('ghg_emissions', {}).get('scope2_location', 'N/A')}</td>
+      <td>{tables.get('ghg_emissions', {}).get('scope2_location_baseline', '—')}</td>
+      <td>{_calc_change(tables.get('ghg_emissions', {}).get('scope2_location', 0), tables.get('ghg_emissions', {}).get('scope2_location_baseline', 0))}</td>
+    </tr>
+    <tr style="background:#f0fdf4;">
+      <td><strong>Scope 2 (Market-based) ⭐</strong></td>
+      <td><strong>{tables.get('ghg_emissions', {}).get('scope2_market', 'N/A')}</strong></td>
+      <td><strong>{tables.get('ghg_emissions', {}).get('scope2_market_baseline', '—')}</strong></td>
+      <td><strong>{_calc_change(tables.get('ghg_emissions', {}).get('scope2_market', 0), tables.get('ghg_emissions', {}).get('scope2_market_baseline', 0))}</strong></td>
+    </tr>
+    <tr>
+      <td>Scope 3</td>
+      <td>{tables.get('ghg_emissions', {}).get('scope3', 'N/A')}</td>
+      <td>{tables.get('ghg_emissions', {}).get('scope3_baseline', '—')}</td>
+      <td>{_calc_change(tables.get('ghg_emissions', {}).get('scope3', 0), tables.get('ghg_emissions', {}).get('scope3_baseline', 0))}</td>
+    </tr>
+    <tr>
+      <td><strong>Total</strong></td>
+      <td><strong>{tables.get('ghg_emissions', {}).get('total', 'N/A')}</strong></td>
+      <td><strong>{tables.get('ghg_emissions', {}).get('total_baseline', '—')}</strong></td>
+      <td><strong>{_calc_change(tables.get('ghg_emissions', {}).get('total', 0), tables.get('ghg_emissions', {}).get('total_baseline', 0))}</strong></td>
+    </tr>
+    </table>
+    <p style="font-size:0.8em;color:#666;margin-top:4px;">
+      ⚠️ ESRS E1-6 richiede il <strong>dual reporting</strong>: sia Location-based che Market-based.
+      Il Market-based (riga evidenziata) riflette contratti di energia rinnovabile (GO/I-REC).
+      Se pari a zero, significa che acquisti energia da fonti rinnovabili certificate.
+    </p>
+    <p style="font-size:0.8em;color:#666;">
+      📅 Anno di riferimento (Baseline): 2025. La colonna "Change (%)" mostra la variazione 
+      rispetto all'anno base. Per il primo anno di rendicontazione CSRD il comparativo è facoltativo.
+    </p>
+
 <h2>Gap Analysis</h2>
 <p>Coverage: {gap.get('coverage_percentage', 'N/A')}%</p>
 <p>Missing datapoints: {gap.get('datapoints_missing', 'N/A')}</p>
@@ -631,8 +709,8 @@ def get_validation_result(
             }
             db.commit()
 
-            errors_list = [i.to_dict() for i in validation_result.issues if i.severity in ("FATAL", "ERROR")]
-            warnings_list = [i.to_dict() for i in validation_result.issues if i.severity == "WARNING"]
+            errors_list = [i.to_dict() for i in validation_result.issues if i.severity.upper() in ("FATAL", "ERROR")]
+            warnings_list = [i.to_dict() for i in validation_result.issues if i.severity.upper() == "WARNING"]
 
             return ValidationResultResponse(
                 passed=validation_result.passed,
@@ -643,16 +721,19 @@ def get_validation_result(
         except Exception as e:
             logger.error(f"On-demand validation error: {e}", exc_info=True)
 
-    # Fallback: return stored validation data
+    # Fallback: return minimal validation over 4 key datapoints only
     return ValidationResultResponse(
         passed=report.xbrl_validation_passed or False,
         errors=[],
         warnings=[
-            {"datapoint": "ESRS E1-6.44(a)", "description": "Dati Scope 3 non verificati da terza parte"},
-            {"datapoint": "ESRS S1-10", "description": "Dati infortuni mancanti per categoria lavoratore"},
+            {"datapoint": "ESRS E1-6 Scope 1", "description": "Verifica completezza dati emissioni dirette"},
+            {"datapoint": "ESRS E1-6 Scope 2 Location", "description": "Verifica completezza dati emissioni indirette (location-based)"},
+            {"datapoint": "ESRS E1-6 Scope 2 Market", "description": "Verifica completezza dati emissioni indirette (market-based) — dual reporting"},
+            {"datapoint": "ESRS E1-6 Scope 3", "description": "Verifica completezza dati emissioni catena del valore"},
         ],
-        total_checks=142,
+        total_checks=4,
     )
+
 
 
 
@@ -679,16 +760,24 @@ def _prepare_export_options(request: ExportRequest) -> ExportOptions:
     )
 
 
+def _sanitize_filename(filename: str) -> str:
+    """Sanitize filename to prevent CRLF injection and path traversal."""
+    sanitized = filename.replace("\n", "").replace("\r", "").replace("\0", "")
+    sanitized = "".join(c for c in sanitized if c.isalnum() or c in "._- ")
+    return sanitized.strip()
+
+
 def _create_export_response(result: ExportResult) -> Response:
     """Create FastAPI Response from ExportResult."""
     if not result.success:
         raise HTTPException(status_code=500, detail=f"Export failed: {result.error_message}")
 
+    safe_filename = _sanitize_filename(result.filename)
     return Response(
         content=result.content,
         media_type=result.mime_type,
         headers={
-            "Content-Disposition": f'attachment; filename="{result.filename}"',
+            "Content-Disposition": f'attachment; filename="{safe_filename}"',
             "Content-Length": str(result.size_bytes),
             "X-Export-Format": result.format,
             "X-Export-Success": "true",
@@ -769,12 +858,13 @@ def export_professional_pdf(
         )
 
         filename = f"CSRD_Report_{company_name.replace(' ', '_')}_{report.reporting_year}.pdf"
+        safe_filename = _sanitize_filename(filename)
 
         return Response(
             content=pdf_bytes,
             media_type="application/pdf",
             headers={
-                "Content-Disposition": f'attachment; filename="{filename}"',
+                "Content-Disposition": f'attachment; filename="{safe_filename}"',
                 "Content-Length": str(len(pdf_bytes)),
             },
         )
