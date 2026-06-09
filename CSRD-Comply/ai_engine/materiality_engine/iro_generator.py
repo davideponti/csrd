@@ -205,6 +205,129 @@ GENERIC_IROS = [
      "default_impact_scale": 1, "default_financial_magnitude": 1, "severity": "low"},
 ]
 
+# ── IRO di fallback per settori non coperti nel database ──────
+GENERIC_SECTOR_IROS: Dict[str, List[Dict]] = {
+    # Energy Supply (D)
+    "D": [
+        {"id": "D_E1_IRO_001", "type": "impact", "topic": "ESRS E1",
+         "name": "Emissioni GHG da produzione energetica",
+         "description": "Emissioni significative di CO2 e GHG dalla generazione di energia da fonti fossili",
+         "default_impact_scale": 4, "default_financial_magnitude": 4, "severity": "high",
+         "applicability_factors": {"min_employees": 0, "sectors": ["D"]}},
+        {"id": "D_E1_IRO_002", "type": "opportunity", "topic": "ESRS E1",
+         "name": "Transizione a rinnovabili",
+         "description": "Opportunità di crescita nell'energia da fonti rinnovabili e decarbonizzazione",
+         "default_impact_scale": 3, "default_financial_magnitude": 5, "severity": "high",
+         "applicability_factors": {"min_employees": 0, "sectors": ["D"]}},
+        {"id": "D_E2_IRO_001", "type": "impact", "topic": "ESRS E2",
+         "name": "Inquinamento atmosferico da combustione",
+         "description": "Emissioni NOx, SOx, PM da centrali e impianti di combustione",
+         "default_impact_scale": 3, "default_financial_magnitude": 3, "severity": "medium",
+         "applicability_factors": {"min_employees": 0, "sectors": ["D"]}},
+        {"id": "D_G1_IRO_001", "type": "risk", "topic": "ESRS G1",
+         "name": "Rischio normativo su concessioni e licenze",
+         "description": "Rischio revoca concessioni e licenze per mancata conformità ESG",
+         "default_impact_scale": 3, "default_financial_magnitude": 4, "severity": "high",
+         "applicability_factors": {"min_employees": 0, "sectors": ["D"]}},
+    ],
+    # Water & Waste (E)
+    "E": [
+        {"id": "E_E3_IRO_001", "type": "impact", "topic": "ESRS E3",
+         "name": "Gestione risorse idriche",
+         "description": "Impatto su disponibilità e qualità delle risorse idriche",
+         "default_impact_scale": 4, "default_financial_magnitude": 3, "severity": "high",
+         "applicability_factors": {"min_employees": 0, "sectors": ["E"]}},
+        {"id": "E_E5_IRO_001", "type": "impact", "topic": "ESRS E5",
+         "name": "Trattamento e smaltimento rifiuti",
+         "description": "Impatto ambientale da gestione e smaltimento rifiuti solidi e liquidi",
+         "default_impact_scale": 4, "default_financial_magnitude": 3, "severity": "high",
+         "applicability_factors": {"min_employees": 0, "sectors": ["E"]}},
+        {"id": "E_E2_IRO_001", "type": "impact", "topic": "ESRS E2",
+         "name": "Inquinamento acque e suolo",
+         "description": "Rischio contaminazione da scarichi e percolati",
+         "default_impact_scale": 4, "default_financial_magnitude": 3, "severity": "high",
+         "applicability_factors": {"min_employees": 0, "sectors": ["E"]}},
+    ],
+    # ICT (J)
+    "J": [
+        {"id": "J_E1_IRO_001", "type": "impact", "topic": "ESRS E1",
+         "name": "Consumo energetico data center",
+         "description": "Elevato consumo elettrico per data center e infrastrutture IT",
+         "default_impact_scale": 3, "default_financial_magnitude": 3, "severity": "medium",
+         "applicability_factors": {"min_employees": 0, "sectors": ["J"]}},
+        {"id": "J_S1_IRO_001", "type": "impact", "topic": "ESRS S1",
+         "name": "Benessere digitale e carico lavoro",
+         "description": "Rischio burnout e stress da iperconnessione e carichi di lavoro intensivi",
+         "default_impact_scale": 3, "default_financial_magnitude": 2, "severity": "medium",
+         "applicability_factors": {"min_employees": 0, "sectors": ["J", "M"]}},
+        {"id": "J_S4_IRO_001", "type": "risk", "topic": "ESRS S4",
+         "name": "Privacy e protezione dati utenti",
+         "description": "Rischio violazione dati personali e sanzioni GDPR",
+         "default_impact_scale": 3, "default_financial_magnitude": 4, "severity": "high",
+         "applicability_factors": {"min_employees": 0, "sectors": ["J", "M", "K"]}},
+        {"id": "J_E5_IRO_001", "type": "impact", "topic": "ESRS E5",
+         "name": "Rifiuti elettronici (e-waste)",
+         "description": "Smaltimento apparecchiature IT e componenti elettroniche",
+         "default_impact_scale": 2, "default_financial_magnitude": 1, "severity": "low",
+         "applicability_factors": {"min_employees": 0, "sectors": ["ALL"]}},
+    ],
+    # Finance & Insurance (K)
+    "K": [
+        {"id": "K_E1_IRO_001", "type": "impact", "topic": "ESRS E1",
+         "name": "Impronta carbonio finanziata (Scope 3)",
+         "description": "Emissioni GHG indirette da portafoglio investimenti e finanziamenti",
+         "default_impact_scale": 3, "default_financial_magnitude": 4, "severity": "high",
+         "applicability_factors": {"min_employees": 0, "sectors": ["K"]}},
+        {"id": "K_G1_IRO_001", "type": "risk", "topic": "ESRS G1",
+         "name": "Rischio conformità e antiriciclaggio",
+         "description": "Rischio sanzioni da mancata conformità normativa finanziaria e antiriciclaggio",
+         "default_impact_scale": 3, "default_financial_magnitude": 5, "severity": "high",
+         "applicability_factors": {"min_employees": 0, "sectors": ["K"]}},
+        {"id": "K_S4_IRO_001", "type": "impact", "topic": "ESRS S4",
+         "name": "Trasparenza e tutela consumatori finanziari",
+         "description": "Impatto su consumatori per trasparenza prodotti finanziari e assicurativi",
+         "default_impact_scale": 3, "default_financial_magnitude": 4, "severity": "high",
+         "applicability_factors": {"min_employees": 0, "sectors": ["K"]}},
+    ],
+    # Hospitality (I)
+    "I": [
+        {"id": "I_E1_IRO_001", "type": "impact", "topic": "ESRS E1",
+         "name": "Consumi energetici strutture ricettive",
+         "description": "Elevati consumi energetici per riscaldamento, climatizzazione e servizi",
+         "default_impact_scale": 3, "default_financial_magnitude": 3, "severity": "medium",
+         "applicability_factors": {"min_employees": 0, "sectors": ["I"]}},
+        {"id": "I_E5_IRO_001", "type": "impact", "topic": "ESRS E5",
+         "name": "Rifiuti e spreco alimentare",
+         "description": "Produzione rifiuti e spreco alimentare in strutture ristorazione e ricettive",
+         "default_impact_scale": 3, "default_financial_magnitude": 2, "severity": "medium",
+         "applicability_factors": {"min_employees": 0, "sectors": ["I"]}},
+        {"id": "I_S1_IRO_001", "type": "impact", "topic": "ESRS S1",
+         "name": "Condizioni lavoro stagionali",
+         "description": "Gestione personale stagionale, turni e condizioni di lavoro",
+         "default_impact_scale": 3, "default_financial_magnitude": 2, "severity": "medium",
+         "applicability_factors": {"min_employees": 0, "sectors": ["I", "A"]}},
+    ],
+    # Real Estate (L)
+    "L": [
+        {"id": "L_E1_IRO_001", "type": "impact", "topic": "ESRS E1",
+         "name": "Efficienza energetica edifici",
+         "description": "Impatto energetico del portafoglio immobiliare e costi di gestione",
+         "default_impact_scale": 3, "default_financial_magnitude": 4, "severity": "high",
+         "applicability_factors": {"min_employees": 0, "sectors": ["L", "F"]}},
+        {"id": "L_E1_IRO_002", "type": "opportunity", "topic": "ESRS E1",
+         "name": "Riqualificazione energetica immobili",
+         "description": "Opportunità di valorizzazione tramite efficientamento e certificazioni green",
+         "default_impact_scale": 2, "default_financial_magnitude": 4, "severity": "medium",
+         "applicability_factors": {"min_employees": 0, "sectors": ["L"]}},
+        {"id": "L_S4_IRO_001", "type": "impact", "topic": "ESRS S4",
+         "name": "Accessibilità e inclusività spazi",
+         "description": "Accessibilità edifici per persone con disabilità e inclusione sociale",
+         "default_impact_scale": 2, "default_financial_magnitude": 2, "severity": "low",
+         "applicability_factors": {"min_employees": 0, "sectors": ["L"]}},
+    ],
+}
+
+
 # ── Benchmark di settore per scoring iniziale ──────────────────
 SECTOR_BENCHMARKS: Dict[str, Dict[str, Any]] = {
     "C": {
@@ -267,7 +390,88 @@ SECTOR_BENCHMARKS: Dict[str, Dict[str, Any]] = {
         "typical_impact_range": (2.0, 3.5),
         "typical_financial_range": (2.0, 3.5),
     },
+    "B": {
+        "name": "Attività Estrattive",
+        "carbon_intensity": "high",
+        "water_intensity": "high",
+        "waste_intensity": "high",
+        "social_risk": "high",
+        "governance_risk": "high",
+        "typical_impact_range": (3.5, 5.0),
+        "typical_financial_range": (3.0, 5.0),
+    },
+    "D": {
+        "name": "Fornitura Energia",
+        "carbon_intensity": "high",
+        "water_intensity": "medium",
+        "waste_intensity": "medium",
+        "social_risk": "low",
+        "governance_risk": "medium",
+        "typical_impact_range": (3.0, 5.0),
+        "typical_financial_range": (3.0, 4.5),
+    },
+    "E": {
+        "name": "Acqua e Rifiuti",
+        "carbon_intensity": "medium",
+        "water_intensity": "high",
+        "waste_intensity": "high",
+        "social_risk": "medium",
+        "governance_risk": "medium",
+        "typical_impact_range": (2.5, 4.5),
+        "typical_financial_range": (2.5, 4.0),
+    },
+    "I": {
+        "name": "Servizi Alloggio e Ristorazione",
+        "carbon_intensity": "medium",
+        "water_intensity": "high",
+        "waste_intensity": "medium",
+        "social_risk": "medium",
+        "governance_risk": "low",
+        "typical_impact_range": (2.0, 3.5),
+        "typical_financial_range": (2.0, 3.0),
+    },
+    "J": {
+        "name": "ICT",
+        "carbon_intensity": "low",
+        "water_intensity": "low",
+        "waste_intensity": "low",
+        "social_risk": "medium",
+        "governance_risk": "high",
+        "typical_impact_range": (1.5, 3.0),
+        "typical_financial_range": (2.0, 3.5),
+    },
+    "K": {
+        "name": "Servizi Finanziari",
+        "carbon_intensity": "low",
+        "water_intensity": "low",
+        "waste_intensity": "low",
+        "social_risk": "medium",
+        "governance_risk": "very_high",
+        "typical_impact_range": (1.5, 3.0),
+        "typical_financial_range": (3.0, 5.0),
+    },
+    "L": {
+        "name": "Attività Immobiliari",
+        "carbon_intensity": "medium",
+        "water_intensity": "low",
+        "waste_intensity": "medium",
+        "social_risk": "low",
+        "governance_risk": "medium",
+        "typical_impact_range": (2.0, 3.5),
+        "typical_financial_range": (2.5, 4.0),
+    },
+    "N": {
+        "name": "Noleggio e Servizi di Supporto",
+        "carbon_intensity": "low",
+        "water_intensity": "low",
+        "waste_intensity": "low",
+        "social_risk": "medium",
+        "governance_risk": "medium",
+        "typical_impact_range": (1.5, 3.0),
+        "typical_financial_range": (2.0, 3.5),
+    },
 }
+
 
 
 class IROGenerator:
@@ -382,26 +586,42 @@ class IROGenerator:
         sector_letter = IROGenerator.get_sector_code(company_sector)
         benchmark = IROGenerator.get_sector_benchmark(company_sector)
 
-        # 1. IRO del settore (filtrati per applicabilità)
+        # 1. IRO del settore (filtrati per applicabilità) o fallback settoriale
         sector_iros = IRO_DATABASE.get(sector_letter, [])
-        filtered_sector = IROGenerator._apply_applicability_filters(
-            sector_iros, company_sector, employee_count, company_context
-        )
+        if sector_iros:
+            filtered_sector = IROGenerator._apply_applicability_filters(
+                sector_iros, company_sector, employee_count, company_context
+            )
+        else:
+            # Usa IRO di fallback per settori non coperti nel database
+            filtered_sector = IROGenerator._apply_applicability_filters(
+                GENERIC_SECTOR_IROS.get(sector_letter, []),
+                company_sector, employee_count, company_context
+            )
 
         # 2. IRO generici (sempre applicabili)
         generic_iros = GENERIC_IROS.copy()
 
-        # 3. IRO AI-generati (se richiesto)
+        # 3. IRO dal contesto aziendale (rule-based) - SEMPRE attivi quando c'è contesto
+        context_iros = []
+        if company_context:
+            context_iros = IROGenerator._generate_rule_based_ai_iros(
+                company_sector, company_context
+            )
+
+        # 4. IRO AI-generati via LLM (solo se richiesto esplicitamente)
         ai_iros = []
         if use_ai and company_context:
             ai_iros = IROGenerator._generate_ai_iros(
                 company_sector, employee_count, company_context
             )
 
-        # 4. Merge
-        all_iros = filtered_sector + generic_iros + ai_iros
+        # 6. Merge: IRO settore + generici + contesto + AI (evitando duplicati)
+        all_iros = filtered_sector + generic_iros + context_iros + ai_iros
 
-        # 5. Applica scoring iniziale basato su benchmark
+        # 7. Applica scoring iniziale basato su benchmark
+
+
         for iro in all_iros:
             iro = IROGenerator._apply_initial_scoring(iro, benchmark)
 
@@ -481,24 +701,23 @@ class IROGenerator:
         """Genera IRO aggiuntivi usando AI/LLM."""
         ai_iros = []
 
+        # Prova a usare LLM se disponibile
         try:
-            # Prova a usare LLM se disponibile
-            try:
-                from openai import OpenAI
-                client = OpenAI()
-                ai_iros = IROGenerator._call_llm_for_iros(client, sector, employee_count, context)
-                if ai_iros:
-                    return ai_iros
-            except (ImportError, Exception):
-                logger.info("OpenAI not available, using rule-based AI IRO generation")
-
-            # Fallback rule-based AI
-            ai_iros = IROGenerator._generate_rule_based_ai_iros(sector, context)
-
+            from openai import OpenAI
+            client = OpenAI()
+            ai_iros = IROGenerator._call_llm_for_iros(client, sector, employee_count, context)
+            if ai_iros:
+                return ai_iros
+        except ImportError:
+            logger.info("OpenAI library not available — skipping LLM IRO generation")
         except Exception as e:
             logger.warning(f"AI IRO generation failed: {e}")
 
+        # No fallback rule-based here — context IROs are already generated
+        # in _generate_rule_based_ai_iros called from the main flow.
         return ai_iros
+
+
 
     @staticmethod
     def _call_llm_for_iros(
