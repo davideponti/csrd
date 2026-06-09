@@ -35,7 +35,25 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# CORS — only specific headers, no wildcards
+# ── Global 500 exception handler (con header CORS) ──────────────
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """Catch unhandled exceptions to return a safe JSON response with CORS headers."""
+    logger.error("Unhandled exception", exc_info=exc, extra={"path": request.url.path})
+    # Determina l'origine per CORS
+    origin = request.headers.get("origin", "")
+    allowed = settings._parse_origins()
+    response = JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error"},
+    )
+    if origin in allowed or "*" in allowed:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+    return response
+
+
+# ── CORS Middleware ──────────────────────────────────────────────
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings._parse_origins(),
@@ -154,13 +172,16 @@ async def run_migrations():
     from sqlalchemy import text
 
     # Add missing columns to existing tables (create_all doesn't do this)
+    # 🔴 ATTENZIONE: Mantieni sincronizzato con il modello User in models/__init__.py
     with engine.connect() as conn:
         for col, col_type in [
             ("email_verified", "BOOLEAN DEFAULT FALSE"),
-            ("otp_code", "VARCHAR(10)"),
+            ("otp_code", "VARCHAR(6)"),
             ("otp_expires_at", "TIMESTAMP"),
+            ("otp_attempts", "INTEGER DEFAULT 0"),
             ("reset_password_token", "VARCHAR(255)"),
             ("reset_password_expires_at", "TIMESTAMP"),
+            ("token_version", "INTEGER DEFAULT 0"),
         ]:
             try:
                 conn.execute(text(f"ALTER TABLE users ADD COLUMN IF NOT EXISTS {col} {col_type}"))
