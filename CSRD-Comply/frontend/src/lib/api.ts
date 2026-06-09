@@ -366,3 +366,9 @@ export const reports = {
       method: 'POST',
     }),
 }
+
+// ── Dashboard (dati reali, niente mock) ──────────────────────
+export const dashboard = {
+  get: () => request<any>('/dashboard/'),
+}
+

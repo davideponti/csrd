@@ -7,13 +7,13 @@ import { Badge } from '@/components/ui'
 import { Progress } from '@/components/ui'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui'
 import { Input } from '@/components/ui'
-import { assessments, emissions, reports } from '@/lib/api'
+import { assessments, emissions, reports, dashboard } from '@/lib/api'
 import {
   LayoutDashboard, ClipboardCheck, Leaf, FileText, Settings, Bell, User,
   TrendingUp, TrendingDown, AlertTriangle, CheckCircle2, Target, Brain,
   Calendar, ChevronRight, Sparkles, MessageCircle, X, Send, Loader2,
   BarChart3, Layers, Plus, ArrowUp, ArrowDown, Minus, Clock,
-  ExternalLink, Activity, Shield, Zap
+  ExternalLink, Activity, Shield, Zap, Inbox
 } from 'lucide-react'
 
 // ── Types ──────────────────────────────────────────────────────
@@ -77,50 +77,30 @@ interface ChatMessage {
   timestamp: Date
 }
 
-// ── Mock data fallback ────────────────────────────────────────
+// ── Stato iniziale VUOTO (nessun mock) ─────────────────────────
 
-const MOCK_DASHBOARD: DashboardData = {
-  readinessScore: 32,
+const EMPTY_DASHBOARD: DashboardData = {
+  readinessScore: 0,
   readinessColor: 'red',
   emissionsSummary: {
-    scope1: 105,
-    scope2: 75,
-    scope3: 420,
-    total: 600,
-    trend: 'down',
-    yoyChange: -8.5,
-    lastYears: [650, 620, 600],
+    scope1: 0,
+    scope2: 0,
+    scope3: 0,
+    total: 0,
+    trend: 'stable',
+    yoyChange: 0,
+    lastYears: [],
   },
-  deadlines: [
-    { id: 'd1', title: 'Completamento Assessment Materialità', date: '2026-06-15', daysRemaining: 23, severity: 'critical', category: 'Assessment' },
-    { id: 'd2', title: 'Raccolta Dati Emissioni Scope 3', date: '2026-07-31', daysRemaining: 69, severity: 'warning', category: 'Emissions' },
-    { id: 'd3', title: 'Generazione Report CSRD Annuale', date: '2026-09-30', daysRemaining: 130, severity: 'info', category: 'Reporting' },
-    { id: 'd4', title: 'Filing Report a ESAP', date: '2027-04-30', daysRemaining: 342, severity: 'info', category: 'Filing' },
-  ],
-  materialityMatrix: [
-    { impactScore: 4.2, financialScore: 3.8, isMaterial: true, topic: 'ESRS E1', count: 12 },
-    { impactScore: 3.5, financialScore: 2.1, isMaterial: true, topic: 'ESRS E2', count: 5 },
-    { impactScore: 2.8, financialScore: 4.0, isMaterial: true, topic: 'ESRS S1', count: 8 },
-    { impactScore: 1.5, financialScore: 2.0, isMaterial: false, topic: 'ESRS E3', count: 3 },
-    { impactScore: 3.2, financialScore: 2.5, isMaterial: true, topic: 'ESRS G1', count: 6 },
-  ],
-  quickActions: [
-    { id: 'qa1', label: 'Completa Gap Analysis', description: 'Identifica i datapoint ESRS mancanti', href: '/assessment', icon: 'AlertTriangle', priority: 'high', completed: false },
-    { id: 'qa2', label: 'Inserisci Dati Emissioni', description: 'Scope 1, 2 e 3 per l\'anno corrente', href: '/emissions', icon: 'Leaf', priority: 'high', completed: false },
-    { id: 'qa3', label: 'Avvia Assessment Materialità', description: 'Valutazione IRO e doppia materialità', href: '/assessment', icon: 'ClipboardCheck', priority: 'medium', completed: true },
-    { id: 'qa4', label: 'Genera Report CSRD', description: 'Report annuale con tagging iXBRL', href: '/reports', icon: 'FileText', priority: 'medium', completed: false },
-  ],
-  regulatoryUpdates: [
-    { id: 'ru1', title: 'EFARG pubblica nuove linee guida su ESRS E5', summary: 'Nuove indicazioni per il reporting sull\'economia circolare e gestione rifiuti.', date: '2026-05-15', impact: 'MODERATE', isNew: true },
-    { id: 'ru2', title: 'Omnibus Directive - Chiarimenti su threshold', summary: 'La Commissione EU chiarisce le soglie per le PMI esonerate dal reporting.', date: '2026-05-10', impact: 'INFO', isNew: true },
-    { id: 'ru3', title: 'ESMA aggiorna tassonomia XBRL per ESRS Set 2', summary: 'Nuovi elementi di tagging per report 2026 con impatti su E4 e S2.', date: '2026-04-28', impact: 'CRITICAL', isNew: false },
-  ],
+  deadlines: [],
+  materialityMatrix: [],
+  quickActions: [],
+  regulatoryUpdates: [],
   gapAnalysisStatus: {
-    total: 320,
-    complete: 45,
-    partial: 120,
-    missing: 155,
-    completionPercentage: 14,
+    total: 0,
+    complete: 0,
+    partial: 0,
+    missing: 0,
+    completionPercentage: 0,
   },
 }
 
@@ -159,6 +139,7 @@ function SparklineChart({ data, color = 'green' }: { data: number[]; color?: str
 }
 
 function DeadlinesTimeline({ deadlines }: { deadlines: DashboardData['deadlines'] }) {
+  if (!deadlines.length) return <p className="text-xs text-muted-foreground text-center py-4">Nessuna scadenza imminente</p>
   const sorted = [...deadlines].sort((a, b) => a.daysRemaining - b.daysRemaining)
   return (
     <div className="space-y-2">
@@ -185,7 +166,7 @@ function DeadlinesTimeline({ deadlines }: { deadlines: DashboardData['deadlines'
 }
 
 function MiniScatterPlot({ data }: { data: DashboardData['materialityMatrix'] }) {
-  if (!data.length) return <p className="text-xs text-muted-foreground text-center py-4">Nessun dato</p>
+  if (!data.length) return <p className="text-xs text-muted-foreground text-center py-4">Nessun dato di materialità. Completa l'assessment per vedere la matrice.</p>
 
   const w = 180, h = 150, pad = 20
   const plotW = w - pad * 2, plotH = h - pad * 2
@@ -269,10 +250,10 @@ function AiChatWidget() {
     // Simulate AI response
     setTimeout(() => {
       const responses = [
-        'In base ai dati attuali, il tuo progresso complessivo è del 32%. Ti consiglio di iniziare dalla Gap Analysis per identificare i datapoint mancanti.',
-        'Per la tua azienda (settore manifatturiero), i topic ESRS più rilevanti sono E1 (Climate Change) e S1 (Own Workforce).',
-        'La scadenza più vicina è il completamento dell\'assessment materialità tra 23 giorni. Vuoi che ti aiuti a prepararlo?',
-        'I benchmark di settore mostrano che le emissioni Scope 1 sono in linea con aziende comparabili. Ottimo lavoro!',
+        'In base ai dati attuali, il tuo progresso complessivo è calcolato dal sistema. Ti consiglio di iniziare dalla Gap Analysis per identificare i datapoint mancanti.',
+        'Per la tua azienda, i topic ESRS più rilevanti dipendono dal settore. Verifica la matrice di materialità nella dashboard.',
+        'La scadenza più vicina è evidenziata nella sezione scadenze. Vuoi che ti aiuti a prepararti?',
+        'I benchmark di settore mostrano i trend delle emissioni. Ottimo lavoro se sono in calo!',
         'Per il filing del report, ricorda che devi completare la validazione iXBRL prima dell\'invio a ESAP.',
       ]
       const resp = responses[Math.floor(Math.random() * responses.length)]
@@ -360,7 +341,7 @@ function AiChatWidget() {
 // ── Main Component ─────────────────────────────────────────────
 
 export default function DashboardPage() {
-  const [data, setData] = useState<DashboardData>(MOCK_DASHBOARD)
+  const [data, setData] = useState<DashboardData>(EMPTY_DASHBOARD)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -372,33 +353,14 @@ export default function DashboardPage() {
     setLoading(true)
     setError(null)
     try {
-      // Try to load real data from API
-      const [emissionsSummary, gapAnalysis, assessmentList, reportsList] = await Promise.allSettled([
-        emissions.getSummary(),
-        assessments.list(),
-        assessments.list(),
-        reports.list(),
-      ])
-
-      // For now use mock data with real data where available
-      const newData = { ...MOCK_DASHBOARD }
-
-      if (emissionsSummary.status === 'fulfilled' && emissionsSummary.value) {
-        const es = emissionsSummary.value.summary
-        newData.emissionsSummary = {
-          ...newData.emissionsSummary,
-          scope1: es.scope1 || 0,
-          scope2: es.scope2 || 0,
-          scope3: es.scope3 || 0,
-          total: es.total || 0,
-        }
-      }
-
-      setData(newData)
+      // Chiamata API reale al backend — niente mock
+      const dashboardData = await dashboard.get()
+      setData(dashboardData)
     } catch (err: any) {
-      setError(err.message)
-      // Fall back to mock data
-      setData(MOCK_DASHBOARD)
+      console.error('Dashboard load error:', err)
+      setError(err.message || 'Impossibile caricare i dati della dashboard')
+      // Non usiamo dati mock — mostriamo errore e stato vuoto
+      setData(EMPTY_DASHBOARD)
     }
     setLoading(false)
   }
@@ -416,6 +378,17 @@ export default function DashboardPage() {
   }
 
   const highPriorityActions = data.quickActions.filter(a => a.priority === 'high' && !a.completed)
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center space-y-4">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
+          <p className="text-sm text-muted-foreground">Caricamento dashboard...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -440,8 +413,12 @@ export default function DashboardPage() {
       </div>
 
       {error && (
-        <div className="p-3 bg-destructive/10 text-destructive rounded-lg text-sm border border-destructive/20">
-          {error}
+        <div className="p-4 bg-destructive/10 text-destructive rounded-lg text-sm border border-destructive/20">
+          <p className="font-medium mb-1">Errore di caricamento</p>
+          <p>{error}</p>
+          <Button variant="outline" size="sm" className="mt-2" onClick={loadDashboardData}>
+            Riprova
+          </Button>
         </div>
       )}
 
@@ -456,43 +433,61 @@ export default function DashboardPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-center py-4">
-              <div className="relative w-28 h-28 mx-auto mb-3">
-                <svg viewBox="0 0 100 100" className="transform -rotate-90 w-full h-full">
-                  <circle cx="50" cy="50" r="42" fill="none" stroke="#e5e7eb" strokeWidth="8" />
-                  <circle
-                    cx="50" cy="50" r="42"
-                    fill="none"
-                    stroke={data.readinessColor === 'red' ? '#ef4444' : data.readinessColor === 'yellow' ? '#f59e0b' : '#22c55e'}
-                    strokeWidth="8"
-                    strokeDasharray={`${(data.readinessScore / 100) * 264} 264`}
-                    strokeLinecap="round"
-                  />
-                </svg>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-3xl font-bold text-foreground">{data.readinessScore}%</span>
+            {data.readinessScore === 0 && data.gapAnalysisStatus.total === 0 ? (
+              <div className="text-center py-6 space-y-3">
+                <Inbox className="h-10 w-10 text-muted-foreground mx-auto" />
+                <p className="text-sm text-muted-foreground">Nessun dato disponibile</p>
+                <p className="text-xs text-muted-foreground">Inserisci i dati di emissioni e completa l'assessment per vedere il tuo readiness score.</p>
+                <div className="flex gap-2 justify-center">
+                  <Button size="sm" variant="outline" asChild>
+                    <a href="/emissions">Inserisci Emissioni</a>
+                  </Button>
+                  <Button size="sm" asChild>
+                    <a href="/assessment">Avvia Assessment</a>
+                  </Button>
                 </div>
               </div>
-              <p className={`text-xs font-medium ${readinessColorClass[data.readinessColor]}`}>
-                {data.readinessScore < 30 ? 'Critico — Azioni richieste urgenti' :
-                 data.readinessScore < 70 ? 'In Progress — Continuare il lavoro' :
-                 'Buono — Compliance in linea'}
-              </p>
-            </div>
+            ) : (
+              <>
+                <div className="text-center py-4">
+                  <div className="relative w-28 h-28 mx-auto mb-3">
+                    <svg viewBox="0 0 100 100" className="transform -rotate-90 w-full h-full">
+                      <circle cx="50" cy="50" r="42" fill="none" stroke="#e5e7eb" strokeWidth="8" />
+                      <circle
+                        cx="50" cy="50" r="42"
+                        fill="none"
+                        stroke={data.readinessColor === 'red' ? '#ef4444' : data.readinessColor === 'yellow' ? '#f59e0b' : '#22c55e'}
+                        strokeWidth="8"
+                        strokeDasharray={`${(data.readinessScore / 100) * 264} 264`}
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <span className="text-3xl font-bold text-foreground">{data.readinessScore}%</span>
+                    </div>
+                  </div>
+                  <p className={`text-xs font-medium ${readinessColorClass[data.readinessColor]}`}>
+                    {data.readinessScore < 30 ? 'Critico — Azioni richieste urgenti' :
+                     data.readinessScore < 70 ? 'In Progress — Continuare il lavoro' :
+                     'Buono — Compliance in linea'}
+                  </p>
+                </div>
 
-            {/* Gap breakdown */}
-            <div className="space-y-2 pt-3 border-t border-border">
-              <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">Gap Analysis</span>
-                <span className="font-medium">{data.gapAnalysisStatus.completionPercentage}%</span>
-              </div>
-              <Progress value={data.gapAnalysisStatus.completionPercentage} className="h-1.5" />
-              <div className="flex justify-between text-[10px] text-muted-foreground">
-                <span className="text-green-500">{data.gapAnalysisStatus.complete} complete</span>
-                <span className="text-amber-500">{data.gapAnalysisStatus.partial} parziali</span>
-                <span className="text-red-500">{data.gapAnalysisStatus.missing} mancanti</span>
-              </div>
-            </div>
+                {/* Gap breakdown */}
+                <div className="space-y-2 pt-3 border-t border-border">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">Gap Analysis</span>
+                    <span className="font-medium">{data.gapAnalysisStatus.completionPercentage}%</span>
+                  </div>
+                  <Progress value={data.gapAnalysisStatus.completionPercentage} className="h-1.5" />
+                  <div className="flex justify-between text-[10px] text-muted-foreground">
+                    <span className="text-green-500">{data.gapAnalysisStatus.complete} complete</span>
+                    <span className="text-amber-500">{data.gapAnalysisStatus.partial} parziali</span>
+                    <span className="text-red-500">{data.gapAnalysisStatus.missing} mancanti</span>
+                  </div>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
 
@@ -501,47 +496,62 @@ export default function DashboardPage() {
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm font-medium">Emissioni GHG</CardTitle>
-              <div className="flex items-center gap-2">
-                <span className={`text-xs font-medium flex items-center gap-1 ${
-                  data.emissionsSummary.trend === 'down' ? 'text-green-500' :
-                  data.emissionsSummary.trend === 'up' ? 'text-red-500' : 'text-muted-foreground'
-                }`}>
-                  {data.emissionsSummary.trend === 'down' ? <TrendingDown className="h-3 w-3" /> :
-                   data.emissionsSummary.trend === 'up' ? <TrendingUp className="h-3 w-3" /> :
-                   <Minus className="h-3 w-3" />}
-                  {Math.abs(data.emissionsSummary.yoyChange).toFixed(1)}% YoY
-                </span>
-                <SparklineChart data={data.emissionsSummary.lastYears} color={data.emissionsSummary.trend === 'down' ? 'green' : 'red'} />
-              </div>
+              {data.emissionsSummary.total > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs font-medium flex items-center gap-1 ${
+                    data.emissionsSummary.trend === 'down' ? 'text-green-500' :
+                    data.emissionsSummary.trend === 'up' ? 'text-red-500' : 'text-muted-foreground'
+                  }`}>
+                    {data.emissionsSummary.trend === 'down' ? <TrendingDown className="h-3 w-3" /> :
+                     data.emissionsSummary.trend === 'up' ? <TrendingUp className="h-3 w-3" /> :
+                     <Minus className="h-3 w-3" />}
+                    {Math.abs(data.emissionsSummary.yoyChange).toFixed(1)}% YoY
+                  </span>
+                  <SparklineChart data={data.emissionsSummary.lastYears} color={data.emissionsSummary.trend === 'down' ? 'green' : 'red'} />
+                </div>
+              )}
             </div>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-4 gap-3 mb-4">
-              <MetricCard value={data.emissionsSummary.scope1} label="Scope 1" unit="tCO₂e" color="text-red-500" />
-              <MetricCard value={data.emissionsSummary.scope2} label="Scope 2" unit="tCO₂e" color="text-blue-500" />
-              <MetricCard value={data.emissionsSummary.scope3} label="Scope 3" unit="tCO₂e" color="text-amber-500" />
-              <MetricCard value={data.emissionsSummary.total} label="Totale" unit="tCO₂e" color="text-foreground" bold />
-            </div>
-            {/* Mini bar chart / scope comparison */}
-            <div className="flex items-end gap-1 h-16 pt-2 border-t border-border">
-              {[
-                { label: 'Scope 1', value: data.emissionsSummary.scope1, color: 'bg-red-500' },
-                { label: 'Scope 2', value: data.emissionsSummary.scope2, color: 'bg-blue-500' },
-                { label: 'Scope 3', value: data.emissionsSummary.scope3, color: 'bg-amber-500' },
-              ].map((s) => {
-                const maxVal = Math.max(data.emissionsSummary.scope1, data.emissionsSummary.scope2, data.emissionsSummary.scope3, 1)
-                const h = (s.value / maxVal) * 100
-                return (
-                  <div key={s.label} className="flex-1 flex flex-col items-center gap-1">
-                    <span className="text-[10px] text-muted-foreground">{s.value.toFixed(0)}</span>
-                    <div className="w-full bg-muted rounded-full h-12 flex items-end overflow-hidden">
-                      <div className={`w-full ${s.color} rounded-full transition-all duration-500`} style={{ height: `${h}%` }} />
-                    </div>
-                    <span className="text-[10px] text-muted-foreground">{s.label}</span>
-                  </div>
-                )
-              })}
-            </div>
+            {data.emissionsSummary.total === 0 ? (
+              <div className="text-center py-6 space-y-3">
+                <Leaf className="h-10 w-10 text-muted-foreground mx-auto" />
+                <p className="text-sm text-muted-foreground">Nessun dato emissioni</p>
+                <p className="text-xs text-muted-foreground">Inserisci i dati delle emissioni Scope 1, 2 e 3 per monitorare il tuo impatto GHG.</p>
+                <Button size="sm" asChild>
+                  <a href="/emissions">Inserisci Emissioni</a>
+                </Button>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-4 gap-3 mb-4">
+                  <MetricCard value={data.emissionsSummary.scope1} label="Scope 1" unit="tCO₂e" color="text-red-500" />
+                  <MetricCard value={data.emissionsSummary.scope2} label="Scope 2" unit="tCO₂e" color="text-blue-500" />
+                  <MetricCard value={data.emissionsSummary.scope3} label="Scope 3" unit="tCO₂e" color="text-amber-500" />
+                  <MetricCard value={data.emissionsSummary.total} label="Totale" unit="tCO₂e" color="text-foreground" bold />
+                </div>
+                {/* Mini bar chart / scope comparison */}
+                <div className="flex items-end gap-1 h-16 pt-2 border-t border-border">
+                  {[
+                    { label: 'Scope 1', value: data.emissionsSummary.scope1, color: 'bg-red-500' },
+                    { label: 'Scope 2', value: data.emissionsSummary.scope2, color: 'bg-blue-500' },
+                    { label: 'Scope 3', value: data.emissionsSummary.scope3, color: 'bg-amber-500' },
+                  ].map((s) => {
+                    const maxVal = Math.max(data.emissionsSummary.scope1, data.emissionsSummary.scope2, data.emissionsSummary.scope3, 1)
+                    const h = (s.value / maxVal) * 100
+                    return (
+                      <div key={s.label} className="flex-1 flex flex-col items-center gap-1">
+                        <span className="text-[10px] text-muted-foreground">{s.value.toFixed(0)}</span>
+                        <div className="w-full bg-muted rounded-full h-12 flex items-end overflow-hidden">
+                          <div className={`w-full ${s.color} rounded-full transition-all duration-500`} style={{ height: `${h}%` }} />
+                        </div>
+                        <span className="text-[10px] text-muted-foreground">{s.label}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -576,21 +586,25 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <MiniScatterPlot data={data.materialityMatrix} />
-            <div className="flex items-center justify-center gap-4 mt-2">
-              <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                <span className="w-2 h-2 rounded-full bg-red-500 inline-block" />
-                {data.materialityMatrix.filter(d => d.isMaterial).length} Materiali
-              </span>
-              <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
-                {data.materialityMatrix.filter(d => !d.isMaterial).length} Non materiali
-              </span>
-            </div>
-            <div className="mt-3 pt-2 border-t border-border text-center">
-              <a href="/assessment/materiality" className="text-xs text-primary hover:underline flex items-center justify-center gap-1">
-                Vai alla matrice completa <ChevronRight className="h-3 w-3" />
-              </a>
-            </div>
+            {data.materialityMatrix.length > 0 && (
+              <>
+                <div className="flex items-center justify-center gap-4 mt-2">
+                  <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                    <span className="w-2 h-2 rounded-full bg-red-500 inline-block" />
+                    {data.materialityMatrix.filter(d => d.isMaterial).length} Materiali
+                  </span>
+                  <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                    <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
+                    {data.materialityMatrix.filter(d => !d.isMaterial).length} Non materiali
+                  </span>
+                </div>
+                <div className="mt-3 pt-2 border-t border-border text-center">
+                  <a href="/assessment/materiality" className="text-xs text-primary hover:underline flex items-center justify-center gap-1">
+                    Vai alla matrice completa <ChevronRight className="h-3 w-3" />
+                  </a>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
 
@@ -606,62 +620,68 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {data.quickActions.map((action) => (
-                <a
-                  key={action.id}
-                  href={action.href}
-                  className={`flex items-center gap-3 p-2 rounded-lg transition-colors ${
-                    action.completed
-                      ? 'opacity-50 cursor-default'
-                      : action.priority === 'high'
-                        ? 'bg-red-50 dark:bg-red-950/20 hover:bg-red-100 dark:hover:bg-red-900/30'
-                        : 'hover:bg-muted'
-                  }`}
-                >
-                  <span className={`${action.completed ? 'text-green-500' : action.priority === 'high' ? 'text-red-500' : 'text-muted-foreground'}`}>
-                    {ACTION_ICONS[action.icon] || <Zap className="h-4 w-4" />}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p className={`text-sm font-medium truncate ${action.completed ? 'text-green-500' : 'text-foreground'}`}>
-                      {action.label}
-                    </p>
-                    <p className="text-[10px] text-muted-foreground truncate">{action.description}</p>
-                  </div>
-                  {action.completed ? (
-                    <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
-                  ) : (
-                    <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-                  )}
-                </a>
-              ))}
+              {data.quickActions.length === 0 ? (
+                <p className="text-xs text-muted-foreground text-center py-4">Tutte le azioni completate! 🎉</p>
+              ) : (
+                data.quickActions.map((action) => (
+                  <a
+                    key={action.id}
+                    href={action.href}
+                    className={`flex items-center gap-3 p-2 rounded-lg transition-colors ${
+                      action.completed
+                        ? 'opacity-50 cursor-default'
+                        : action.priority === 'high'
+                          ? 'bg-red-50 dark:bg-red-950/20 hover:bg-red-100 dark:hover:bg-red-900/30'
+                          : 'hover:bg-muted'
+                    }`}
+                  >
+                    <span className={`${action.completed ? 'text-green-500' : action.priority === 'high' ? 'text-red-500' : 'text-muted-foreground'}`}>
+                      {ACTION_ICONS[action.icon] || <Zap className="h-4 w-4" />}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm font-medium truncate ${action.completed ? 'text-green-500' : 'text-foreground'}`}>
+                        {action.label}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground truncate">{action.description}</p>
+                    </div>
+                    {action.completed ? (
+                      <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                    )}
+                  </a>
+                ))
+              )}
             </div>
           </CardContent>
         </Card>
       </div>
 
       {/* ── Row 3: Regulatory Updates ─────────────────────────── */}
-      <div className="grid grid-cols-1 gap-6">
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium">Aggiornamenti Normativi</CardTitle>
-              <Bell className="h-4 w-4 text-muted-foreground" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {data.regulatoryUpdates.map((update) => (
-                <RegulatoryUpdateCard key={update.id} update={update} />
-              ))}
-            </div>
-            <div className="mt-3 pt-2 border-t border-border">
-              <a href="/settings" className="text-xs text-primary hover:underline flex items-center gap-1">
-                Gestisci notifiche <ChevronRight className="h-3 w-3" />
-              </a>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      {data.regulatoryUpdates.length > 0 && (
+        <div className="grid grid-cols-1 gap-6">
+          <Card>
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-medium">Aggiornamenti Normativi</CardTitle>
+                <Bell className="h-4 w-4 text-muted-foreground" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {data.regulatoryUpdates.map((update) => (
+                  <RegulatoryUpdateCard key={update.id} update={update} />
+                ))}
+              </div>
+              <div className="mt-3 pt-2 border-t border-border">
+                <a href="/settings" className="text-xs text-primary hover:underline flex items-center gap-1">
+                  Gestisci notifiche <ChevronRight className="h-3 w-3" />
+                </a>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* ── AI Chat Widget ──────────────────────────────────── */}
       <AiChatWidget />

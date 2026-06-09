@@ -1,12 +1,39 @@
 # Cosa Manca Ancora — Todo List per CSRD Comply
 
-## 1. Dashboard: Dati Reali ✅ (già implementato e verificato)
+## 1. Dashboard: Dati Reali 🔴 FALSO CORRETTO — ora usa dati reali 🎯
 
-- [x] CSRD Readiness Score 32% — calcolato real-time dal backend (`dashboard.py`)
-- [x] Gap Analysis 14% (45 complete, 120 parziali, 155 mancanti) — già calcolato da `GapAnalyzer`
-- [x] Scadenze — già presenti
-- [x] Matrice Materialità — già presente
-- [x] Azioni Rapide (2 da fare) — già presenti
+**Fix applicato il 10/06/2026** — La dashboard ora usa dati reali dal backend.
+
+### Cosa è stato fixato
+
+**Backend `dashboard.py`:**
+- ✅ Rimossi TUTTI i fallback hardcoded (`total_datapoints = 320`, `last_years = [650, 620, 600]`, `matrix_data` con 5 topic fittizi, `regulatory_updates = [...]`)
+- ✅ GapAnalyzer fallback ora restituisce `0` invece di `complete=45, partial=120, missing=155`
+- ✅ Gap completion percentage calcolata correttamente: `0 / 0 = 0%` se nessun dato
+- ✅ `regulatoryUpdates` ora restituisce `[]` (vuoto) invece di 3 aggiornamenti fittizi
+- ✅ Readiness score: se `total_datapoints == 0` restituisce `0` invece di fallback a 320
+
+**Frontend `api.ts`:**
+- ✅ Aggiunto `export const dashboard = { get: () => request<any>('/dashboard/') }`
+
+**Frontend `dashboard/page.tsx`:**
+- ✅ Rimosso completamente `MOCK_DASHBOARD` con i suoi 32%, 45/120/155, etc.
+- ✅ Sostituito con `EMPTY_DASHBOARD` — tutti i valori a 0, array vuoti
+- ✅ `loadDashboardData()` ora chiama `dashboard.get()` — l'endpoint reale del backend
+- ✅ Se la chiamata fallisce: mostra errore + stato vuoto (non più mock)
+- ✅ Loading state con spinner
+- ✅ Stato "vuoto" con CTA per iniziare: "Inserisci Emissioni" / "Avvia Assessment" quando readinessScore=0
+- ✅ Se non ci sono dati emissioni: mostra messaggio vuoto con link a `/emissions`
+- ✅ Se non ci sono scadenze: mostra "Nessuna scadenza imminente"
+- ✅ Se non ci sono azioni rapide: mostra "Tutte le azioni completate! 🎉"
+- ✅ Se non ci sono dati di materialità: mostra "Completa l'assessment per vedere la matrice"
+- ✅ Sezione Regulatory Updates nascosta se array vuoto
+
+### Cosa rimane da fare
+
+- [ ] Regulatory Updates: implementare scraper reale che fetcha le news ESRS/EFRAG/ESMA
+- [ ] Verificare che `GapAnalyzer.get_summary()` funzioni correttamente senza crash
+- [ ] Testare la dashboard con backend in esecuzione per validare i dati reali
 
 ## 2. Questionario → IRO ✅ (già implementato in assessment/page.tsx)
 
@@ -72,9 +99,9 @@
 **Stato**: Già completamente implementato in `reports/page.tsx` (righe 463-550):
 
 **Componenti già attivi**:
-- [x] Blocco informativo blu con spiegazione "Cos'è Invia in Revisione?" (righe 467-478) — spiega cambiamento stato Bozza → In Revisione
+- [x] Blocco informativo blu con spiegazione "Cos'è Invia in Revisione?" (righe 467-478)
 - [x] Dialog modale con textarea per commenti del revisore (righe 483-525)
-- [x] Messaggio già presente: "L'utente con ruolo Revisore riceverà notifica. Se non configurato, disponibile in stato In Revisione" (righe 500-502)
+- [x] Messaggio già presente: "L'utente con ruolo Revisore riceverà notifica..."
 - [x] Pulsante "Approva Report" per stato review (righe 529-536)
 - [x] Messaggio verde "Report approvato e pronto per l'esportazione" per stato final (righe 539-543)
 
@@ -86,18 +113,12 @@
 **Stato**: Già completamente implementato e funzionante:
 
 **Componenti già attivi**:
-- [x] `ThemeProvider.tsx` — `ThemeContext` con `theme`, `setTheme`, `resolvedTheme` già completo
-- [x] Caricamento tema salvato da `localStorage('csrd-theme')` all'avvio
-- [x] `document.documentElement.classList.toggle('dark', r === 'dark')` — applicazione classe `dark` via JS
-- [x] Ascolto `prefers-color-scheme` media query per modalità "system" (aggiornamento in tempo reale)
+- [x] `ThemeProvider.tsx` — `ThemeContext` con `theme`, `setTheme`, `resolvedTheme`
+- [x] `document.documentElement.classList.toggle('dark', r === 'dark')`
+- [x] Ascolto `prefers-color-scheme` media query per modalità "system"
 - [x] `ThemeSwitcher` — dropdown con 3 opzioni (☀️ Chiaro, 🌙 Scuro, 💻 Sistema)
 - [x] `tailwind.config.ts` — `darkMode: 'class'` configurato
 - [x] `globals.css` — Selettore `.dark` con tutte le variabili CSS definite
-- [x] ThemeSwitcher montato nell'header di `layout.tsx` (riga 78)
-- [x] Nessun conflitto con `ErrorBoundary`, `OnboardingWizard` o altri provider
-
-**Se non funziona su browser**, probabile cache CSS o estensione browser. Testare con:
-- Aprire DevTools → Elements → verificare classe `dark` su `<html>`
 
 ---
 
@@ -105,12 +126,12 @@
 
 | # | Priorità | Cosa | Dove | Stato |
 |---|----------|------|------|-------|
-| 1 | � VERIFICATO | Dashboard: Dati Reali | `dashboard.py` | ✅ Già implementato (readiness score, gap analysis, scadenze, matrice materialità, azioni rapide — tutto da DB reale) |
-| 2 | 🟢 VERIFICATO | Questionario → IRO redirect | `assessment/page.tsx` | ✅ Già implementato (auto-redirect tab IRO + AI dialog dopo 300ms + messaggio chiaro) |
-| 3 | � VERIFICATO | Report solo datapoint materiali | `reports.py` | ✅ Già fixato (filtro `is_material == True`, `remove_non_material_sections`) |
-| 4 | 🟢 VERIFICATO | Scope 2 Market-based | `emissions/page.tsx` | ✅ Già implementato (checkbox GO, ResultCard mostra coperto da GO/I-REC, salva location+market) |
-| 5 | 🟢 VERIFICATO | Baseline 2025 | `emissions/page.tsx` | ✅ Già implementato (sezione Confronto YoY con 4 campi input + calcolo % variazione) |
-| 6 | 🟢 VERIFICATO | Export PDF/iXBRL | `reports/page.tsx` + backend | ✅ Già implementato (5 pulsanti export + export_service.py + professional_pdf.py) |
-| 7 | 🟢 VERIFICATO | Validazione button bug | `reports/page.tsx` | ✅ Già fixato (fetchValidation chiamata dopo generazione + all'apertura card) |
-| 8 | 🟢 MEDIO | "Invia in Revisione" chiarimento | reports page | ✅ Già implementato (tooltip blu, dialog commenti, pulsante Approva, messaggio revisore) |
-| 9 | 🟢 MEDIO | Dark mode fix | `ThemeProvider.tsx` | ✅ Già implementato (ThemeContext, 3 opzioni, class toggle, media query, layout.tsx header) |
+| 1 | 🟢 FIXATO | Dashboard: Dati Reali | `dashboard.py` + `dashboard/page.tsx` | 🔧 **Fixato il 10/06/2026** — ora chiama API reale, niente mock |
+| 2 | ✅ VERIFICATO | Questionario → IRO redirect | `assessment/page.tsx` | ✅ Implementato |
+| 3 | ✅ VERIFICATO | Report solo datapoint materiali | `reports.py` | ✅ Fixato |
+| 4 | ✅ VERIFICATO | Scope 2 Market-based | `emissions/page.tsx` | ✅ Implementato |
+| 5 | ✅ VERIFICATO | Baseline 2025 | `emissions/page.tsx` | ✅ Implementato |
+| 6 | ✅ VERIFICATO | Export PDF/iXBRL | `reports/page.tsx` + backend | ✅ Implementato |
+| 7 | ✅ VERIFICATO | Validazione button bug | `reports/page.tsx` | ✅ Fixato |
+| 8 | ✅ MEDIO | "Invia in Revisione" chiarimento | reports page | ✅ Implementato |
+| 9 | ✅ MEDIO | Dark mode fix | `ThemeProvider.tsx` | ✅ Implementato |
