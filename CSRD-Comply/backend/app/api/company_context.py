@@ -178,7 +178,7 @@ def _dict_to_model(settings: CompanyContextSettings, data: Dict[str, Any]) -> No
 
 # ── Endpoints ───────────────────────────────────────────────────
 
-@router.get("/company-context", response_model=CompanyContextSettingsResponse)
+@router.get("", response_model=CompanyContextSettingsResponse)
 def get_company_context(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -198,7 +198,7 @@ def get_company_context(
     return settings
 
 
-@router.put("/company-context", response_model=CompanyContextSettingsResponse)
+@router.put("", response_model=CompanyContextSettingsResponse)
 def update_company_context(
     data: CompanyContextSettingsSchema,
     current_user: User = Depends(get_current_user),
@@ -248,7 +248,7 @@ def update_company_context(
     return settings
 
 
-@router.patch("/company-context", response_model=CompanyContextSettingsResponse)
+@router.patch("", response_model=CompanyContextSettingsResponse)
 def patch_company_context(
     data: CompanyContextSettingsSchema,
     current_user: User = Depends(get_current_user),
@@ -292,7 +292,7 @@ def patch_company_context(
     return settings
 
 
-@router.delete("/company-context", status_code=204)
+@router.delete("", status_code=204)
 def delete_company_context(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
