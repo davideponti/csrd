@@ -97,8 +97,8 @@ class CompanyContextSettingsSchema(BaseModel):
 
 class CompanyContextSettingsResponse(BaseModel):
     """Response model for company context settings."""
-    id: str
-    company_id: str
+    id: uuid.UUID
+    company_id: uuid.UUID
 
     # Company Profile
     company_name: Optional[str] = None
@@ -191,8 +191,8 @@ def get_company_context(
     if not settings:
         # Return empty settings with defaults
         return CompanyContextSettingsResponse(
-            id=str(uuid.uuid4()),
-            company_id=str(current_user.company_id),
+            id=uuid.uuid4(),
+            company_id=current_user.company_id,
         )
 
     return settings
