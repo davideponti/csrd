@@ -1,13 +1,19 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import dynamic from 'next/dynamic'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui'
 import { Button } from '@/components/ui'
 import { Input } from '@/components/ui'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui'
-import { Save, User, Building, Palette, Loader2 } from 'lucide-react'
+import { Save, User, Building, Palette, FileText, Loader2 } from 'lucide-react'
 import { companies } from '@/lib/api'
 import { useTheme } from '@/components/ThemeProvider'
+
+const CompanyContextSettings = dynamic(
+  () => import('@/components/CompanyContextSettings'),
+  { ssr: false }
+)
 
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme()
@@ -111,6 +117,10 @@ export default function SettingsPage() {
           <TabsTrigger value="theme">
             <Palette className="h-4 w-4 mr-2" />
             Aspetto
+          </TabsTrigger>
+          <TabsTrigger value="context">
+            <FileText className="h-4 w-4 mr-2" />
+            Contesto Report
           </TabsTrigger>
         </TabsList>
 
@@ -291,6 +301,10 @@ export default function SettingsPage() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="context">
+          <CompanyContextSettings />
         </TabsContent>
       </Tabs>
     </div>

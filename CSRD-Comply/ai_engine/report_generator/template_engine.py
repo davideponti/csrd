@@ -307,6 +307,74 @@ class ReportTemplate:
         # Emissions data for narrative context
         self._emissions_data: Dict[str, Any] = {}
 
+        # Company context data for placeholder resolution
+        # Populated from CompanyContextSettings before rendering.
+        # Each key maps to a value string. Empty/missing values keep [TO BE CONFIRMED].
+        self.company_context: Dict[str, str] = {}
+
+    def set_company_context(self, ctx: Dict[str, str]) -> None:
+        """
+        Set company context data used to replace [TO BE CONFIRMED] placeholders
+        throughout the report. Only non-empty values are used; for any missing
+        or empty keys the placeholder [TO BE CONFIRMED] is preserved.
+        """
+        self.company_context = {k: v for k, v in ctx.items() if v}
+
+    def _resolve_placeholder(self, text: str, key: str) -> str:
+        """
+        Replace the first occurrence of ``[TO BE CONFIRMED]`` in *text*
+        with the value stored under *key* in ``company_context``, if one exists.
+        If the key is missing or empty, the placeholder is left untouched.
+        """
+        if not self.company_context:
+            return text
+        value = self.company_context.get(key)
+        if not value:
+            return text
+        return text.replace("[TO BE CONFIRMED]", str(value), 1)
+
+    def resolve_placeholders(self, html: str) -> str:
+        """
+        Walk through all known company-context keys and replace
+        ``[TO BE CONFIRMED]`` placeholders with the corresponding value
+        wherever possible.
+
+        The order of replacement matches the key ordering so that
+        ``[TO BE CONFIRMED]`` tokens are consumed left-to-right.
+        """
+        known_keys = [
+            # Company Profile
+            "company_name", "country", "sector", "reporting_year",
+            "employee_count_total", "employee_count_permanent",
+            "employee_count_temporary", "employee_count_male",
+            "employee_count_female", "employee_count_other",
+            "annual_revenue_eur", "operational_sites_count",
+            # GHG Emissions
+            "scope1_emissions", "scope2_location_emissions",
+            "scope2_market_emissions", "scope3_total_emissions",
+            "scope3_material_categories", "emissions_baseline_year",
+            "emissions_methodology",
+            # Supply Chain
+            "tier1_suppliers_count", "tier2_suppliers_estimated",
+            "value_chain_countries", "high_risk_countries",
+            "suppliers_code_of_conduct_pct", "supplier_audits_last_year",
+            # Workforce KPIs
+            "ltifr", "fatal_accidents", "voluntary_turnover_pct",
+            "avg_training_hours_per_employee", "women_in_management_pct",
+            "gender_pay_gap_pct", "union_coverage_pct",
+            "employee_engagement_score",
+            # Payment Practices
+            "standard_payment_terms_days", "avg_actual_payment_time_days",
+            "invoices_paid_within_terms_pct", "invoices_paid_late_pct",
+            # Governance
+            "anti_corruption_training_pct", "corruption_incidents_count",
+            "whistleblowing_reports_count",
+        ]
+        result = html
+        for key in known_keys:
+            result = self._resolve_placeholder(result, key)
+        return result
+
     def _default_title(self) -> str:
         """Genera il titolo predefinito del report."""
         return f"CSRD Sustainability Report {self.reporting_year}"
@@ -1117,7 +1185,8 @@ class ReportTemplate:
 </div>""")
 
         raw = "\n".join(parts)
-        return self._resolve_iro2_placeholder(raw)
+        resolved = self._resolve_iro2_placeholder(raw)
+        return self.resolve_placeholders(resolved)
 
     def render_to_xhtml(self) -> str:
         """

@@ -1,3 +1,5 @@
+import type { CompanyContextSettings } from '@/types'
+
 // ── API Client ──────────────────────────────────────────────────
 // Uses HttpOnly cookies for JWT authentication (XSS-safe).
 // All requests include credentials so the browser sends the cookie.
@@ -28,7 +30,7 @@ async function request<T>(
   const res = await fetch(`${API_BASE}${endpoint}`, {
     ...options,
     headers,
-    credentials: 'include',  // ← Invia cookie HttpOnly contenente il JWT
+    credentials: 'include',
   })
 
   if (!res.ok) {
@@ -139,8 +141,6 @@ export const api = {
     const headers: Record<string, string> = {};
     const res = await fetch(`${API_BASE}${endpoint}`, { headers, credentials: 'include' });
     if (!res.ok) {
-      // In HTTP/2, statusText è SEMPRE stringa vuota, quindi includiamo status code
-      // e proviamo a leggere il corpo JSON dell'errore per debug
       let detail = "";
       try {
         const errorBody = await res.clone().json().catch(() => null);
@@ -213,7 +213,6 @@ export const assessments = {
     }),
   get: (id: string) => request<any>(`/assessment/${id}`),
 
-  // Context Questionnaire
   getContext: (id: string) => request<any>(`/assessment/${id}/context`),
   updateContext: (id: string, data: any) =>
     request<any>(`/assessment/${id}/context`, {
@@ -222,7 +221,6 @@ export const assessments = {
     }),
   getQuestionnaire: (id: string) => request<any>(`/assessment/${id}/questionnaire`),
 
-  // IRO Generator
   getIros: (id: string) => request<any>(`/assessment/${id}/iros`),
   generateIros: (id: string, data?: { use_ai?: boolean; context_override?: any }) =>
     request<any>(`/assessment/${id}/iros/generate`, {
@@ -230,7 +228,6 @@ export const assessments = {
       body: JSON.stringify(data || { use_ai: false }),
     }),
 
-  // Scoring Engine (Step 10)
   listScores: (id: string) => request<any>(`/assessment/${id}/scores`),
   updateScore: (id: string, scoreId: string, data: {
     impact_scale?: number;
@@ -376,8 +373,33 @@ export const reports = {
     }),
 }
 
+// ── Company Context Settings ────────────────────────────────────
+export const companyContext = {
+  get: () => api.get<CompanyContextSettings>('/company-context/'),
+
+  update: (data: {
+    company_profile?: Record<string, any>
+    ghg_emissions?: Record<string, any>
+    supply_chain?: Record<string, any>
+    workforce_kpis?: Record<string, any>
+    payment_practices?: Record<string, any>
+    governance?: Record<string, any>
+  }) => api.put<CompanyContextSettings>('/company-context/', data),
+
+  patch: (data: {
+    company_profile?: Record<string, any>
+    ghg_emissions?: Record<string, any>
+    supply_chain?: Record<string, any>
+    workforce_kpis?: Record<string, any>
+    payment_practices?: Record<string, any>
+    governance?: Record<string, any>
+  }) => api.patch<CompanyContextSettings>('/company-context/', data),
+
+  delete: () => api.del('/company-context/'),
+}
+
 // ── Dashboard (dati reali, niente mock) ──────────────────────
+
 export const dashboard = {
   get: () => request<any>('/dashboard/'),
 }
-

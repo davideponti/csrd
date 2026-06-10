@@ -62,6 +62,65 @@ export interface Report {
   filed_to?: string
 }
 
+// ── Company Context Settings ────────────────────────────────────
+export interface CompanyContextSettings {
+  id: string
+  company_id: string
+
+  // Company Profile
+  company_name?: string
+  country?: string
+  sector?: string
+  reporting_year?: number
+  employee_count_total?: number
+  employee_count_permanent?: number
+  employee_count_temporary?: number
+  employee_count_male?: number
+  employee_count_female?: number
+  employee_count_other?: number
+  employee_count_by_geography?: Record<string, number>
+  annual_revenue_eur?: number
+  operational_sites_count?: number
+
+  // GHG Emissions
+  scope1_emissions?: number
+  scope2_location_based?: number
+  scope2_market_based?: number
+  scope3_total?: number
+  scope3_material_categories?: string[]
+  emissions_baseline_year?: number
+  emissions_methodology?: string
+
+  // Supply Chain
+  tier1_suppliers_count?: number
+  tier2_suppliers_count?: number
+  value_chain_countries?: string[]
+  high_risk_countries?: string[]
+  suppliers_code_of_conduct_pct?: number
+  supplier_audits_last_year?: number
+
+  // Workforce KPIs
+  ltifr?: number
+  fatal_accidents?: number
+  voluntary_turnover_pct?: number
+  avg_training_hours_per_year?: number
+  women_in_management_pct?: number
+  gender_pay_gap_pct?: number
+  union_coverage_pct?: number
+  employee_engagement_score?: number
+
+  // Payment Practices
+  standard_payment_terms_days?: number
+  avg_actual_payment_time_days?: number
+  invoices_paid_within_terms_pct?: number
+  invoices_paid_late_pct?: number
+
+  // Governance
+  anti_corruption_training_pct?: number
+  corruption_incidents_last_year?: number
+  whistleblowing_reports_received?: number
+}
+
 // ── Context Questionnaire (Step 8) ────────────────────────────
 export interface QuestionnaireQuestion {
   id: string
@@ -92,6 +151,65 @@ export interface CompanyContext {
   business_relationships?: Record<string, any>
   geographical_scope?: string[]
   stakeholder_groups?: string[]
+}
+
+// ── Company Context Settings (Report Data Injection) ────────────
+export interface CompanyContextSettings {
+  id: string
+  company_id: string
+
+  // Company Profile
+  company_name?: string
+  country?: string
+  sector?: string
+  reporting_year?: number
+  employee_count_total?: number
+  employee_count_permanent?: number
+  employee_count_temporary?: number
+  employee_count_male?: number
+  employee_count_female?: number
+  employee_count_other?: number
+  employee_count_by_geography?: Record<string, number>
+  annual_revenue_eur?: number
+  operational_sites_count?: number
+
+  // GHG Emissions
+  scope1_emissions?: number
+  scope2_location_based?: number
+  scope2_market_based?: number
+  scope3_total?: number
+  scope3_material_categories?: string[]
+  emissions_baseline_year?: number
+  emissions_methodology?: string
+
+  // Supply Chain
+  tier1_suppliers_count?: number
+  tier2_suppliers_count?: number
+  value_chain_countries?: string[]
+  high_risk_countries?: string[]
+  suppliers_code_of_conduct_pct?: number
+  supplier_audits_last_year?: number
+
+  // Workforce KPIs
+  ltifr?: number
+  fatal_accidents?: number
+  voluntary_turnover_pct?: number
+  avg_training_hours_per_year?: number
+  women_in_management_pct?: number
+  gender_pay_gap_pct?: number
+  union_coverage_pct?: number
+  employee_engagement_score?: number
+
+  // Payment Practices
+  standard_payment_terms_days?: number
+  avg_actual_payment_time_days?: number
+  invoices_paid_within_terms_pct?: number
+  invoices_paid_late_pct?: number
+
+  // Governance
+  anti_corruption_training_pct?: number
+  corruption_incidents_last_year?: number
+  whistleblowing_reports_received?: number
 }
 
 // ── IRO Generator (Step 9) ───────────────────────────────────
@@ -125,7 +243,10 @@ export interface IroSummary {
   benchmark_sourced: number
 }
 
+
+
 export interface SectorBenchmark {
+
   name: string
   carbon_intensity: string
   water_intensity: string

@@ -239,7 +239,7 @@ def _compile_esrs_data(report, db):
     in modo che il report contenga solo le sezioni ESRS rilevanti (circa 4-8 topic,
     non tutti i 320+ datapoint).
     """
-    from app.models import Assessment, EmissionData, Company, MaterialityScore, EsrsDatapoint
+    from app.models import Assessment, EmissionData, Company, MaterialityScore, EsrsDatapoint, CompanyContextSettings
     from ai_engine.report_generator.template_engine import ReportTemplate
 
     company = db.query(Company).filter(
@@ -339,6 +339,61 @@ def _compile_esrs_data(report, db):
     )
     template.company_country = company.country if company else ""
     template.employee_count = company.employee_count or 0
+
+    # ── Load Company Context Settings and inject into template ────
+    ctx = db.query(CompanyContextSettings).filter(
+        CompanyContextSettings.company_id == report.company_id,
+    ).first()
+    if ctx:
+        context_data = {
+            # Company Profile
+            "company_name": ctx.company_name or "",
+            "country": ctx.country or "",
+            "sector": ctx.sector or "",
+            "reporting_year": str(ctx.reporting_year or ""),
+            "employee_count_total": str(ctx.employee_count_total or ""),
+            "employee_count_permanent": str(ctx.employee_count_permanent or ""),
+            "employee_count_temporary": str(ctx.employee_count_temporary or ""),
+            "employee_count_male": str(ctx.employee_count_male or ""),
+            "employee_count_female": str(ctx.employee_count_female or ""),
+            "employee_count_other": str(ctx.employee_count_other or ""),
+            "annual_revenue_eur": str(ctx.annual_revenue_eur or ""),
+            "operational_sites_count": str(ctx.operational_sites_count or ""),
+            # GHG Emissions
+            "scope1_emissions": str(ctx.scope1_emissions or ""),
+            "scope2_location_emissions": str(ctx.scope2_location_emissions or ""),
+            "scope2_market_emissions": str(ctx.scope2_market_emissions or ""),
+            "scope3_total_emissions": str(ctx.scope3_total_emissions or ""),
+            "scope3_material_categories": ctx.scope3_material_categories or "",
+            "emissions_baseline_year": str(ctx.emissions_baseline_year or ""),
+            "emissions_methodology": ctx.emissions_methodology or "",
+            # Supply Chain
+            "tier1_suppliers_count": str(ctx.tier1_suppliers_count or ""),
+            "tier2_suppliers_estimated": str(ctx.tier2_suppliers_estimated or ""),
+            "value_chain_countries": ctx.value_chain_countries or "",
+            "high_risk_countries": ctx.high_risk_countries or "",
+            "suppliers_code_of_conduct_pct": str(ctx.suppliers_code_of_conduct_pct or ""),
+            "supplier_audits_last_year": str(ctx.supplier_audits_last_year or ""),
+            # Workforce KPIs
+            "ltifr": str(ctx.ltifr or ""),
+            "fatal_accidents": str(ctx.fatal_accidents or ""),
+            "voluntary_turnover_pct": str(ctx.voluntary_turnover_pct or ""),
+            "avg_training_hours_per_employee": str(ctx.avg_training_hours_per_employee or ""),
+            "women_in_management_pct": str(ctx.women_in_management_pct or ""),
+            "gender_pay_gap_pct": str(ctx.gender_pay_gap_pct or ""),
+            "union_coverage_pct": str(ctx.union_coverage_pct or ""),
+            "employee_engagement_score": str(ctx.employee_engagement_score or ""),
+            # Payment Practices
+            "standard_payment_terms_days": str(ctx.standard_payment_terms_days or ""),
+            "avg_actual_payment_time_days": str(ctx.avg_actual_payment_time_days or ""),
+            "invoices_paid_within_terms_pct": str(ctx.invoices_paid_within_terms_pct or ""),
+            "invoices_paid_late_pct": str(ctx.invoices_paid_late_pct or ""),
+            # Governance
+            "anti_corruption_training_pct": str(ctx.anti_corruption_training_pct or ""),
+            "corruption_incidents_count": str(ctx.corruption_incidents_count or ""),
+            "whistleblowing_reports_count": str(ctx.whistleblowing_reports_count or ""),
+        }
+        template.set_company_context(context_data)
 
     template.set_materiality(material_standards_list)
 

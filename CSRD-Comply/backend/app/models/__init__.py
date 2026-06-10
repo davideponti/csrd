@@ -90,6 +90,77 @@ class CompanyContext(TimestampMixin, Base):
     company = relationship("Company", back_populates="context")
 
 
+# ── Company Context Settings (CSRD Reporting Data) ──────────────
+class CompanyContextSettings(TimestampMixin, Base):
+    """
+    Comprehensive company context data that gets automatically injected
+    into every report generation prompt to replace [TO BE CONFIRMED]
+    placeholders with real company data wherever possible.
+
+    All fields are optional. When empty, [TO BE CONFIRMED] remains.
+    """
+    __tablename__ = "company_context_settings"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    company_id = Column(UUID(as_uuid=True), ForeignKey("companies.company_id"),
+                        unique=True, nullable=False)
+
+    # ── COMPANY PROFILE ─────────────────────────────────────────
+    company_name = Column(String(255), nullable=True)
+    country = Column(String(255), nullable=True)
+    sector = Column(String(255), nullable=True)
+    reporting_year = Column(Integer, nullable=True)
+    employee_count_total = Column(Integer, nullable=True)
+    employee_count_permanent = Column(Integer, nullable=True)
+    employee_count_temporary = Column(Integer, nullable=True)
+    employee_count_male = Column(Integer, nullable=True)
+    employee_count_female = Column(Integer, nullable=True)
+    employee_count_other = Column(Integer, nullable=True)
+    employee_count_by_geography = Column(JSON, nullable=True)  # {"Italy": 50, "Germany": 30}
+    annual_revenue_eur = Column(Float, nullable=True)
+    operational_sites_count = Column(Integer, nullable=True)
+
+    # ── GHG EMISSIONS ───────────────────────────────────────────
+    scope1_emissions = Column(Float, nullable=True)
+    scope2_location_based = Column(Float, nullable=True)
+    scope2_market_based = Column(Float, nullable=True)
+    scope3_total = Column(Float, nullable=True)
+    scope3_material_categories = Column(JSON, nullable=True)   # ["Purchased goods", "Transportation", ...]
+    emissions_baseline_year = Column(Integer, nullable=True)
+    emissions_methodology = Column(String(255), nullable=True)  # GHG Protocol / ISO 14064 / other
+
+    # ── SUPPLY CHAIN ────────────────────────────────────────────
+    tier1_suppliers_count = Column(Integer, nullable=True)
+    tier2_suppliers_count = Column(Integer, nullable=True)
+    value_chain_countries = Column(JSON, nullable=True)        # ["Italy", "Germany", ...]
+    high_risk_countries = Column(JSON, nullable=True)           # ["Country A", "Country B"]
+    suppliers_code_of_conduct_pct = Column(Float, nullable=True)
+    supplier_audits_last_year = Column(Integer, nullable=True)
+
+    # ── WORKFORCE KPIs ─────────────────────────────────────────
+    ltifr = Column(Float, nullable=True)                       # Lost-time injury frequency rate
+    fatal_accidents = Column(Integer, nullable=True)
+    voluntary_turnover_pct = Column(Float, nullable=True)
+    avg_training_hours_per_year = Column(Float, nullable=True)
+    women_in_management_pct = Column(Float, nullable=True)
+    gender_pay_gap_pct = Column(Float, nullable=True)
+    union_coverage_pct = Column(Float, nullable=True)
+    employee_engagement_score = Column(Float, nullable=True)
+
+    # ── PAYMENT PRACTICES ───────────────────────────────────────
+    standard_payment_terms_days = Column(Integer, nullable=True)
+    avg_actual_payment_time_days = Column(Float, nullable=True)
+    invoices_paid_within_terms_pct = Column(Float, nullable=True)
+    invoices_paid_late_pct = Column(Float, nullable=True)
+
+    # ── GOVERNANCE ──────────────────────────────────────────────
+    anti_corruption_training_pct = Column(Float, nullable=True)
+    corruption_incidents_last_year = Column(Integer, nullable=True)
+    whistleblowing_reports_received = Column(Integer, nullable=True)
+
+    company = relationship("Company", backref="context_settings")
+
+
 # ── Sustainability Matters (ESRS Topic Registry) ────────────────
 class SustainabilityMatter(Base):
     __tablename__ = "sustainability_matters"
@@ -190,6 +261,7 @@ class EmissionsData(TimestampMixin, Base):
     company = relationship("Company", back_populates="emissions")
 
 
+# ── Company Report Context (Settings for report generation) ─────
 # ── Reports ─────────────────────────────────────────────────────
 class ReportStatus(str, enum.Enum):
     draft = "draft"

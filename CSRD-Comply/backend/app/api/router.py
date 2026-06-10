@@ -3,7 +3,9 @@ from fastapi import APIRouter
 from app.api import (
     auth, companies, assessment, emissions, reports, ai,
     subscriptions, stripe, emails, admin, dashboard,
+    company_context,
 )
+
 
 router = APIRouter()
 
@@ -18,3 +20,5 @@ router.include_router(stripe.router, prefix="/stripe", tags=["stripe"])
 router.include_router(emails.router, prefix="/emails", tags=["emails"])
 router.include_router(admin.router, prefix="/admin", tags=["admin"])
 router.include_router(dashboard.router, prefix="/dashboard", tags=["dashboard"])
+router.include_router(company_context.router, prefix="/company-context", tags=["company-context"])
+
