@@ -299,6 +299,7 @@ class ReportTemplate:
         self.employee_count: int = 0
         self.company_country: str = ""
         self.company_vat: str = ""
+        self.currency: str = "EUR"  # Valuta predefinita per il report
 
         # Materiality tracking — populated by set_materiality()
         self.material_standards: List[str] = []
