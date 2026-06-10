@@ -1,7 +1,5 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'standalone',
-
   /**
    * 🔒 ATTENZIONE: Non usare rewrites per proxy API!
    * 
@@ -12,6 +10,15 @@ const nextConfig = {
    * In sviluppo locale, usa NEXT_PUBLIC_API_URL=http://localhost:8000
    * in .env.local per chiamare FastAPI direttamente.
    */
+
+  /**
+   * output: 'standalone' è SOLO per Docker, non per Vercel.
+   * Su Vercel si usa il comportamento predefinito.
+   * Per Docker: decommentare la riga sottostante o passare
+   * NEXT_OUTPUT=standalone come env var.
+   */
+  // output: process.env.NEXT_OUTPUT || undefined,
 }
 
 module.exports = nextConfig
+

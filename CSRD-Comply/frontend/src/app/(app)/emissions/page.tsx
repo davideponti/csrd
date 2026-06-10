@@ -881,11 +881,12 @@ function ValidationPanel({ result }: { result: any }) {
                   )
                 }
                 return null
-              })()
+              })()}
             </CardContent>
           </Card>
 
           {/* ═══ ESRS E1-6 — GHG EMISSIONS TABLE ═══ */}
+
           <Card className="border-green-200 dark:border-green-800">
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
