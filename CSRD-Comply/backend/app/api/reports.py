@@ -275,15 +275,13 @@ def _compile_esrs_data(report, db):
         elif em.scope == "3":
             scope3_total += em.value
 
-    if scope1_total > 0:
-        emissions_data["scope1"] = scope1_total
-    if scope2_location_total > 0:
-        emissions_data["scope2_location"] = scope2_location_total
-    if scope2_market_total > 0:
-        emissions_data["scope2_market"] = scope2_market_total
-    if scope3_total > 0:
-        emissions_data["scope3"] = scope3_total
+    # Always include current year values (even 0) so the table renders properly
+    emissions_data["scope1"] = scope1_total
+    emissions_data["scope2_location"] = scope2_location_total
+    emissions_data["scope2_market"] = scope2_market_total
+    emissions_data["scope3"] = scope3_total
 
+    # ── Prior year (N-1) comparison data ─────────────────────────
     prev_year = report.reporting_year - 1
     prev_emissions = db.query(EmissionData).filter(
         EmissionData.company_id == report.company_id,
@@ -292,14 +290,15 @@ def _compile_esrs_data(report, db):
 
     scope1_n1 = sum(e.value for e in prev_emissions if e.scope == "1")
     scope2_loc_n1 = sum(e.value for e in prev_emissions if e.scope == "2" and (not e.category or "location" in e.category.lower()))
+    scope2_mkt_n1 = sum(e.value for e in prev_emissions if e.scope == "2" and (e.category and "market" in e.category.lower()))
     scope3_n1 = sum(e.value for e in prev_emissions if e.scope == "3")
 
-    if scope1_n1 > 0:
-        emissions_data["scope1_n1"] = scope1_n1
-    if scope2_loc_n1 > 0:
-        emissions_data["scope2_location_n1"] = scope2_loc_n1
-    if scope3_n1 > 0:
-        emissions_data["scope3_n1"] = scope3_n1
+    # Always include N-1 values — the template's _pct_change handles
+    # the case where previous == 0 (returns "—")
+    emissions_data["scope1_n1"] = scope1_n1
+    emissions_data["scope2_location_n1"] = scope2_loc_n1
+    emissions_data["scope2_market_n1"] = scope2_mkt_n1
+    emissions_data["scope3_n1"] = scope3_n1
 
     # ── Determina standard materiali dal materiality assessment ──
     material_standards = set()
@@ -376,15 +375,51 @@ def _generate_narratives(report, db):
 
 
 def _build_tables_charts(report, db):
-    """Step 4: Build tables and charts for the report."""
+    """Step 4: Build tables and charts for the report with real data including baseline."""
+    from app.models import EmissionData
+
+    current_year = report.reporting_year
+    prev_year = current_year - 1
+
+    # Fetch current year emissions
+    current_emissions = db.query(EmissionData).filter(
+        EmissionData.company_id == report.company_id,
+        EmissionData.reporting_year == current_year,
+    ).all()
+
+    scope1 = sum(e.value for e in current_emissions if e.scope == "1")
+    scope2_loc = sum(e.value for e in current_emissions if e.scope == "2" and (not e.category or "location" in e.category.lower()))
+    scope2_mkt = sum(e.value for e in current_emissions if e.scope == "2" and (e.category and "market" in e.category.lower()))
+    scope3 = sum(e.value for e in current_emissions if e.scope == "3")
+    total = scope1 + scope2_loc + scope3
+
+    # Fetch previous year (baseline) emissions
+    prev_emissions = db.query(EmissionData).filter(
+        EmissionData.company_id == report.company_id,
+        EmissionData.reporting_year == prev_year,
+    ).all()
+
+    scope1_bl = sum(e.value for e in prev_emissions if e.scope == "1")
+    scope2_loc_bl = sum(e.value for e in prev_emissions if e.scope == "2" and (not e.category or "location" in e.category.lower()))
+    scope2_mkt_bl = sum(e.value for e in prev_emissions if e.scope == "2" and (e.category and "market" in e.category.lower()))
+    scope3_bl = sum(e.value for e in prev_emissions if e.scope == "3")
+    total_bl = scope1_bl + scope2_loc_bl + scope3_bl
+
     report.table_data = {
         "ghg_emissions": {
-            "scope1": 52.6,
-            "scope2_location": 25.3,
-            "scope2_market": 10.1,
-            "scope3": 175.2,
-            "total": 263.2,
+            "scope1": scope1,
+            "scope2_location": scope2_loc,
+            "scope2_market": scope2_mkt,
+            "scope3": scope3,
+            "total": total,
+            "scope1_baseline": scope1_bl,
+            "scope2_location_baseline": scope2_loc_bl,
+            "scope2_market_baseline": scope2_mkt_bl,
+            "scope3_baseline": scope3_bl,
+            "total_baseline": total_bl,
             "unit": "tCO2e",
+            "current_year": current_year,
+            "baseline_year": prev_year,
         }
     }
 
@@ -960,24 +995,91 @@ def get_available_formats():
 
 
 def _build_report_data(report: Report, current_user: User) -> Dict[str, Any]:
-    """Build structured report data for XLSX/JSON export."""
+    """Build structured report data for XLSX/JSON export with real emissions and baseline data."""
     company = current_user.company
+
+    current_year = report.reporting_year
+    prev_year = current_year - 1
+
+    # Use table_data if already populated by _build_tables_charts, otherwise fallback
+    if report.table_data and "ghg_emissions" in report.table_data:
+        ghg = report.table_data["ghg_emissions"]
+        scopes = {
+            "scope1": {
+                "value": ghg.get("scope1", ""),
+                "unit": "tCO2eq",
+                "current_year": current_year,
+                "previous_year": prev_year,
+                "current_value": ghg.get("scope1", ""),
+                "previous_value": ghg.get("scope1_baseline", ""),
+                "change_pct": _calc_change(ghg.get("scope1", 0), ghg.get("scope1_baseline", 0)),
+            },
+            "scope2_location": {
+                "value": ghg.get("scope2_location", ""),
+                "unit": "tCO2eq",
+                "current_year": current_year,
+                "previous_year": prev_year,
+                "current_value": ghg.get("scope2_location", ""),
+                "previous_value": ghg.get("scope2_location_baseline", ""),
+                "change_pct": _calc_change(ghg.get("scope2_location", 0), ghg.get("scope2_location_baseline", 0)),
+            },
+            "scope2_market": {
+                "value": ghg.get("scope2_market", ""),
+                "unit": "tCO2eq",
+                "current_year": current_year,
+                "previous_year": prev_year,
+                "current_value": ghg.get("scope2_market", ""),
+                "previous_value": ghg.get("scope2_market_baseline", ""),
+                "change_pct": _calc_change(ghg.get("scope2_market", 0), ghg.get("scope2_market_baseline", 0)),
+            },
+            "scope3": {
+                "value": ghg.get("scope3", ""),
+                "unit": "tCO2eq",
+                "current_year": current_year,
+                "previous_year": prev_year,
+                "current_value": ghg.get("scope3", ""),
+                "previous_value": ghg.get("scope3_baseline", ""),
+                "change_pct": _calc_change(ghg.get("scope3", 0), ghg.get("scope3_baseline", 0)),
+            },
+            "total": {
+                "value": ghg.get("total", ""),
+                "unit": "tCO2eq",
+                "current_year": current_year,
+                "previous_year": prev_year,
+                "current_value": ghg.get("total", ""),
+                "previous_value": ghg.get("total_baseline", ""),
+                "change_pct": _calc_change(ghg.get("total", 0), ghg.get("total_baseline", 0)),
+            },
+        }
+    else:
+        # Fallback with empty placeholders
+        scopes = {
+            "scope1": {"value": "", "unit": "tCO2eq", "current_year": current_year, "previous_year": prev_year, "current_value": "", "previous_value": "", "change_pct": "—"},
+            "scope2_location": {"value": "", "unit": "tCO2eq", "current_year": current_year, "previous_year": prev_year, "current_value": "", "previous_value": "", "change_pct": "—"},
+            "scope2_market": {"value": "", "unit": "tCO2eq", "current_year": current_year, "previous_year": prev_year, "current_value": "", "previous_value": "", "change_pct": "—"},
+            "scope3": {"value": "", "unit": "tCO2eq", "current_year": current_year, "previous_year": prev_year, "current_value": "", "previous_value": "", "change_pct": "—"},
+            "total": {"value": "", "unit": "tCO2eq", "current_year": current_year, "previous_year": prev_year, "current_value": "", "previous_value": "", "change_pct": "—"},
+        }
 
     return {
         "company_name": company.company_name if company else current_user.email,
         "report_title": report.title,
         "reporting_year": report.reporting_year,
+        "baseline_year": prev_year,
         "language": "en",
         "generated_at": report.updated_at.isoformat() if report.updated_at else "",
         "status": report.status.value if hasattr(report.status, 'value') else str(report.status),
         "esrs_version": "ESRS Set 1 — 2023",
         "emissions": {
-            "scopes": {
-                "scope1": {"value": "", "unit": "tCO2eq", "current_year": "", "previous_year": ""},
-                "scope2_location": {"value": "", "unit": "tCO2eq", "current_year": "", "previous_year": ""},
-                "scope2_market": {"value": "", "unit": "tCO2eq", "current_year": "", "previous_year": ""},
-                "scope3": {"value": "", "unit": "tCO2eq", "current_year": "", "previous_year": ""},
-            }
+            "scopes": scopes,
+            "baseline_year": prev_year,
+            "change_summary": {
+                "scope1": scopes["scope1"]["change_pct"],
+                "scope2_location": scopes["scope2_location"]["change_pct"],
+                "scope2_market": scopes["scope2_market"]["change_pct"],
+                "scope3": scopes["scope3"]["change_pct"],
+                "total": scopes["total"]["change_pct"],
+            },
         },
         "materiality": {"iros": []},
         "gap_analysis": {"gaps_by_standard": {}},

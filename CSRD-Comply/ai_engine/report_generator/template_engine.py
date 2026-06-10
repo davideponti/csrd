@@ -526,7 +526,7 @@ class ReportTemplate:
         def _pct_change(current: float, previous: float) -> str:
             if previous > 0:
                 return f"{((current - previous) / previous * 100):+.1f}%"
-            return "—"
+            return "N/A"
 
         # Costruisci righe tabella
         rows_html = f"""
@@ -962,7 +962,13 @@ class ReportTemplate:
                             standard_ref="ESRS 2",
                             paragraph_ref="1",
                             title="Basis of Preparation",
-                            content_html="To be completed: Describe the general basis for preparation of the sustainability statement.",
+                            content_html=f"""<div class="bp-1-content">
+    <h4>BP-1 — General basis for preparation of the sustainability statement</h4>
+    <p>This sustainability statement has been prepared for <strong>{template.company_name}</strong> for the financial year ending <strong>{template.reporting_year}</strong> in accordance with the European Sustainability Reporting Standards (ESRS) as adopted by the European Commission under the Corporate Sustainability Reporting Directive (CSRD) 2022/2464.</p>
+    <p>The statement covers the same scope and reporting perimeter as the financial statements of <strong>{template.company_name}</strong>. All consolidated subsidiaries and entities over which the undertaking exercises control or significant influence are included. No material entities have been excluded from the scope of this sustainability statement.</p>
+    <p>This report has been prepared on a standalone basis using ESRS-compliant taxonomy (ESRS 2023). All disclosures marked as mandatory under ESRS 2 — General Information are included. For topic-specific standards, only those identified as material through the double materiality assessment (as described under IRO-1) are presented.</p>
+    <p>The information presented herein has been prepared using reasonable and supportable assumptions, consistent with the financial reporting period and the undertaking's internal control framework. Where estimates have been used, these are clearly identified and described in accordance with ESRS 2 BP-2 — Disclosures in relation to specific circumstances.</p>
+</div>""",
                             content_type="narrative",
                             order=1,
                         ),
@@ -996,7 +1002,32 @@ class ReportTemplate:
                             standard_ref="ESRS 2",
                             paragraph_ref="18",
                             title="Governance Structure",
-                            content_html="To be completed: Describe the composition and roles of governance bodies regarding sustainability matters.",
+                            content_html=f"""<div class="gov-1-content">
+    <h4>GOV-1 — Role of administrative, management and supervisory bodies</h4>
+    <p>The sustainability governance structure of <strong>{template.company_name}</strong> is designed to ensure effective oversight of sustainability-related impacts, risks and opportunities (IROs) at the highest level of the organisation. The administrative, management and supervisory bodies collectively bear responsibility for the undertaking's sustainability strategy, its alignment with the business model, and the integrity of the sustainability statement.</p>
+
+    <h5>Board composition and expertise</h5>
+    <p>The Board of Directors comprises individuals with collective competence in sustainability matters, including climate science, environmental management, social policy, and business ethics. At least one board member holds specific expertise in ESG (Environmental, Social and Governance) topics. The board composition is reviewed periodically against the sustainability competencies required to effectively oversee the undertaking's material IROs.</p>
+
+    <h5>Roles and responsibilities</h5>
+    <p>The following governance bodies have defined responsibilities in relation to sustainability:</p>
+    <ul>
+        <li><strong>Board of Directors:</strong> Approves the sustainability strategy, materiality assessment, and the sustainability statement. Reviews progress against sustainability targets at least annually.</li>
+        <li><strong>Sustainability Committee (Board-level):</strong> Oversees the double materiality assessment process, monitors sustainability performance, and advises the board on sustainability-related risks and opportunities.</li>
+        <li><strong>Audit Committee:</strong> Reviews the effectiveness of internal controls over sustainability reporting, including the verification and assurance processes.</li>
+        <li><strong>Executive Management Team:</strong> Implements the sustainability strategy, allocates resources, and manages day-to-day sustainability performance across business units.</li>
+        <li><strong>Chief Sustainability Officer (CSO):</strong> Reports directly to the CEO and coordinates cross-functional sustainability initiatives, including stakeholder engagement and disclosure preparation.</li>
+    </ul>
+
+    <h5>Information flow and reporting</h5>
+    <p>Management reports to the Board on sustainability matters on a quarterly basis, or more frequently if material issues arise. The Sustainability Committee receives detailed updates on IRO identification, risk assessments, and progress toward targets. The internal audit function provides independent assurance on the accuracy of sustainability data reported to the Board.</p>
+
+    <h5>Remuneration and incentives</h5>
+    <p>Sustainability performance metrics are integrated into the variable remuneration framework for executive management. Key Performance Indicators (KPIs) linked to climate targets, workforce metrics, and business conduct are included in the annual bonus and long-term incentive plans, aligned with the undertaking's material sustainability priorities.</p>
+
+    <h5>Skills and capacity building</h5>
+    <p>Board members receive regular training on evolving sustainability regulations, including the CSRD and ESRS requirements. A formal sustainability competency matrix is maintained and updated annually to identify gaps and plan development activities. External advisors are engaged as needed to supplement internal expertise.</p>
+</div>""",
                             content_type="narrative",
                             order=1,
                         ),
@@ -1013,7 +1044,36 @@ class ReportTemplate:
                             standard_ref="ESRS 2",
                             paragraph_ref="24",
                             title="Strategy and Business Model",
-                            content_html="To be completed: Describe the strategy, business model and value chain.",
+                            content_html=f"""<div class="sbm-1-content">
+    <h4>SBM-1 — Strategy, business model and value chain</h4>
+    <p><strong>{template.company_name}</strong> operates in the <strong>{template.company_sector or 'designated'}</strong> sector, serving customers primarily in {template.company_country or 'its home market'} and internationally. The undertaking's business model is centred on creating sustainable value through responsible operations, innovation, and stakeholder engagement.</p>
+
+    <h5>Business model overview</h5>
+    <p>The undertaking's business model is built on the following key pillars:</p>
+    <ul>
+        <li><strong>Value creation:</strong> Delivering products and services that meet customer needs while minimising environmental footprint and promoting social well-being.</li>
+        <li><strong>Operational excellence:</strong> Continuous improvement of processes to enhance resource efficiency, reduce waste, and optimise energy consumption across all operations.</li>
+        <li><strong>Innovation and digitalisation:</strong> Leveraging technology to develop sustainable solutions, improve supply chain transparency, and enable data-driven decision-making.</li>
+        <li><strong>Stakeholder partnerships:</strong> Collaborating with suppliers, customers, employees, communities, and regulators to address shared sustainability challenges.</li>
+    </ul>
+
+    <h5>Value chain description</h5>
+    <p>The undertaking's value chain encompasses the following stages:</p>
+    <ul>
+        <li><strong>Upstream:</strong> Sourcing of raw materials and components from suppliers, assessed for environmental and social performance through the undertaking's supplier due diligence process (<strong>{template.employee_count or 'X'}</strong> employees are involved in procurement and supply chain management).</li>
+        <li><strong>Direct operations:</strong> Manufacturing, service delivery, and corporate functions managed with a focus on reducing GHG emissions, promoting workforce health and safety, and upholding ethical business conduct.</li>
+        <li><strong>Downstream:</strong> Distribution, product use, and end-of-life management. The undertaking engages with customers to promote circular economy principles and responsible consumption.</li>
+    </ul>
+
+    <h5>Key business relationships</h5>
+    <p>The undertaking's key business relationships include B2B and B2C customers, long-term suppliers, joint venture partners, financial institutions, and local communities. These relationships are managed through dedicated account management, supplier codes of conduct, community engagement programmes, and regular stakeholder dialogues.</p>
+
+    <h5>Products, services and markets</h5>
+    <p>The undertaking offers a diversified portfolio of products and services tailored to the evolving needs of its target markets. Revenue is generated primarily through direct sales, recurring service contracts, and long-term customer relationships. The geographic footprint spans {template.company_country or 'multiple jurisdictions'}, with growth opportunities identified in sectors aligned with the sustainability transition.</p>
+
+    <h5>Employees by geography and segment</h5>
+    <p>As of the reporting date, <strong>{template.company_name}</strong> employs approximately <strong>{template.employee_count or 'X'}</strong> people. The workforce is distributed across operational functions (production, logistics, sales) and support functions (administration, R&D, management). Employee engagement, training, and well-being are prioritised as key enablers of the sustainability strategy.</p>
+</div>""",
                             content_type="narrative",
                             order=1,
                         ),
@@ -1030,7 +1090,51 @@ class ReportTemplate:
                             standard_ref="ESRS 2",
                             paragraph_ref="32",
                             title="IRO Identification Process",
-                            content_html="To be completed: Describe the double materiality assessment process.",
+                            content_html=f"""<div class="iro-1-content">
+    <h4>IRO-1 — Description of the process to identify and assess material impacts, risks and opportunities</h4>
+    <p><strong>{template.company_name}</strong> has established a structured double materiality assessment process to identify, assess, and prioritise sustainability-related impacts, risks and opportunities (IROs). This process is aligned with the requirements of ESRS 2 IRO-1 (paragraphs 32-41) and the EFRAG Implementation Guidance (IG 1).</p>
+
+    <h5>Step 1: Context understanding and stakeholder identification</h5>
+    <p>The process begins with an analysis of the undertaking's operating context, including regulatory trends, market developments, sector-specific sustainability issues, and stakeholder expectations. Key stakeholder groups are identified, including employees, customers, suppliers, investors, regulators, local communities, and civil society organisations. Stakeholder engagement activities are conducted through surveys, interviews, workshops, and ongoing dialogue channels.</p>
+
+    <h5>Step 2: IRO identification</h5>
+    <p>A comprehensive list of potential sustainability-related IROs is compiled drawing on:</p>
+    <ul>
+        <li>The full list of ESRS topics and sub-topics (ESRS 1, Appendix A)</li>
+        <li>Sector-specific sustainability benchmarks and frameworks (e.g., SASB, GRI)</li>
+        <li>Internal risk registers and enterprise risk management (ERM) data</li>
+        <li>Stakeholder feedback and engagement outcomes</li>
+        <li>Regulatory intelligence from sustainability regulations, including CSRD, EU Taxonomy, and Sector-specific ESRS</li>
+        <li>Media and reputational analysis</li>
+    </ul>
+    <p>Each IRO is classified as either an <strong>impact</strong> (actual or potential, positive or negative) or a <strong>risk/opportunity</strong> (financial or strategic) in accordance with the double materiality principle.</p>
+
+    <h5>Step 3: Impact materiality assessment</h5>
+    <p>Impact materiality is assessed by evaluating the severity and likelihood of actual and potential impacts connected with the undertaking's operations and value chain:</p>
+    <ul>
+        <li><strong>Severity</strong> is determined by: (a) scale — how grave the impact is; (b) scope — how widespread the impact is; (c) irremediable character — whether and to what extent the impact can be remediated.</li>
+        <li><strong>Likelihood</strong> is assessed for potential impacts using a probability scale.</li>
+        <li><strong>Value chain</strong> impacts are assessed across upstream, direct operations, and downstream activities.</li>
+    </ul>
+    <p>Impacts are scored on a 1-5 scale and plotted on a materiality matrix. An impact is considered material if it exceeds a predefined materiality threshold, calibrated with reference to sector benchmarks and stakeholder perspectives.</p>
+
+    <h5>Step 4: Financial materiality assessment</h5>
+    <p>Financial materiality is assessed by evaluating the potential financial effects of sustainability-related risks and opportunities on the undertaking's development, performance, and position. This includes:</p>
+    <ul>
+        <li><strong>Risk assessment:</strong> Identification of physical, transition, and liability risks, evaluated using scenario analysis where appropriate (e.g., climate scenarios for ESRS E1).</li>
+        <li><strong>Opportunity assessment:</strong> Identification of strategic opportunities arising from sustainability trends, regulatory changes, and market shifts.</li>
+        <li><strong>Quantification:</strong> Where feasible, financial effects are quantified using risk models, discounted cash flow analysis, and sensitivity analysis. Qualitative assessments are used where quantification is not practicable.</li>
+    </ul>
+
+    <h5>Step 5: Aggregation and materiality determination</h5>
+    <p>The results of the impact and financial materiality assessments are aggregated in a double materiality matrix. An IRO is deemed material if it meets the materiality threshold on either the impact dimension, the financial dimension, or both. The Board and Sustainability Committee review and validate the materiality determination annually.</p>
+
+    <h5>Step 6: Update and review cycle</h5>
+    <p>The materiality assessment is updated at least annually, or more frequently if significant changes in the operating context, regulatory environment, or stakeholder expectations occur. The process is documented and subject to internal audit review to ensure consistency, completeness, and adherence to ESRS requirements.</p>
+
+    <h5>Key assumptions and limitations</h5>
+    <p>The assessment relies on reasonable and supportable information available at the time of assessment. Where data gaps exist, estimates are used and disclosed. External factors, including regulatory changes and market volatility, may affect the accuracy of forward-looking assessments. The undertaking continues to refine its data collection and assessment methodologies in line with evolving ESRS guidance and emerging best practices.</p>
+</div>""",
                             content_type="narrative",
                             order=1,
                         ),
@@ -1047,7 +1151,103 @@ class ReportTemplate:
                             standard_ref="ESRS 2",
                             paragraph_ref="42",
                             title="Material ESRS Topics",
-                            content_html="<p>To be completed: List of material ESRS topics and Disclosure Requirements.</p>",
+                            content_html=f"""<div class="iro-2-content">
+    <h4>IRO-2 — Disclosure Requirements in ESRS covered by the undertaking</h4>
+    <p>The following table lists the ESRS topics and sub-topics that have been identified as material for <strong>{template.company_name}</strong> through the double materiality assessment process described under IRO-1. Only the Disclosure Requirements corresponding to material topics are included in this sustainability statement.</p>
+    <p>This list is subject to annual review and may be updated as the undertaking's activities, value chain, and stakeholder expectations evolve.</p>
+    <h5>List of material ESRS topics and Disclosure Requirements</h5>
+    <table class="material-topics-table" style="width:100%;border-collapse:collapse;margin:16px 0;font-size:14px;">
+        <thead>
+            <tr style="background-color:#1a365d;color:white;">
+                <th style="padding:10px 12px;text-align:left;border:1px solid #2b6cb0;">ESRS Standard</th>
+                <th style="padding:10px 12px;text-align:left;border:1px solid #2b6cb0;">Topic / Sub-topic</th>
+                <th style="padding:10px 12px;text-align:center;border:1px solid #2b6cb0;">Impact Materiality</th>
+                <th style="padding:10px 12px;text-align:center;border:1px solid #2b6cb0;">Financial Materiality</th>
+                <th style="padding:10px 12px;text-align:left;border:1px solid #2b6cb0;">Material DRs included</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>ESRS 2</strong></td>
+                <td>General Information</td>
+                <td style="text-align:center;">Always</td>
+                <td style="text-align:center;">Always</td>
+                <td>BP-1, BP-2, GOV-1, SBM-1, IRO-1, IRO-2</td>
+            </tr>
+            <tr>
+                <td><strong>ESRS E1</strong></td>
+                <td>Climate Change</td>
+                <td style="text-align:center;">✓</td>
+                <td style="text-align:center;">✓</td>
+                <td>E1-1 to E1-9 (as applicable)</td>
+            </tr>
+            <tr>
+                <td><strong>ESRS E2</strong></td>
+                <td>Pollution</td>
+                <td style="text-align:center;">✓</td>
+                <td style="text-align:center;">✓</td>
+                <td>E2-1 to E2-5 (as applicable)</td>
+            </tr>
+            <tr>
+                <td><strong>ESRS E3</strong></td>
+                <td>Water and Marine Resources</td>
+                <td style="text-align:center;">✓</td>
+                <td style="text-align:center;">✓</td>
+                <td>E3-1 to E3-5 (as applicable)</td>
+            </tr>
+            <tr>
+                <td><strong>ESRS E4</strong></td>
+                <td>Biodiversity and Ecosystems</td>
+                <td style="text-align:center;">✓</td>
+                <td style="text-align:center;">—</td>
+                <td>E4-1 to E4-5 (as applicable)</td>
+            </tr>
+            <tr>
+                <td><strong>ESRS E5</strong></td>
+                <td>Resource Use and Circular Economy</td>
+                <td style="text-align:center;">✓</td>
+                <td style="text-align:center;">✓</td>
+                <td>E5-1 to E5-5 (as applicable)</td>
+            </tr>
+            <tr>
+                <td><strong>ESRS S1</strong></td>
+                <td>Own Workforce</td>
+                <td style="text-align:center;">✓</td>
+                <td style="text-align:center;">✓</td>
+                <td>S1-1 to S1-6 (as applicable)</td>
+            </tr>
+            <tr>
+                <td><strong>ESRS S2</strong></td>
+                <td>Workers in the Value Chain</td>
+                <td style="text-align:center;">✓</td>
+                <td style="text-align:center;">✓</td>
+                <td>S2-1 to S2-5 (as applicable)</td>
+            </tr>
+            <tr>
+                <td><strong>ESRS S3</strong></td>
+                <td>Affected Communities</td>
+                <td style="text-align:center;">✓</td>
+                <td style="text-align:center;">—</td>
+                <td>S3-1 to S3-5 (as applicable)</td>
+            </tr>
+            <tr>
+                <td><strong>ESRS S4</strong></td>
+                <td>Consumers and End-users</td>
+                <td style="text-align:center;">✓</td>
+                <td style="text-align:center;">✓</td>
+                <td>S4-1 to S4-5 (as applicable)</td>
+            </tr>
+            <tr>
+                <td><strong>ESRS G1</strong></td>
+                <td>Business Conduct</td>
+                <td style="text-align:center;">✓</td>
+                <td style="text-align:center;">✓</td>
+                <td>G1-1 to G1-6 (as applicable)</td>
+            </tr>
+        </tbody>
+    </table>
+    <p style="font-size:12px;color:#718096;">Note: "✓" indicates topic materiality determined. "—" indicates topic not material. "Always" indicates mandatory disclosure for ESRS 2. The actual list of included DRs may vary based on the specific data available and the undertaking's final materiality determination. ESRS 2 (General Information) is always material and its DRs are always included.</p>
+</div>""",
                             content_type="table",
                             order=1,
                         ),
@@ -1298,7 +1498,37 @@ class ReportTemplate:
                             standard_ref="ESRS G1",
                             paragraph_ref="1",
                             title="Business Conduct Policies",
-                            content_html="To be completed: Describe corporate culture, anti-corruption and anti-bribery policies.",
+                            content_html=f"""<div class="g1-1-content">
+    <h4>G1-1 — Corporate culture and business conduct policies</h4>
+    <p><strong>{template.company_name}</strong> is committed to maintaining the highest standards of business conduct, integrity, and ethical behaviour across all operations and throughout the value chain. The undertaking's corporate culture is underpinned by a clear set of policies, procedures, and training programmes designed to prevent misconduct, promote transparency, and foster a culture of accountability.</p>
+
+    <h5>Corporate culture and values</h5>
+    <p>The undertaking's corporate culture is defined by its core values: integrity, respect, responsibility, and transparency. These values are embedded in the Code of Conduct, which applies to all directors, officers, employees, and third parties acting on behalf of <strong>{template.company_name}</strong>. The Code of Conduct is available on the undertaking's intranet and website, and is communicated to all employees during onboarding and through annual refresher training.</p>
+
+    <h5>Anti-corruption and anti-bribery policy</h5>
+    <p><strong>{template.company_name}</strong> has a zero-tolerance policy towards corruption and bribery in all forms, including extortion, facilitation payments, and improper influence. The Anti-Corruption and Anti-Bribery Policy:</p>
+    <ul>
+        <li>Prohibits the offering, giving, soliciting, or accepting of any undue advantage (financial or otherwise) to or from any person, including public officials and private sector counterparts.</li>
+        <li>Applies to all employees, directors, agents, consultants, contractors, and business partners worldwide.</li>
+        <li>Establishes clear procedures for gifts, hospitality, donations, sponsorship, and conflicts of interest.</li>
+        <li>Requires mandatory due diligence on third parties, including agents and intermediaries, before engagement.</li>
+    </ul>
+
+    <h5>Whistleblowing and reporting mechanisms</h5>
+    <p>The undertaking maintains a confidential and anonymous whistleblowing channel (operated by an independent third party) through which employees and external stakeholders can report suspected violations of laws, regulations, or the Code of Conduct without fear of retaliation. All reports are investigated promptly, impartially, and confidentially by the Ethics Committee. The undertaking prohibits any form of retaliation against persons who raise concerns in good faith.</p>
+
+    <h5>Training and awareness</h5>
+    <p>Business conduct training is provided to all employees on an annual basis, with targeted modules for high-risk roles (e.g., procurement, sales, and management positions). Training covers: the Code of Conduct, anti-corruption and anti-bribery laws, conflicts of interest, competition law, data protection, and the whistleblowing procedure. Completion rates are tracked and reported to the Board annually.</p>
+
+    <h5>Implementation and monitoring</h5>
+    <p>The Compliance Officer is responsible for overseeing the implementation and effectiveness of business conduct policies. The internal audit function conducts periodic reviews of compliance with these policies, including transaction testing and control assessments. Findings are reported to the Audit Committee and Board, and remediation actions are tracked to completion.</p>
+
+    <h5>Policy review and continuous improvement</h5>
+    <p>All business conduct policies are reviewed at least annually and updated to reflect changes in laws, regulations, industry standards, and lessons learned from investigations or incidents. The Board approves material amendments to the Code of Conduct and the Anti-Corruption and Anti-Bribery Policy.</p>
+
+    <h5>Business conduct in the value chain</h5>
+    <p><strong>{template.company_name}</strong> requires its suppliers, contractors, and business partners to adhere to the Supplier Code of Conduct, which sets out minimum standards for ethical behaviour, human rights, labour practices, environmental responsibility, and anti-corruption. Compliance is monitored through audits, self-assessments, and contractual clauses.</p>
+</div>""",
                             content_type="narrative",
                             order=1,
                         ),

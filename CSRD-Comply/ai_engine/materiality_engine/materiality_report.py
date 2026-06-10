@@ -89,7 +89,14 @@ class MaterialityReportGenerator:
                     f"(2) identification of actual and potential impacts, risks and opportunities (IROs), "
                     f"(3) assessment of impact materiality using scale, scope, irremediability and likelihood criteria, "
                     f"(4) assessment of financial materiality using magnitude and likelihood criteria. "
-                    f"The materiality threshold was set at {ScoringEngine.MATERIALITY_THRESHOLD} out of 5."
+                    f"The materiality threshold was set at {ScoringEngine.MATERIALITY_THRESHOLD} out of 5. "
+                    f"Topic-level materiality is driven primarily by IRO scores. "
+                    f"IRO-matched datapoints receive scores derived from the IRO assessment, "
+                    f"while non-IRO datapoints are assigned a neutral baseline of 1/5, "
+                    f"requiring explicit user adjustment to contribute to materiality. "
+                    f"Sector benchmark baselines are used only as a secondary reference "
+                    f"for datapoints not covered by specific IROs and do not independently "
+                    f"drive topic-level materiality."
                 ),
                 "company_context": {
                     "value_chain": context.value_chain_description if context else "Not provided",
@@ -349,7 +356,33 @@ class MaterialityReportGenerator:
         - Evidenze a supporto dell'esclusione
         """
         all_standards = list(MaterialityReportGenerator.STANDARD_NAMES.keys())
-        non_material = [s for s in all_standards if s not in material_standards]
+
+        # ── FIX BUG: determine material topics independently from DB ──────────
+        # The passed material_standards parameter may be incomplete/empty if
+        # calculate_assessment_scores could not compute scores (e.g. when
+        # MaterialityScore records exist but have NULL scoring fields).
+        # Query the DB directly to find ALL material scores for this assessment
+        # and derive the canonical set of material topic prefixes.
+        db_material_scores = db.query(MaterialityScore).filter(
+            MaterialityScore.assessment_id == assessment.id,
+            MaterialityScore.is_material == True,
+        ).all()
+
+        db_material_topics: set = set()
+        for score in db_material_scores:
+            datapoint = db.query(EsrsDatapoint).filter(
+                EsrsDatapoint.id == score.datapoint_id
+            ).first()
+            if datapoint:
+                topic = MaterialityReportGenerator._extract_topic(datapoint.standard_ref)
+                if topic:
+                    db_material_topics.add(topic)
+
+        # Merge DB-derived material topics with the passed parameter.
+        # The union ensures MAXIMAL correctness: if either source identifies a
+        # topic as material, it is treated as material.
+        effective_material_standards = set(material_standards) | db_material_topics
+        non_material = [s for s in all_standards if s not in effective_material_standards]
         
         # Recupera gli score medi per ogni topic non materiale
         scores = db.query(MaterialityScore).filter(
@@ -678,17 +711,31 @@ class MaterialityReportGenerator:
             company, context, assessment, db, material_standard_refs
         )
 
-        # ── FIX BUG 3: documenta il cambio metodologico per increase da 0.49 a 1.21 ──
+        # ═══════════════════════════════════════════════════════════════
+        # METHODOLOGY NOTE — IRO-Primary Approach (documented per ESRS 2 IRO-1)
+        #
+        # Revision: Topic-level materiality is driven PRIMARILY by IRO scores.
+        # Non-IRO datapoints receive a flat neutral baseline of 1/5.
+        # Sector benchmark baselines are used only as a secondary reference
+        # for datapoints not covered by specific IROs.
+        #
+        # Change from prior approach:
+        # - OLD: Differentiated sector benchmark baselines (1-3) applied to all non-IRO
+        #   datapoints, which could drive topic materiality through baseline aggregation
+        #   rather than through identified IROs.
+        # - NEW (current): Flat neutral baseline (1/5) for non-IRO datapoints. IRO scores
+        #   are the primary driver of topic-level materiality. Datapoints without IRO
+        #   coverage require explicit user override to contribute to materiality.
+        # ═══════════════════════════════════════════════════════════════
         scoring_methodology_note = (
-            "Context-aware baseline scores applied. "
-            "Previously, all non-IRO-matched datapoints defaulted to 1/5, which biased "
-            "the assessment toward non-materiality for topics without direct IRO coverage. "
-            "The current methodology assigns differentiated baselines per ESRS topic based on "
-            "sector intensity benchmarks (carbon_intensity for E1-E4, social_risk for S1-S4, "
-            "governance_risk for G1), ranging from 1 (low-intensity) to 3 (very-high-intensity). "
-            "This explains the increase in average impact score from the previous assessment "
-            f"(was ~0.49, now {scores_summary.get('average_impact_score', 'N/A')}) "
-            "and reflects a methodological correction, not a change in company operations."
+            "IRO-primary materiality methodology applied. "
+            "Topic-level materiality is driven by IRO scores rather than sector benchmark baselines. "
+            "IRO-matched datapoints are scored based on IRO assessment results, while all "
+            "non-IRO datapoints are assigned a neutral baseline of 1/5. "
+            "This ensures materiality signals originate from identified impacts, risks and opportunities, "
+            "not from baseline aggregation. Previous methodology applied differentiated sector "
+            "benchmark baselines (1–3 depending on intensity) which could unintentionally drive "
+            "topic materiality without direct IRO coverage."
         )
 
         return {
@@ -727,13 +774,15 @@ class MaterialityReportGenerator:
                 },
             },
             "scoring_methodology_change": {
-                "previous_baseline": "All non-IRO datapoints defaulted to 1/5",
-                "current_baseline": "Context-aware per-topic baselines (1-3/5) based on sector intensity",
-                "impact_on_average_score": (
-                    f"The average impact score increased from ~0.49 to "
-                    f"{scores_summary.get('average_impact_score', 'N/A')} as a direct result "
-                    f"of this methodological change. This does not reflect a change in "
-                    f"company operations or risk profile."
+                "previous_baseline": "Differentiated sector benchmark baselines (1-3/5) applied to all non-IRO datapoints",
+                "current_baseline": "IRO-primary approach: neutral baseline (1/5) for non-IRO datapoints; sector benchmarks used only as secondary reference",
+                "rationale": (
+                    "Topic-level materiality is now driven primarily by IRO scores. "
+                    "Previously, differentiated baseline scores (1-3 depending on sector intensity) "
+                    "could cause topics to appear material through baseline aggregation alone. "
+                    "The revised methodology ensures materiality signals originate specifically "
+                    "from identified Impacts, Risks and Opportunities (IROs), with non-IRO "
+                    "datapoints requiring explicit user override to contribute to materiality."
                 ),
                 "regulatory_compliance": (
                     "Methodology documented per ESRS 2 IRO-1 (par. 7): changes in assessment "

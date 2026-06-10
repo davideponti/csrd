@@ -881,7 +881,93 @@ function ValidationPanel({ result }: { result: any }) {
                   )
                 }
                 return null
-              })()}
+              })()
+            </CardContent>
+          </Card>
+
+          {/* ═══ ESRS E1-6 — GHG EMISSIONS TABLE ═══ */}
+          <Card className="border-green-200 dark:border-green-800">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <PieChart className="h-5 w-5 text-green-600" />
+                ESRS E1-6 — Tabella Emissioni GHG (Scope 1, 2, 3, Total)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground mb-4">
+                Confronto tra l'anno di riferimento ({reportYear}) e l'anno base (2025).
+                Variazione % calcolata come (valore corrente − valore base) ÷ valore base × 100.
+                Obbligatorio ai sensi dell'ESRS E1-6 e del GHG Protocol.
+              </p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-green-200 dark:border-green-700">
+                      <th className="text-left py-3 px-2 font-semibold">Categoria di emissione</th>
+                      <th className="text-right py-3 px-2 font-semibold">2025 (tCO₂e)</th>
+                      <th className="text-right py-3 px-2 font-semibold">{reportYear} (tCO₂e)</th>
+                      <th className="text-right py-3 px-2 font-semibold">Variazione (%)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(() => {
+                      // Helper to compute change
+                      const calcPct = (base: number, current: number): { label: string; cls: string } => {
+                        if (!base || base <= 0) {
+                          return { label: 'N/A', cls: 'text-muted-foreground' }
+                        }
+                        const chg = ((current - base) / base) * 100
+                        const sign = chg > 0 ? '+' : ''
+                        const cls = chg > 0
+                          ? 'text-red-600 dark:text-red-400 font-semibold'
+                          : chg < 0
+                            ? 'text-green-600 dark:text-green-400 font-semibold'
+                            : 'text-muted-foreground'
+                        return { label: `${sign}${chg.toFixed(1)}%`, cls }
+                      }
+
+                      // Helper to format numbers (show dash if zero)
+                      const fmtNum = (v: number): string => v ? v.toFixed(2) : '—'
+
+                      // Read values
+                      const bl1 = parseFloat(baseline2025.scope1) || 0
+                      const bl2 = parseFloat(baseline2025.scope2) || 0
+                      const bl2m = parseFloat(baseline2025.scope2_market_based) || 0
+                      const bl3 = parseFloat(baseline2025.scope3) || 0
+                      const blTotal = bl1 + bl2 + bl3
+
+                      const cur1 = summary?.summary?.scope1 || 0
+                      const cur2 = summary?.summary?.scope2 || 0
+                      const cur2m = summary?.summary?.scope2_market_based || 0
+                      const cur3 = summary?.summary?.scope3 || 0
+                      const curTotal = summary?.summary?.total || 0
+
+                      const rows: { label: string; base: number; cur: number }[] = [
+                        { label: 'Scope 1 — Emissioni dirette (GHG)', base: bl1, cur: cur1 },
+                        { label: 'Scope 2 — Emissioni indirette (location-based)', base: bl2, cur: cur2 },
+                        { label: 'Scope 2 — Emissioni indirette (market-based)', base: bl2m, cur: cur2m },
+                        { label: 'Scope 3 — Emissioni indirette catena del valore', base: bl3, cur: cur3 },
+                        { label: 'Totale emissioni GHG (Scope 1 + 2 + 3)', base: blTotal, cur: curTotal },
+                      ]
+
+                      return rows.map((row, i) => {
+                        const pct = calcPct(row.base, row.cur)
+                        const isTotal = i === rows.length - 1
+                        return (
+                          <tr key={i} className={`border-b ${isTotal ? 'border-green-300 dark:border-green-600 font-semibold bg-green-50 dark:bg-green-950/50' : 'border-border/50 hover:bg-muted/30'}`}>
+                            <td className={`py-2.5 px-2 ${isTotal ? 'text-green-800 dark:text-green-200' : ''}`}>
+                              {row.label}
+                            </td>
+                            <td className="text-right py-2.5 px-2 tabular-nums">{fmtNum(row.base)}</td>
+                            <td className="text-right py-2.5 px-2 tabular-nums">{fmtNum(row.cur)}</td>
+                            <td className={`text-right py-2.5 px-2 tabular-nums ${pct.cls}`}>{pct.label}</td>
+                          </tr>
+                        )
+                      })
+                    })()}
+                  </tbody>
+                </table>
+              </div>
             </CardContent>
           </Card>
 

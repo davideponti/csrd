@@ -411,54 +411,43 @@ def generate_score_entries(
             iro_matched_datapoint_ids.add(dp_id_str)
             iro_created += 1
 
-    # ── Phase 3: Create context-aware baseline scores for ALL remaining datapoints ──
-    # Invece di defaultare tutto a 1 (che pre-giudica come non-materiale ogni topic),
-    # usiamo baseline differenziate per topic basate sul benchmark di settore.
-    # Questo evita il bias "tutto non materiale" mantenendo la necessità di 
-    # validazione utente per superare la soglia 3.0/5.0.
+    # ── Phase 3: Create neutral baseline scores for ALL remaining datapoints ──
+    # ⚠  METHODOLOGY CHANGE (IRO-Primary Approach):
+    # Topic-level materiality is driven PRIMARILY by IRO scores. Baseline scores
+    # for non-IRO datapoints serve only as a neutral secondary input (1/5).
     #
-    # Logica: topic con alta intensità nel settore partono da baseline più alta (2-3),
-    # topic a bassa intensità partono da baseline neutra (1-2).
-    # In ogni caso, per superare 3.0 serve adjustment esplicito dell'utente.
-    benchmark = IROGenerator.get_sector_benchmark(company.sector)
+    # Previously, this phase applied differentiated sector benchmark baselines
+    # (1-3 depending on sector intensity) to all remaining datapoints. This
+    # could unintentionally drive topic-level materiality through many neutral
+    # datapoints rather than through identified IROs — inconsistent with the
+    # principle that materiality should originate from specific IRO assessment.
+    #
+    # Revised approach per ESRS 2 IRO-1 (documented methodology change):
+    # - IRO-matched datapoints → scored based on IRO assessment (primary driver)
+    # - Non-IRO datapoints → flat neutral baseline (1/5), requiring explicit user
+    #   adjustment (manual scoring override) to contribute to materiality.
+    # - Sector benchmarks remain available as reference context in the UI but
+    #   no longer auto-apply as scoring baselines.
+    #
+    # The neutral baseline (1/5) ensures:
+    #   1) IROs are the sole origin of materiality signals
+    #   2) No topic can appear material purely from baseline aggregation
+    #   3) Auditable traceability: every material datapoint maps to an IRO
+    #      or an explicit user override documented in the scoring rationale.
+    # ==============================================================
 
-    # Mappa topic ESRS → baseline score suggerito basato sul benchmark di settore
     def _get_topic_baseline(standard_ref: str) -> tuple:
-        """Restituisce (impact_baseline, financial_baseline) per un topic ESRS.
+        """Restituisce baseline neutra (1, 1) per ogni topic ESRS non coperto da IRO.
         
-        I valori sono volutamente conservativi (sotto-soglia 3.0) per non 
-        pre-giudicare la materialità, ma abbastanza alti da non escludere 
-        a priori interi topic.
+        IRO-Primary Approach:
+        I punteggi IRO sono il driver principale della materialità a livello di topic.
+        Le baseline per datapoint non coperti da IRO specifici sono neutre (1/5)
+        e fungono solo da input secondario. Per superare la soglia di materialità
+        (3.0/5.0), è necessario un intervento esplicito dell'utente (scoring manuale)
+        o la presenza di IRO sufficientemente alti nel topic.
         """
-        topic = standard_ref.split("-")[0] if "-" in standard_ref else standard_ref
-        
-        # Mappa intensità benchmark a baseline numerica
-        intensity_map = {"very_high": 3, "high": 2, "medium": 2, "low": 1}
-        
-        # Topic ambientali: usano carbon/water/waste intensity
-        env_baseline = intensity_map.get(benchmark.get("carbon_intensity", "medium"), 2)
-        water_baseline = intensity_map.get(benchmark.get("water_intensity", "medium"), 2)
-        waste_baseline = intensity_map.get(benchmark.get("waste_intensity", "medium"), 2)
-        
-        # Topic sociali: usano social_risk
-        social_baseline = intensity_map.get(benchmark.get("social_risk", "medium"), 2)
-        
-        # Topic governance: usano governance_risk
-        gov_baseline = intensity_map.get(benchmark.get("governance_risk", "medium"), 2)
-        
-        baselines = {
-            "ESRS E1": (env_baseline, env_baseline),
-            "ESRS E2": (env_baseline, max(1, env_baseline - 1)),
-            "ESRS E3": (water_baseline, max(1, water_baseline - 1)),
-            "ESRS E4": (max(1, env_baseline - 1), max(1, env_baseline - 1)),
-            "ESRS E5": (waste_baseline, max(1, waste_baseline - 1)),
-            "ESRS S1": (social_baseline, social_baseline),
-            "ESRS S2": (social_baseline, social_baseline),
-            "ESRS S3": (max(1, social_baseline - 1), max(1, social_baseline - 1)),
-            "ESRS S4": (max(1, social_baseline - 1), social_baseline),
-            "ESRS G1": (gov_baseline, gov_baseline),
-        }
-        return baselines.get(topic, (2, 2))
+        # Flat neutral baseline: 1/5 per tutti i topic non coperti da IRO
+        return (1, 1)
 
     all_datapoints = db.query(EsrsDatapoint).all()
     neutral_created = 0
