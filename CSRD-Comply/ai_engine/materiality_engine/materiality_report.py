@@ -341,7 +341,7 @@ class MaterialityReportGenerator:
 
         # Determina quali standard sono nel report
         material_standard_refs = list(set(
-            MaterialityReportGenerator._extract_topic(m["standard_ref"])
+            MaterialityReportGenerator._extract_topic(m["reference"])
             for m in matrix.get("content", {}).get("material_datapoints", [])
         ))
 
