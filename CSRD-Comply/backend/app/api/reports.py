@@ -344,7 +344,7 @@ def _compile_esrs_data(report, db):
     template.set_materiality(material_standards_list)
 
     # Rimuovi le sezioni non materiali dal template
-    template.remove_non_material_sections(material_standards_list)
+    template.remove_non_material_sections()
 
     if emissions_data:
         template.populate_ghg_section(emissions_data)
