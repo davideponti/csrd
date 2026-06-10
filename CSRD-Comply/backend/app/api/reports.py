@@ -840,7 +840,7 @@ def export_report(
 
     xhtml_content = report.xhtml_content or "<html><body><p>No content generated yet.</p></body></html>"
     filename_base = f"csrd_report_{report.reporting_year}"
-    report_data = _build_report_data(report, current_user)
+    report_data = _build_report_data(report, current_user, db)
     options = ExportOptions()
 
     try:
@@ -925,7 +925,7 @@ def export_all_formats(
     service = ExportService()
 
     xhtml_content = report.xhtml_content or ""
-    report_data = _build_report_data(report, current_user)
+    report_data = _build_report_data(report, current_user, db)
 
     results = service.export_all(xhtml_content, report_data)
 
@@ -994,9 +994,17 @@ def get_available_formats():
     }
 
 
-def _build_report_data(report: Report, current_user: User) -> Dict[str, Any]:
-    """Build structured report data for XLSX/JSON export with real emissions and baseline data."""
+def _build_report_data(report: Report, current_user: User, db: Optional[Session] = None) -> Dict[str, Any]:
+    """Build structured report data for XLSX/JSON export with real emissions and baseline data.
+    
+    Usa `current_user.company` se disponibile (relazione lazy-loaded),
+    altrimenti fa una query esplicita tramite `db`.
+    """
+    from app.models import Company as CompanyModel
     company = current_user.company
+    if company is None and db is not None:
+        company = db.query(CompanyModel).filter(CompanyModel.company_id == current_user.company_id).first()
+    company_name = company.company_name if company else current_user.email
 
     current_year = report.reporting_year
     prev_year = current_year - 1
@@ -1062,7 +1070,7 @@ def _build_report_data(report: Report, current_user: User) -> Dict[str, Any]:
         }
 
     return {
-        "company_name": company.company_name if company else current_user.email,
+        "company_name": company_name,
         "report_title": report.title,
         "reporting_year": report.reporting_year,
         "baseline_year": prev_year,

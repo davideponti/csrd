@@ -77,7 +77,11 @@ async def add_correlation_id(request: Request, call_next):
 # ── Security Headers Middleware ──────────────────────────────────
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):
-    """Aggiunge header di sicurezza a tutte le risposte, incluso Content-Security-Policy."""
+    """Aggiunge header di sicurezza a tutte le risposte, incluso Content-Security-Policy.
+    
+    Salta CSP per endpoint di export/download binario (PDF, XLSX, DOCX)
+    per evitare interferenze con il download di blob.
+    """
     response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
@@ -85,14 +89,18 @@ async def add_security_headers(request: Request, call_next):
     response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
-    response.headers["Content-Security-Policy"] = (
-        "default-src 'self'; "
-        "script-src 'self'; "
-        "style-src 'self' 'unsafe-inline'; "
-        "img-src 'self' data:; "
-        "font-src 'self'; "
-        "frame-ancestors 'none';"
-    )
+    
+    # Skip CSP for export/download endpoints to avoid blocking blob fetches
+    path = request.url.path
+    if not ("export" in path or "ixbrl" in path or path.endswith((".pdf", ".xlsx", ".docx"))):
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self'; "
+            "style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data:; "
+            "font-src 'self'; "
+            "frame-ancestors 'none';"
+        )
     return response
 
 

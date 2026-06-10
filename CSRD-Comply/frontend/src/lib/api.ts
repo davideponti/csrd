@@ -139,7 +139,16 @@ export const api = {
     const headers: Record<string, string> = {};
     const res = await fetch(`${API_BASE}${endpoint}`, { headers, credentials: 'include' });
     if (!res.ok) {
-      throw new Error(`Failed to fetch blob: ${res.statusText}`);
+      // In HTTP/2, statusText è SEMPRE stringa vuota, quindi includiamo status code
+      // e proviamo a leggere il corpo JSON dell'errore per debug
+      let detail = "";
+      try {
+        const errorBody = await res.clone().json().catch(() => null);
+        detail = errorBody?.detail || "";
+      } catch {}
+      throw new Error(
+        `Failed to fetch blob (HTTP ${res.status})` + (detail ? `: ${detail}` : "")
+      );
     }
     return res.blob();
   },
