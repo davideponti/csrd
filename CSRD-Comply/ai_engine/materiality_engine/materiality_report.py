@@ -637,22 +637,22 @@ class MaterialityReportGenerator:
         db: Session,
     ) -> Dict[str, Any]:
         """Genera il report completo di doppia materialità con tutte le sezioni ESRS."""
+        # ⭐ CRITICAL: calculate ALL scores FIRST before generating any section.
+        # calculate_assessment_scores sets is_material=True/False + total_impact/financial_score
+        # on every MaterialityScore record and commits to DB. Without this step, IRO-2 would
+        # query is_material==True and find nothing (NULL), producing empty sections.
+        scores_summary = ScoringEngine.calculate_assessment_scores(db, str(assessment.id))
+
+        # Derive material_standard_refs from scores_summary (single source of truth).
+        # This avoids calling generate_iro2_section twice and eliminates ordering bugs.
+        # scores_summary.material_topics is computed by ScoringEngine using the same
+        # logic as IRO-2 (query is_material==True from DB), so they are guaranteed consistent.
+        material_standard_refs = sorted(scores_summary.get('material_topics', []))
+
         iro1 = MaterialityReportGenerator.generate_iro1_section(company, context, assessment, db)
         iro2 = MaterialityReportGenerator.generate_iro2_section(assessment, db)
         matrix = MaterialityReportGenerator.generate_matrix_section(assessment, db)
         standard_sections = MaterialityReportGenerator.generate_standard_detail_sections(assessment, db)
-        scores_summary = ScoringEngine.calculate_assessment_scores(db, str(assessment.id))
-
-        # ── FIX BUG 2: derive material_standard_refs from IRO-2 (DB truth), NOT from matrix ──
-        # CONTEXT: IRO-2 queries MaterialityScore WHERE is_material=True directly from DB.
-        # The matrix section may exclude scores where one dimension (impact/financial) is None,
-        # creating a contradiction: topics appear material in IRO-2 but get listed as "non-material"
-        # in the justifications section below.
-        iro2_data = MaterialityReportGenerator.generate_iro2_section(assessment, db)
-        material_standard_refs = sorted([
-            dr["standard"]
-            for dr in iro2_data.get("content", {}).get("material_disclosure_requirements", [])
-        ])
 
         # Ottieni tutti gli standard ESRS per contesto (anche non materiali)
         all_standards = list(MaterialityReportGenerator.STANDARD_NAMES.keys())
