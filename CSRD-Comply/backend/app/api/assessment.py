@@ -355,7 +355,10 @@ def generate_score_entries(
     db.commit()
     logger.info(f"Deleted {existing_scores_count} existing scores for assessment {assessment.id}")
 
-    # ── Phase 2: Create IRO-matched scores ──
+    # ── Phase 2: Create IRO-matched scores (ONE per datapoint) ──
+    # Critical fix: skip if this datapoint already has a score from a previous IRO
+    # (multiple IROs for the same topic, e.g. 2 x ESRS E1, would otherwise
+    # create duplicate scores for the same datapoint, inflating counts).
     iro_created = 0
     iro_matched_datapoint_ids = set()
 
@@ -369,9 +372,28 @@ def generate_score_entries(
             continue
 
         for datapoint in matching_datapoints:
-            impact_val = int(round(iro.get("initial_impact_score") or 3))
+            dp_id_str = str(datapoint.id)
+            # ⭐ Skip if this datapoint already matched by a previous IRO
+            if dp_id_str in iro_matched_datapoint_ids:
+                continue
 
+            impact_val = int(round(iro.get("initial_impact_score") or 3))
             financial_val = int(round(iro.get("initial_financial_score") or 2))
+
+            # Calcola subito i punteggi aggregati (total_impact_score, etc.)
+            # così non restano NULL e il report/materialità funziona subito.
+            impact_score = ScoringEngine.calculate_impact_score(
+                impact_val,              # scale
+                impact_val,              # scope
+                max(1, impact_val - 1),  # irremediability
+                impact_val,              # likelihood
+            )
+            financial_score = ScoringEngine.calculate_financial_score(
+                financial_val,  # magnitude
+                financial_val,  # likelihood
+            )
+            dm_result = ScoringEngine.calculate_double_materiality(impact_score, financial_score)
+
             score = MaterialityScore(
                 assessment_id=assessment.id,
                 datapoint_id=datapoint.id,
@@ -381,9 +403,12 @@ def generate_score_entries(
                 impact_likelihood=impact_val,
                 financial_magnitude=financial_val,
                 financial_likelihood=financial_val,
+                total_impact_score=impact_score,
+                total_financial_score=financial_score,
+                is_material=dm_result["is_material"],
             )
             db.add(score)
-            iro_matched_datapoint_ids.add(str(datapoint.id))
+            iro_matched_datapoint_ids.add(dp_id_str)
             iro_created += 1
 
     # ── Phase 3: Create context-aware baseline scores for ALL remaining datapoints ──
@@ -447,6 +472,19 @@ def generate_score_entries(
         # Determina baseline contestuale per questo datapoint
         impact_bl, financial_bl = _get_topic_baseline(datapoint.standard_ref)
 
+        # Calcola subito i punteggi aggregati, come per IRO-matched
+        impact_score = ScoringEngine.calculate_impact_score(
+            impact_bl,                         # scale
+            impact_bl,                         # scope
+            max(1, impact_bl - 1),             # irremediability
+            impact_bl,                         # likelihood
+        )
+        financial_score = ScoringEngine.calculate_financial_score(
+            financial_bl,                      # magnitude
+            financial_bl,                      # likelihood
+        )
+        dm_result = ScoringEngine.calculate_double_materiality(impact_score, financial_score)
+
         score = MaterialityScore(
             assessment_id=assessment.id,
             datapoint_id=datapoint.id,
@@ -456,6 +494,9 @@ def generate_score_entries(
             impact_likelihood=impact_bl,
             financial_magnitude=financial_bl,
             financial_likelihood=financial_bl,
+            total_impact_score=impact_score,
+            total_financial_score=financial_score,
+            is_material=dm_result["is_material"],
         )
         db.add(score)
         neutral_datapoint_ids.add(dp_id_str)
@@ -687,19 +728,18 @@ def calculate_all_scores(
     ).all()
 
     for score in scores:
-        # Recalculate if ANY dimension has a value (impact or financial)
-        if score.impact_scale is not None or score.financial_magnitude is not None:
-            ScoringEngine.score_single_datapoint(
-                db, str(score.id),
-                impact_scale=score.impact_scale,
-                impact_scope=score.impact_scope,
-                impact_irremediability=score.impact_irremediability,
-                impact_likelihood=score.impact_likelihood,
-                financial_magnitude=score.financial_magnitude,
-                financial_likelihood=score.financial_likelihood,
-            )
+        # Recalculate always — the ScoringEngine handles None values (returns 0.0)
+        ScoringEngine.score_single_datapoint(
+            db, str(score.id),
+            impact_scale=score.impact_scale,
+            impact_scope=score.impact_scope,
+            impact_irremediability=score.impact_irremediability,
+            impact_likelihood=score.impact_likelihood,
+            financial_magnitude=score.financial_magnitude,
+            financial_likelihood=score.financial_likelihood,
+        )
 
-    # Then calculate aggregate
+    # Then calculate aggregate (sets is_material on all, commits)
     summary = ScoringEngine.calculate_assessment_scores(db, assessment_id)
     return summary
 
