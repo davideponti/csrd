@@ -663,6 +663,8 @@ def get_gap_analysis(
     """Run gap analysis and return results comparing ESRS requirements vs company data."""
     company = _get_company_or_404(current_user, db)
 
+    assessment = _get_assessment_or_404(assessment_id, current_user.company_id, db)
     gap_analyzer = GapAnalyzer(db)
-    result = gap_analyzer.get_summary(str(company.company_id))
+    # Pass assessment_id so the analyzer can check MaterialityScores for this assessment
+    result = gap_analyzer.get_summary(company.company_id, assessment_id=str(assessment.id))
     return result

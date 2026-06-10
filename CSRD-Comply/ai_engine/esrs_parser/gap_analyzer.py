@@ -59,8 +59,8 @@ class GapAnalyzer:
     def __init__(self, db: Session = None):
         self.db = db
 
-    def analyze(self, company_id: str) -> GapAnalysisResult:
-        """Run gap analysis for a given company."""
+    def analyze(self, company_id: str, assessment_id: str = None) -> GapAnalysisResult:
+        """Run gap analysis for a given company and optional assessment."""
         result = GapAnalysisResult()
 
         if self.db is None:
@@ -74,8 +74,6 @@ class GapAnalyzer:
                 "ESRS S1": {"category": "social", "required": 20, "complete": 5, "partial": 5, "missing": 10},
                 "ESRS G1": {"category": "governance", "required": 15, "complete": 0, "partial": 5, "missing": 10},
             }
-            from random import seed as random_seed
-            # Use deterministic gaps for tests
             return result
 
         # Get all required datapoints for this company
@@ -86,44 +84,64 @@ class GapAnalyzer:
         )
         result.total_required = len(required_datapoints)
 
+        # Pre-fetch company context to check narrative completeness
+        company_context = (
+            self.db.query(CompanyContext)
+            .filter(CompanyContext.company_id == company_id)
+            .first()
+        )
+        has_context = company_context is not None
+        has_value_chain = bool(company_context and company_context.value_chain_description)
+        has_activities = bool(company_context and company_context.key_activities)
+
+        # Pre-fetch all emission records for this company (one query)
+        company_emissions = (
+            self.db.query(EmissionsData)
+            .filter(EmissionsData.company_id == company_id)
+            .all()
+        ) if company_id else []
+        has_any_emission_data = len(company_emissions) > 0
+
+        # Pre-fetch materiality scores for this assessment
+        materiality_scores_map = {}
+        if assessment_id:
+            scores = (
+                self.db.query(MaterialityScore)
+                .filter(MaterialityScore.assessment_id == assessment_id)
+                .all()
+            )
+            for s in scores:
+                materiality_scores_map[str(s.datapoint_id)] = s
+
         # Group by standard
         standards = {}
         for dp in required_datapoints:
             std = dp.standard_ref.split("-")[0] if "-" in dp.standard_ref else dp.standard_ref
             if std not in standards:
-                standards[std] = {"required": 0, "complete": 0, "partial": 0, "missing": 0}
+                standards[std] = {"category": "environmental" if std.startswith("ESRS E") else "social" if std.startswith("ESRS S") else "governance", "required": 0, "complete": 0, "partial": 0, "missing": 0}
             standards[std]["required"] += 1
 
         # Check each datapoint against existing data
         for dp in required_datapoints:
             std = dp.standard_ref.split("-")[0] if "-" in dp.standard_ref else dp.standard_ref
-
-            # Check emissions_data
-            emission_exists = (
-                self.db.query(EmissionsData)
-                .filter(
-                    EmissionsData.company_id == company_id,
-                    # Match based on topic keywords in disclosure text
-                )
-                .first()
-            )
-
-            # Check materiality_scores
-            materiality_exists = (
-                self.db.query(MaterialityScore)
-                .filter(
-                    MaterialityScore.datapoint_id == dp.id,
-                    MaterialityScore.is_material == True,
-                )
-                .first()
-            )
-
-            # Simplified matching logic:
-            # If datapoint relates to emissions, check emissions_data
             text_lower = dp.disclosure_requirement.lower()
 
+            # ── Check 1: Emissions datapoints ──
             if any(kw in text_lower for kw in ["emission", "ghg", "scope 1", "scope 2", "scope 3"]):
-                if emission_exists:
+                # Check if company has actual emission data for this keyword
+                emission_match = False
+                if has_any_emission_data:
+                    # Match keyword: if "scope 1" in disclosure, look for scope=1 records
+                    if "scope 1" in text_lower:
+                        emission_match = any(e.scope == "1" for e in company_emissions)
+                    elif "scope 2" in text_lower:
+                        emission_match = any(e.scope == "2" for e in company_emissions)
+                    elif "scope 3" in text_lower:
+                        emission_match = any(e.scope == "3" for e in company_emissions)
+                    else:
+                        emission_match = has_any_emission_data
+
+                if emission_match:
                     result.complete += 1
                     standards[std]["complete"] += 1
                 else:
@@ -136,8 +154,18 @@ class GapAnalyzer:
                         effort="medium",
                         suggestion=f"Inserire dati {dp.standard_ref}: {dp.disclosure_requirement}",
                     ))
-            elif any(kw in text_lower for kw in ["materiality", "impact", "iro"]):
-                if materiality_exists:
+
+            # ── Check 2: Materiality / Impact / IRO datapoints ──
+            elif any(kw in text_lower for kw in ["materiality", "impact", "iro", "risk", "opportunity"]):
+                # Check if this specific datapoint has been scored in the current assessment
+                dp_id_str = str(dp.id)
+                has_score = dp_id_str in materiality_scores_map
+                is_scored = has_score and (
+                    materiality_scores_map[dp_id_str].impact_scale is not None
+                    or materiality_scores_map[dp_id_str].financial_magnitude is not None
+                )
+
+                if is_scored:
                     result.complete += 1
                     standards[std]["complete"] += 1
                 else:
@@ -150,10 +178,55 @@ class GapAnalyzer:
                         effort="medium",
                         suggestion=f"Completare valutazione materialità per {dp.standard_ref}",
                     ))
+
+            # ── Check 3: Energy / consumption datapoints ──
+            elif any(kw in text_lower for kw in ["energy", "consumption", "kwh", "fuel"]):
+                if has_any_emission_data:
+                    result.complete += 1
+                    standards[std]["complete"] += 1
+                else:
+                    result.missing += 1
+                    standards[std]["missing"] += 1
+                    result.priority_actions.append(GapAction(
+                        datapoint=dp.disclosure_requirement,
+                        standard_ref=dp.standard_ref,
+                        priority="high",
+                        effort="medium",
+                        suggestion=f"Inserire dati consumo energetico per {dp.standard_ref}",
+                    ))
+
+            # ── Check 4: Narrative / Context datapoints ──
+            elif any(kw in text_lower for kw in ["policy", "description", "narrative", "process", "due diligence", "strategy", "plan", "target", "action"]):
+                # Check if company has context data => partial completion
+                if has_value_chain or has_activities:
+                    result.partial += 1
+                    standards[std]["partial"] += 1
+                else:
+                    result.missing += 1
+                    standards[std]["missing"] += 1
+                    result.priority_actions.append(GapAction(
+                        datapoint=dp.disclosure_requirement,
+                        standard_ref=dp.standard_ref,
+                        priority="medium",
+                        effort="low",
+                        suggestion=f"Documentare {dp.standard_ref}: {dp.disclosure_requirement}",
+                    ))
+
             else:
-                # Narrative/context datapoints - mark as partial
-                result.partial += 1
-                standards[std]["partial"] += 1
+                # Default: mark as partial if context exists, otherwise missing
+                if has_context:
+                    result.partial += 1
+                    standards[std]["partial"] += 1
+                else:
+                    result.missing += 1
+                    standards[std]["missing"] += 1
+                    result.priority_actions.append(GapAction(
+                        datapoint=dp.disclosure_requirement,
+                        standard_ref=dp.standard_ref,
+                        priority="medium",
+                        effort="medium",
+                        suggestion=f"Completare {dp.standard_ref}: {dp.disclosure_requirement}",
+                    ))
 
         result.gaps_by_standard = standards
         result.priority_actions.sort(
@@ -168,9 +241,9 @@ class GapAnalyzer:
 
         return result
 
-    def get_summary(self, company_id: str) -> dict:
+    def get_summary(self, company_id: str, assessment_id: str = None) -> dict:
         """Get a summary of the gap analysis as a dict (for API response)."""
-        analysis = self.analyze(company_id)
+        analysis = self.analyze(company_id, assessment_id=assessment_id)
 
         return {
             "total_required": analysis.total_required,

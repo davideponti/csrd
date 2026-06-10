@@ -782,7 +782,14 @@ class IROGenerator:
         sector: str,
         context: Dict,
     ) -> List[Dict]:
-        """Genera IRO basati su regole a partire dal contesto."""
+        """Genera IRO basati su regole a partire dal contesto aziendale.
+        
+        Più contesto l'utente inserisce, più IRO vengono generati.
+        - Se c'è value_chain → genera IRO S2 (catena fornitura)
+        - Se ci sono attività → genera IRO contestuali per topic ESRS
+        - Se ci sono paesi → IRO compliance
+        - Se ci sono stakeholder → IRO S3
+        """
         sector_letter = IROGenerator.get_sector_code(sector)
         ai_iros = []
         idx = 1
@@ -793,40 +800,115 @@ class IROGenerator:
         geo_scope = context.get("geographical_scope") or []
         stakeholders = context.get("stakeholder_groups") or []
 
-        # Se value chain descrive supply chain complessa
-        if any(w in value_chain for w in ["fornitore", "supplier", "supply", "import", "extra-eu"]):
-            ai_iros.append({
-                "id": f"AI_{sector_letter}_S2_{idx:03d}", "type": "risk",
-                "topic": "ESRS S2", "ai_generated": True,
-                "name": "Rischio supply chain extra-EU",
-                "description": "Rischio violazione diritti umani/ambientali nella supply chain internazionale",
-                "default_impact_scale": 4, "default_financial_magnitude": 3, "severity": "high",
-                "generation_method": "rule_based",
-            })
+        # Conta quanti campi sono compilati — usiamo questo per variare il numero di IRO
+        filled_fields = 0
+        if value_chain and len(value_chain) > 3:
+            filled_fields += 1
+        if activities:
+            filled_fields += 1
+        if geo_scope:
+            filled_fields += 1
+        if stakeholders:
+            filled_fields += 1
+
+        # ── SEMPRE genera almeno 1 IRO se c'è contesto, +1 per ogni campo compilato ──
+
+        # 1) Value chain → sempre se c'è almeno testo (anche breve)
+        if value_chain and len(value_chain) > 3:
+            if any(w in value_chain for w in ["fornitore", "supplier", "supply", "import", "extra-eu", "logistic", "distribuzion", "acquisto", "approvvigion"]):
+                ai_iros.append({
+                    "id": f"AI_{sector_letter}_S2_{idx:03d}", "type": "risk",
+                    "topic": "ESRS S2", "ai_generated": True,
+                    "name": "Rischio supply chain",
+                    "description": "Rischio violazione diritti umani/ambientali nella supply chain",
+                    "default_impact_scale": 4, "default_financial_magnitude": 3, "severity": "high",
+                    "generation_method": "rule_based",
+                })
+            else:
+                ai_iros.append({
+                    "id": f"AI_{sector_letter}_S2_{idx:03d}", "type": "impact",
+                    "topic": "ESRS S2", "ai_generated": True,
+                    "name": "Gestione relazioni con fornitori",
+                    "description": "Impatto delle pratiche di approvvigionamento sulla catena del valore",
+                    "default_impact_scale": 3, "default_financial_magnitude": 2, "severity": "medium",
+                    "generation_method": "rule_based",
+                })
             idx += 1
 
-        # Se operano in più paesi
-        if len(geo_scope) > 3:
-            ai_iros.append({
-                "id": f"AI_{sector_letter}_G1_{idx:03d}", "type": "risk",
-                "topic": "ESRS G1", "ai_generated": True,
-                "name": "Rischio compliance multi-giurisdizione",
-                "description": "Complessità normativa operando in giurisdizioni multiple",
-                "default_impact_scale": 3, "default_financial_magnitude": 3, "severity": "medium",
-                "generation_method": "rule_based",
-            })
+        # 2) Attività → genera IRO sul modello di business
+        if activities:
+            # Se attività manifatturiere/industriali
+            if any(a in " ".join(activities) for a in ["produzion", "fabbricazion", "manifattur", "industrial", "processo produttiv"]):
+                ai_iros.append({
+                    "id": f"AI_{sector_letter}_E1_{idx:03d}", "type": "impact",
+                    "topic": "ESRS E1", "ai_generated": True,
+                    "name": "Impatto ambientale processi produttivi",
+                    "description": f"Emissioni e consumi energetici legati a: {', '.join(activities[:3])}",
+                    "default_impact_scale": 3, "default_financial_magnitude": 3, "severity": "medium",
+                    "generation_method": "rule_based",
+                })
+            elif any(a in " ".join(activities) for a in ["serviz", "consulenza", "professional", "digital", "software"]):
+                ai_iros.append({
+                    "id": f"AI_{sector_letter}_S1_{idx:03d}", "type": "impact",
+                    "topic": "ESRS S1", "ai_generated": True,
+                    "name": "Capitale umano e competenze",
+                    "description": f"Gestione talenti e competenze per: {', '.join(activities[:3])}",
+                    "default_impact_scale": 3, "default_financial_magnitude": 3, "severity": "medium",
+                    "generation_method": "rule_based",
+                })
+            else:
+                ai_iros.append({
+                    "id": f"AI_{sector_letter}_E1_{idx:03d}", "type": "impact",
+                    "topic": "ESRS E1", "ai_generated": True,
+                    "name": "Impronta carbonio operativa",
+                    "description": f"Emissioni GHG derivate dall'attività di: {', '.join(activities[:3])}",
+                    "default_impact_scale": 2, "default_financial_magnitude": 2, "severity": "low",
+                    "generation_method": "rule_based",
+                })
             idx += 1
 
-        # Se hanno stakeholder espliciti
-        if len(stakeholders) > 3:
-            ai_iros.append({
-                "id": f"AI_{sector_letter}_S3_{idx:03d}", "type": "impact",
-                "topic": "ESRS S3", "ai_generated": True,
-                "name": "Coinvolgimento stakeholder multipli",
-                "description": "Gestione delle aspettative di numerosi stakeholder",
-                "default_impact_scale": 3, "default_financial_magnitude": 2, "severity": "medium",
-                "generation_method": "rule_based",
-            })
+        # 3) Paesi → sempre se specificati (anche 1 solo paese extra-EU o multi-country)
+        if len(geo_scope) > 0:
+            if len(geo_scope) > 2:
+                ai_iros.append({
+                    "id": f"AI_{sector_letter}_G1_{idx:03d}", "type": "risk",
+                    "topic": "ESRS G1", "ai_generated": True,
+                    "name": "Compliance multi-giurisdizione",
+                    "description": f"Rischio conformità normativa operando in {len(geo_scope)} paesi/regioni",
+                    "default_impact_scale": 3, "default_financial_magnitude": 3, "severity": "medium",
+                    "generation_method": "rule_based",
+                })
+            else:
+                ai_iros.append({
+                    "id": f"AI_{sector_letter}_G1_{idx:03d}", "type": "risk",
+                    "topic": "ESRS G1", "ai_generated": True,
+                    "name": "Rischio normativo locale",
+                    "description": f"Conformità a normative locali in {geo_scope[0]}",
+                    "default_impact_scale": 2, "default_financial_magnitude": 3, "severity": "low",
+                    "generation_method": "rule_based",
+                })
+            idx += 1
+
+        # 4) Stakeholder → sempre se specificati
+        if len(stakeholders) > 0:
+            if len(stakeholders) > 3:
+                ai_iros.append({
+                    "id": f"AI_{sector_letter}_S3_{idx:03d}", "type": "impact",
+                    "topic": "ESRS S3", "ai_generated": True,
+                    "name": "Relazioni con stakeholder multipli",
+                    "description": "Gestione aspettative di stakeholder diversificati",
+                    "default_impact_scale": 3, "default_financial_magnitude": 2, "severity": "medium",
+                    "generation_method": "rule_based",
+                })
+            else:
+                ai_iros.append({
+                    "id": f"AI_{sector_letter}_S3_{idx:03d}", "type": "impact",
+                    "topic": "ESRS S3", "ai_generated": True,
+                    "name": "Coinvolgimento stakeholder",
+                    "description": f"Dialogo e reporting con stakeholder: {', '.join(stakeholders)}",
+                    "default_impact_scale": 2, "default_financial_magnitude": 1, "severity": "low",
+                    "generation_method": "rule_based",
+                })
 
         return ai_iros
 
