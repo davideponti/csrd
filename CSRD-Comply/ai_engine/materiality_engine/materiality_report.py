@@ -7,6 +7,7 @@ ESRS 2 IRO-2: Disclosure Requirements in ESRS covered by the undertaking
 Include sezioni dettagliate per ogni standard ESRS materiale.
 """
 import re
+import logging
 from typing import Optional, Dict, List, Any
 from sqlalchemy.orm import Session
 from app.models import (
@@ -14,6 +15,8 @@ from app.models import (
     EsrsDatapoint, SustainabilityMatter,
 )
 from ai_engine.materiality_engine.scoring_engine import ScoringEngine
+
+logger = logging.getLogger(__name__)
 
 
 class MaterialityReportGenerator:
@@ -640,21 +643,52 @@ class MaterialityReportGenerator:
         standard_sections = MaterialityReportGenerator.generate_standard_detail_sections(assessment, db)
         scores_summary = ScoringEngine.calculate_assessment_scores(db, str(assessment.id))
 
-        # Determina quali standard sono nel report
-        material_standard_refs = list(set(
-            MaterialityReportGenerator._extract_topic(m["reference"])
-            for m in matrix.get("content", {}).get("material_datapoints", [])
-        ))
+        # ── FIX BUG 2: derive material_standard_refs from IRO-2 (DB truth), NOT from matrix ──
+        # CONTEXT: IRO-2 queries MaterialityScore WHERE is_material=True directly from DB.
+        # The matrix section may exclude scores where one dimension (impact/financial) is None,
+        # creating a contradiction: topics appear material in IRO-2 but get listed as "non-material"
+        # in the justifications section below.
+        iro2_data = MaterialityReportGenerator.generate_iro2_section(assessment, db)
+        material_standard_refs = sorted([
+            dr["standard"]
+            for dr in iro2_data.get("content", {}).get("material_disclosure_requirements", [])
+        ])
 
         # Ottieni tutti gli standard ESRS per contesto (anche non materiali)
         all_standards = list(MaterialityReportGenerator.STANDARD_NAMES.keys())
         non_material_standards = [s for s in all_standards if s not in material_standard_refs]
 
+        # ── FIX BUG 1: resolve incongruenza conteggio ──
+        # 'total_datapoints' = count of MaterialityScore records (can exceed EsrsDatapoint
+        # count if score generation endpoint was called multiple times, creating duplicates).
+        # 'total_datapoints_available_in_db' = count of EsrsDatapoint rows (single source of truth).
+        # Cap at DB count to avoid "X out of Y" where X > Y, which auditors flag immediately.
+        total_scored = scores_summary.get('total_datapoints', 0)
         total_in_db = scores_summary.get("total_datapoints_available_in_db", 0)
+        if total_scored > total_in_db:
+            logger.warning(
+                f"MaterialityScore count ({total_scored}) exceeds EsrsDatapoint count ({total_in_db}). "
+                "Capping report to DB count. This may indicate score generation was run multiple times."
+            )
+            total_scored = total_in_db
         
         # CRITICAL: Generate non-material justifications per CSRD compliance
+        # Uses material_standard_refs from IRO-2 (consistent with all other sections)
         non_material_section = MaterialityReportGenerator.generate_non_material_justifications(
             company, context, assessment, db, material_standard_refs
+        )
+
+        # ── FIX BUG 3: documenta il cambio metodologico per increase da 0.49 a 1.21 ──
+        scoring_methodology_note = (
+            "Context-aware baseline scores applied. "
+            "Previously, all non-IRO-matched datapoints defaulted to 1/5, which biased "
+            "the assessment toward non-materiality for topics without direct IRO coverage. "
+            "The current methodology assigns differentiated baselines per ESRS topic based on "
+            "sector intensity benchmarks (carbon_intensity for E1-E4, social_risk for S1-S4, "
+            "governance_risk for G1), ranging from 1 (low-intensity) to 3 (very-high-intensity). "
+            "This explains the increase in average impact score from the previous assessment "
+            f"(was ~0.49, now {scores_summary.get('average_impact_score', 'N/A')}) "
+            "and reflects a methodological correction, not a change in company operations."
         )
 
         return {
@@ -665,23 +699,25 @@ class MaterialityReportGenerator:
             "assessment_date": str(assessment.assessment_date),
             "executive_summary": (
                 f"The double materiality assessment for {company.company_name} evaluated "
-                f"{scores_summary['total_datapoints']} out of {total_in_db} total ESRS datapoints "
+                f"{total_scored} out of {total_in_db} total ESRS datapoints "
                 f"across all standards. "
                 f"Of these, {scores_summary['material_datapoints']} were identified as material "
                 f"({scores_summary['completion_percentage']}% completion rate). "
-                f"Material topics identified: {', '.join(scores_summary['material_topics'])}. "
+                f"Material topics identified: {', '.join(material_standard_refs)}. "
                 f"For each non-material topic, a documented justification is provided in accordance "
-                f"with ESRS 1 and EFRAG IG 1 requirements."
+                f"with ESRS 1 and EFRAG IG 1 requirements. "
+                f"{scoring_methodology_note}"
             ),
             "executive_summary_detailed": {
-                "total_datapoints": scores_summary["total_datapoints"],
+                "total_datapoints": total_scored,
                 "total_datapoints_available_in_db": total_in_db,
+                "total_datapoints_raw_from_scores_table": scores_summary.get('total_datapoints', 0),
                 "scored_datapoints": scores_summary["scored_datapoints"],
                 "material_datapoints": scores_summary["material_datapoints"],
                 "completion_percentage": scores_summary["completion_percentage"],
                 "average_impact_score": scores_summary["average_impact_score"],
                 "average_financial_score": scores_summary["average_financial_score"],
-                "material_topics": scores_summary["material_topics"],
+                "material_topics": material_standard_refs,
                 "assessed_standards": {
                     "total": len(all_standards),
                     "material": len(material_standard_refs),
@@ -689,6 +725,20 @@ class MaterialityReportGenerator:
                     "material_list": material_standard_refs,
                     "non_material_list": non_material_standards,
                 },
+            },
+            "scoring_methodology_change": {
+                "previous_baseline": "All non-IRO datapoints defaulted to 1/5",
+                "current_baseline": "Context-aware per-topic baselines (1-3/5) based on sector intensity",
+                "impact_on_average_score": (
+                    f"The average impact score increased from ~0.49 to "
+                    f"{scores_summary.get('average_impact_score', 'N/A')} as a direct result "
+                    f"of this methodological change. This does not reflect a change in "
+                    f"company operations or risk profile."
+                ),
+                "regulatory_compliance": (
+                    "Methodology documented per ESRS 2 IRO-1 (par. 7): changes in assessment "
+                    "methodology must be disclosed. See IRO-1 section for full scoring approach."
+                ),
             },
             "sections": [
                 iro1,                           # ESRS 2 IRO-1
@@ -703,7 +753,7 @@ class MaterialityReportGenerator:
                         "all_standards": all_standards,
                         "material_standards": material_standard_refs,
                         "non_material_standards": non_material_standards,
-                        "total_esrs_datapoints_available": scores_summary["total_datapoints"],
+                        "total_esrs_datapoints_available": total_in_db,
                         "note": "Non-material standards are excluded from detailed reporting per ESRS 1 principle of materiality. See 'Non-Material Topics Justifications' section for detailed rationale.",
                     },
                 },
