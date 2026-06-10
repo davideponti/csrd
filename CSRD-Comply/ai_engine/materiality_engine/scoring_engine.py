@@ -198,15 +198,20 @@ class ScoringEngine:
         scores = db.query(MaterialityScore).filter(
             MaterialityScore.assessment_id == assessment_id
         ).all()
+        
+        # Conta anche i datapoint totali disponibili in DB (1.184 ESRS)
+        total_esrs_datapoints_in_db = db.query(EsrsDatapoint).count()
 
         if not scores:
             return {
                 "total_datapoints": 0,
+                "total_datapoints_available_in_db": total_esrs_datapoints_in_db,
                 "scored_datapoints": 0,
                 "material_datapoints": 0,
                 "average_impact_score": 0.0,
                 "average_financial_score": 0.0,
                 "material_topics": [],
+                "completion_percentage": 0,
             }
 
         # Ricalcola tutti i punteggi
@@ -237,21 +242,28 @@ class ScoringEngine:
         avg_impact = sum(scored_impact) / len(scored_impact) if scored_impact else 0.0
         avg_financial = sum(scored_financial) / len(scored_financial) if scored_financial else 0.0
 
-        # Determina i topic materiali
-        material_datapoint_ids = [s.datapoint_id for s in material]
-        material_topics = []
-        if material_datapoint_ids:
-            topics = (
-                db.query(SustainabilityMatter)
-                .join(EsrsDatapoint, SustainabilityMatter.standard == func.split_part(EsrsDatapoint.standard_ref, ' ', 1))
-                .filter(EsrsDatapoint.id.in_(material_datapoint_ids))
-                .distinct()
-                .all()
-            )
-            material_topics = [t.standard for t in topics]
+        # Determina i topic materiali estraendo il topic (es. "ESRS E1") dalla standard_ref
+        material_topics = set()
+        for s in material:
+            datapoint = db.query(EsrsDatapoint).filter(
+                EsrsDatapoint.id == s.datapoint_id
+            ).first()
+            if datapoint:
+                ref = datapoint.standard_ref
+                # Extract topic prefix: "ESRS E1-6" -> "ESRS E1"
+                import re
+                match = re.match(r'(ESRS [A-Z]\d+)', ref)
+                if match:
+                    material_topics.add(match.group(1))
+                else:
+                    # Fallback: take first two segments
+                    parts = ref.split('-')
+                    topic = '-'.join(parts[:2]) if len(parts) >= 2 else ref
+                    material_topics.add(topic)
 
         return {
             "total_datapoints": len(scores),
+            "total_datapoints_available_in_db": total_esrs_datapoints_in_db,
             "scored_datapoints": len(scored),
             "material_datapoints": len(material),
             "average_impact_score": round(avg_impact, 2),

@@ -2,6 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 import uuid
+import logging
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import date
@@ -16,6 +17,8 @@ from ai_engine.materiality_engine.iro_generator import IROGenerator
 from ai_engine.materiality_engine.scoring_engine import ScoringEngine
 from ai_engine.materiality_engine.materiality_report import MaterialityReportGenerator
 from ai_engine.esrs_parser.gap_analyzer import GapAnalyzer
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -298,8 +301,11 @@ def generate_score_entries(
     db: Session = Depends(get_db),
 ):
     """
-    Generate MaterialityScore entries for each ESRS datapoint
-    based on the generated IROs.
+    Generate MaterialityScore entries for ALL ESRS datapoints.
+    
+    First, creates scored entries for datapoints matching IRO topics (with IRO-based scoring).
+    Then, creates neutral score entries (default 1/5) for ALL remaining datapoints
+    so the full 1,000+ ESRS datapoint set is covered in the assessment.
     """
     # ⚠️ SECURITY FIX: verify assessment belongs to user's company
     assessment = _get_assessment_or_404(assessment_id, current_user.company_id, db)
@@ -325,66 +331,101 @@ def generate_score_entries(
         company_context=context_dict,
     )
 
-    # Create score entries for each IRO
-    created_count = 0
-    skip_reason = {"no_datapoint_match": 0, "already_exists": 0}
-    
-    # If no ESRS datapoints exist yet, try to seed them first
+    # If ESRS datapoints are fewer than expected, try full Excel seeding
     esrs_count = db.query(EsrsDatapoint).count()
-    if esrs_count == 0:
+    MIN_EXPECTED_DATAPOINTS = 100
+    if esrs_count < MIN_EXPECTED_DATAPOINTS:
         try:
             from app.seed_esrs_datapoints import get_all_datapoints, seed_to_db
-            logger.info("No ESRS datapoints found — auto-seeding before score generation...")
-            datapoints = get_all_datapoints(use_excel=False)
+            logger.info(f"Only {esrs_count} ESRS datapoints found — triggering full seeding from Excel...")
+            datapoints = get_all_datapoints(use_excel=True)
             seeded = seed_to_db(db, datapoints)
             logger.info(f"Auto-seeded {seeded} ESRS datapoints for score generation")
         except Exception as e:
-            logger.warning(f"Auto-seed fallback failed: {e}, will use IRO topic as fallback")
+            logger.warning(f"Auto-seed fallback failed: {e}")
+
+    total_available = db.query(EsrsDatapoint).count()
+    logger.info(f"Total ESRS datapoints in DB: {total_available}")
+
+    # ── Phase 1: DELETE all existing scores for this assessment first ──
+    # This ensures a clean regeneration every time (handles re-runs, new datapoints, etc.)
+    existing_scores_count = db.query(MaterialityScore).filter(
+        MaterialityScore.assessment_id == assessment.id,
+    ).delete()
+    db.commit()
+    logger.info(f"Deleted {existing_scores_count} existing scores for assessment {assessment.id}")
+
+    # ── Phase 2: Create IRO-matched scores ──
+    iro_created = 0
+    iro_matched_datapoint_ids = set()
 
     for iro in iros:
-        # Find matching datapoint using topic directly (e.g. "ESRS E1" to match "ESRS E1-6")
         topic_prefix = iro['topic']
-        datapoint = db.query(EsrsDatapoint).filter(
+        matching_datapoints = db.query(EsrsDatapoint).filter(
             EsrsDatapoint.standard_ref.like(f"{topic_prefix}%")
-        ).first()
+        ).all()
 
-        if not datapoint:
-            skip_reason["no_datapoint_match"] += 1
+        if not matching_datapoints:
             continue
 
-        existing = db.query(MaterialityScore).filter(
-            MaterialityScore.assessment_id == assessment.id,
-            MaterialityScore.datapoint_id == datapoint.id,
-        ).first()
+        for datapoint in matching_datapoints:
+            impact_val = int(round(iro.get("initial_impact_score") or 3))
 
-        if existing:
-            skip_reason["already_exists"] += 1
+            financial_val = int(round(iro.get("initial_financial_score") or 2))
+            score = MaterialityScore(
+                assessment_id=assessment.id,
+                datapoint_id=datapoint.id,
+                impact_scale=impact_val,
+                impact_scope=impact_val,
+                impact_irremediability=max(1, impact_val - 1),
+                impact_likelihood=impact_val,
+                financial_magnitude=financial_val,
+                financial_likelihood=financial_val,
+            )
+            db.add(score)
+            iro_matched_datapoint_ids.add(str(datapoint.id))
+            iro_created += 1
+
+    # ── Phase 3: Create neutral scores for ALL remaining datapoints ──
+    # (All existing scores were already deleted in Phase 1, so no need to check for duplicates)
+    all_datapoints = db.query(EsrsDatapoint).all()
+    neutral_created = 0
+    neutral_datapoint_ids = set()
+
+    for datapoint in all_datapoints:
+        dp_id_str = str(datapoint.id)
+        if dp_id_str in iro_matched_datapoint_ids:
             continue
 
-        impact_val = int(round(iro.get("initial_impact_score") or 3))
-        financial_val = int(round(iro.get("initial_financial_score") or 2))
+        # Default neutral score = 1 (low relevance, non-assessed by default)
+
         score = MaterialityScore(
             assessment_id=assessment.id,
             datapoint_id=datapoint.id,
-            impact_scale=impact_val,
-            impact_scope=impact_val,
-            impact_irremediability=max(1, impact_val - 1),
-            impact_likelihood=impact_val,
-            financial_magnitude=financial_val,
-            financial_likelihood=financial_val,
+            impact_scale=1,
+            impact_scope=1,
+            impact_irremediability=1,
+            impact_likelihood=1,
+            financial_magnitude=1,
+            financial_likelihood=1,
         )
         db.add(score)
-        created_count += 1
+        neutral_datapoint_ids.add(dp_id_str)
+        neutral_created += 1
 
-    if created_count > 0:
+    total_created = iro_created + neutral_created
+    if total_created > 0:
         db.commit()
-        logger.info(f"Created {created_count} MaterialityScore entries")
+        logger.info(f"Created {total_created} MaterialityScore entries ({iro_created} IRO-based + {neutral_created} neutral)")
 
     return {
         "assessment_id": assessment_id,
         "total_iros": len(iros),
-        "score_entries_created": created_count,
-        "skip_details": skip_reason,
+        "total_datapoints_available": total_available,
+        "score_entries_created": total_created,
+        "iro_matched_created": iro_created,
+        "neutral_default_created": neutral_created,
+        "iro_matched_total_unique_datapoints": len(iro_matched_datapoint_ids),
     }
 
 

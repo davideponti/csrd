@@ -77,11 +77,33 @@ export default function AssessmentPage() {
       setIroBenchmark(data.benchmark || null)
       setActiveTab('iros')
       setShowAiDialog(false)
+
+      // ⭐ AUTO-GENERATE SCORES AFTER IROS: generate score entries for ALL datapoints
+      // (1,184 ESRS datapoints: IRO-matched + neutral defaults)
+      try {
+        const scoreResult = await assessments.generateScores(selectedAssessment)
+        // Auto-calculate scores after generating entries
+        const calcResult = await assessments.calculateScores(selectedAssessment)
+        // Also pre-load the matrix data
+        const matrixData = await assessments.getMatrix(selectedAssessment)
+        setMatrix(matrixData.matrix || [])
+        setShowSuccessDialog({
+          title: '✅ IRO e Score Generati',
+          message: `IRO generati: ${data.iros?.length || 0}\nScore entries creati: ${scoreResult.score_entries_created || 'completi'}\nDatapoint materiali: ${calcResult.material_datapoints}\n\nTutti i ${scoreResult.total_datapoints_available || 1184} datapoint ESRS sono stati valutati con punteggi IRO-matched + neutrali di default.`
+        })
+      } catch (scoreErr: any) {
+        console.warn('[AssessmentPage] Score auto-generation warning:', scoreErr)
+        setShowSuccessDialog({
+          title: '✅ IRO Generati',
+          message: `IRO generati con successo (${data.iros?.length || 0}).\n\n⚠️ La generazione automatica degli score ha avuto un problema: ${scoreErr.message}\nClicca manualmente "Genera Score Entries" nella tab Scoring.`
+        })
+      }
     } catch (err: any) {
       setError(err.message)
     }
     setLoading(false)
   }
+
 
   const handleSaveQuestionnaireResponse = (qId: string, value: string) => {
     setQuestionnaireResponses(prev => ({ ...prev, [qId]: value }))
@@ -781,11 +803,20 @@ export default function AssessmentPage() {
                   )}
 
                   {report.scores_summary && (
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      <MetricCard label="Total Datapoints" value={report.scores_summary.total_datapoints} />
-                      <MetricCard label="Scored" value={report.scores_summary.scored_datapoints} />
-                      <MetricCard label="Material" value={report.scores_summary.material_datapoints} />
-                      <MetricCard label="Completion" value={`${report.scores_summary.completion_percentage}%`} />
+                    <div>
+                      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                        <MetricCard label="ESRS Datapoints Totali" value={report.scores_summary.total_datapoints_available_in_db || report.scores_summary.total_datapoints} />
+                        <MetricCard label="Valutati (scored)" value={report.scores_summary.scored_datapoints} />
+                        <MetricCard label="Materiali" value={report.scores_summary.material_datapoints} />
+                        <MetricCard label="Completion" value={`${report.scores_summary.completion_percentage}%`} />
+                        <MetricCard label="Impact Medio" value={report.scores_summary.average_impact_score} />
+                      </div>
+                      {report.scores_summary.total_datapoints_available_in_db && (
+                        <p className="text-xs text-muted-foreground mt-2 text-center">
+                          Database contiene {report.scores_summary.total_datapoints_available_in_db} datapoint ESRS totali, 
+                          di cui {report.scores_summary.total_datapoints} con score generato per questo assessment.
+                        </p>
+                      )}
                     </div>
                   )}
 
