@@ -93,6 +93,12 @@ class GapAnalyzer:
         has_context = company_context is not None
         has_value_chain = bool(company_context and company_context.value_chain_description)
         has_activities = bool(company_context and company_context.key_activities)
+        has_business_relationships = bool(company_context and company_context.business_relationships)
+        has_geographical_scope = bool(company_context and company_context.geographical_scope)
+        has_stakeholders = bool(company_context and company_context.stakeholder_groups)
+        context_field_count = sum([has_value_chain, has_activities, has_business_relationships,
+                                   has_geographical_scope, has_stakeholders])
+
 
         # Pre-fetch all emission records for this company (one query)
         company_emissions = (
@@ -198,9 +204,22 @@ class GapAnalyzer:
             # ── Check 4: Narrative / Context datapoints ──
             elif any(kw in text_lower for kw in ["policy", "description", "narrative", "process", "due diligence", "strategy", "plan", "target", "action"]):
                 # Check if company has context data => partial completion
-                if has_value_chain or has_activities:
+                # Differentiate based on how MANY context fields are filled
+                if context_field_count >= 3:
+                    # Good context coverage: consider it partially done
                     result.partial += 1
                     standards[std]["partial"] += 1
+                elif context_field_count >= 1:
+                    # Some context: still mostly missing but has some basis
+                    result.missing += 1
+                    standards[std]["missing"] += 1
+                    result.priority_actions.append(GapAction(
+                        datapoint=dp.disclosure_requirement,
+                        standard_ref=dp.standard_ref,
+                        priority="medium",
+                        effort="low",
+                        suggestion=f"Arricchire il contesto aziendale per {dp.standard_ref}: {dp.disclosure_requirement}",
+                    ))
                 else:
                     result.missing += 1
                     standards[std]["missing"] += 1
@@ -213,8 +232,13 @@ class GapAnalyzer:
                     ))
 
             else:
-                # Default: mark as partial if context exists, otherwise missing
-                if has_context:
+                # Default: mark as complete only if FULL context exists,
+                # partial if some context, missing if no context at all
+                if context_field_count >= 4:
+                    # Rich context coverage => consider it addressed
+                    result.complete += 1
+                    standards[std]["complete"] += 1
+                elif context_field_count >= 1:
                     result.partial += 1
                     standards[std]["partial"] += 1
                 else:
@@ -227,6 +251,7 @@ class GapAnalyzer:
                         effort="medium",
                         suggestion=f"Completare {dp.standard_ref}: {dp.disclosure_requirement}",
                     ))
+
 
         result.gaps_by_standard = standards
         result.priority_actions.sort(

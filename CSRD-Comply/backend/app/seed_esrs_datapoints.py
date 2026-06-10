@@ -292,30 +292,22 @@ def seed_to_db(db_session, datapoints: List[Dict]) -> int:
     existing_count = db_session.query(EsrsDatapoint).count()
     logger.info(f"Datapoint già presenti nel DB: {existing_count}")
 
-    # Se ci sono già tanti datapoint (>10), probabilmente è già stato seedato
-    if existing_count > len(REQUIRED_TOPICS):
-        logger.info("Database già popolato con datapoint. Salto seed.")
+    # Se ci sono già abbastanza datapoint (almeno quanti i minimi), salta
+    MINIMAL_COUNT = len(MINIMAL_DATAPOINTS)
+    if existing_count >= MINIMAL_COUNT:
+        logger.info(f"Database già popolato con {existing_count} datapoint (soglia: {MINIMAL_COUNT}). Salto seed.")
         return 0
+
 
     created_count = 0
     for dp in datapoints:
-        # Verifica se esiste già
+        # Verifica se esiste già (esatta stessa standard_ref + paragraph_ref)
         existing = db_session.query(EsrsDatapoint).filter(
             EsrsDatapoint.standard_ref == dp["standard_ref"],
             EsrsDatapoint.paragraph_ref == dp.get("paragraph_ref", ""),
         ).first()
 
         if existing:
-            continue
-
-        # Verifica se esiste almeno un datapoint con stesso topic
-        topic = dp["standard_ref"].split("-")[0]
-        topic_exists = db_session.query(EsrsDatapoint).filter(
-            EsrsDatapoint.standard_ref.like(f"{topic}%")
-        ).first()
-
-        # Se per questo topic esiste già almeno un datapoint, salta (per i fallback)
-        if topic_exists and dp in get_minimal_datapoints():
             continue
 
         datapoint = EsrsDatapoint(
@@ -336,6 +328,7 @@ def seed_to_db(db_session, datapoints: List[Dict]) -> int:
             db_session.flush()
 
     db_session.commit()
+
 
     final_count = db_session.query(EsrsDatapoint).count()
     logger.info(f"Creati {created_count} nuovi datapoint. Totale ora: {final_count}")
