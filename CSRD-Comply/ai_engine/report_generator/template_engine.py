@@ -968,7 +968,7 @@ class ReportTemplate:
         """
         self.material_standards = sorted(set(material_standards))
         self.non_material_standards = sorted(
-            set(self.STANDARD_NAMES.keys()) - set(self.material_standards)
+            set(self.STANDARD_NAMES.keys()) - set(self.material_standards) - {"ESRS 2"}
         )
 
         for section in self.sections:
@@ -1286,7 +1286,72 @@ class ReportTemplate:
                             standard_ref="ESRS 2",
                             paragraph_ref="10",
                             title="Specific Circumstances",
-                            content_html="To be completed: Describe specific circumstances and estimations used.",
+                            content_html=f"""<div class="bp-2-content">
+    <h4>BP-2 — Disclosures in relation to specific circumstances</h4>
+    <p>In preparing this sustainability statement, <strong>{template.company_name}</strong> has exercised judgement and made estimates where precise data was not available, in accordance with ESRS 2 BP-2 (paragraphs 10-17). The following sections describe the key areas where estimates, assumptions, and forward-looking information have been used, as well as any departures from the standard disclosure requirements.</p>
+
+    <h5>Estimates and measurement uncertainty</h5>
+    <p>The preparation of sustainability information in accordance with ESRS requires management to make estimates and assumptions that affect the reported amounts and disclosures. Key areas of estimation include:</p>
+    <ul>
+        <li><strong>GHG emissions (Scope 3):</strong> Where direct data from value chain partners is not available, emissions have been estimated using spend-based and average-data methodologies, in accordance with the GHG Protocol Corporate Value Chain (Scope 3) Standard. The associated estimation uncertainty is described in ESRS E1-6.</li>
+        <li><strong>Pollutant emissions (ESRS E2):</strong> Emissions of pollutants to air, water, and soil have been estimated using emission factors from technical literature and regulatory databases where direct monitoring data was not available for all sources.</li>
+        <li><strong>Water consumption (ESRS E3):</strong> Water withdrawal and consumption data for certain non-metered facilities has been estimated based on industry benchmarks and operational parameters.</li>
+        <li><strong>Biodiversity impacts (ESRS E4):</strong> The assessment of dependencies and impacts on biodiversity and ecosystems relies on spatial analysis tools and proxy data, as direct site-level surveys were not conducted at all locations.</li>
+        <li><strong>Workforce metrics (ESRS S1):</strong> Certain workforce composition data, particularly for part-time and temporary employees across non-consolidated entities, has been estimated based on available payroll records and management information systems.</li>
+    </ul>
+    <p>All estimates are based on the most reliable information available at the time of reporting. Estimates are reviewed and updated annually as more accurate data becomes available. Actual results may differ from these estimates due to changes in circumstances, assumptions, or data quality improvements.</p>
+
+    <h5>Forward-looking information and assumptions</h5>
+    <p>This sustainability statement contains forward-looking information, including targets, transition plans, and anticipated financial effects. Such information is based on reasonable and supportable assumptions about future events and conditions, including:</p>
+    <ul>
+        <li>Projected regulatory and policy developments (including EU Taxonomy criteria and national transpositions of CSRD requirements).</li>
+        <li>Expected technological advancements and their associated costs (e.g., renewable energy capacity, low-carbon production processes).</li>
+        <li>Forecasted market conditions and stakeholder expectations.</li>
+        <li>Climate scenarios aligned with the Paris Agreement (1.5°C and 2°C pathways) used for resilience analysis under ESRS E1.</li>
+    </ul>
+    <p>Forward-looking statements reflect management's best judgement at the reporting date and are subject to inherent uncertainties. Actual outcomes may differ materially from those projected. The undertaking does not undertake any obligation to update forward-looking statements except as required by applicable law or regulations.</p>
+
+    <h5>Changes in preparation or presentation</h5>
+    <p>Where there have been changes in the methods used to prepare or present sustainability information compared to the previous reporting period — including changes in scope, measurement methodologies, or data sources — these are clearly identified and explained in the relevant disclosure notes. The undertaking aims to maintain consistency in its reporting methodologies and will restate comparative figures where practicable to ensure comparability.</p>
+
+    <h5>Errors and restatements</h5>
+    <p>Any material errors identified in prior period disclosures are corrected and disclosed in accordance with ESRS 2 BP-2 (paragraph 17). The nature of the error, the amount of the correction, and the reason for the correction are described in the relevant disclosure note.</p>
+
+    <h5>Sources of estimation uncertainty</h5>
+    <table>
+        <thead>
+            <tr>
+                <th>Area of estimation</th>
+                <th>Nature of uncertainty</th>
+                <th>Key assumptions used</th>
+                <th>Sensitivity</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Scope 3 GHG emissions (Category 1 — Purchased goods and services)</td>
+                <td>Spend-based methodology uses industry-average emission factors</td>
+                <td>EEIO factors from [TO BE CONFIRMED] database; supplier spend classification accuracy ±10%</td>
+                <td>A ±10% change in emission factors would result in a variation of approximately [TO BE CONFIRMED] tCO2e</td>
+            </tr>
+            <tr>
+                <td>Pollutant emissions to air (NOx, SOx, PM)</td>
+                <td>Emission factors based on equipment type and fuel consumption</td>
+                <td>Factors sourced from [TO BE CONFIRMED] regulatory database; operating hours estimated</td>
+                <td>A ±15% change in operating hours would affect reported emissions by [TO BE CONFIRMED] kg/year</td>
+            </tr>
+            <tr>
+                <td>Workforce gender pay gap</td>
+                <td>Partially estimated for bonus and variable compensation components</td>
+                <td>Bonus accrual rates based on historical data; estimated error margin ±2%</td>
+                <td>Sensitivity analysis indicates a ±2% variation in total pay gap figures</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h5>Use of alternative measures and additional disclosures</h5>
+    <p>Where a specific ESRS disclosure requirement has not been applied because the undertaking considers the matter not material, or because a transitional provision has been used, this is explicitly stated in the relevant section of this sustainability statement. The justification for non-disclosure follows the principles set out in ESRS 1 Chapter 3.2.</p>
+</div>""",
                             content_type="narrative",
                             order=1,
                         ),
@@ -1569,13 +1634,419 @@ class ReportTemplate:
             ],
         )
 
-        # Sezioni E2-E5 (placeholder, leggere)
+        # Sezioni E2-E5
         for std_code, title in [
             ("E2", "Pollution"),
             ("E3", "Water and Marine Resources"),
             ("E4", "Biodiversity and Ecosystems"),
             ("E5", "Resource Use and Circular Economy"),
         ]:
+            # Build DRs with blocks for E2 only (others keep empty blocks)
+            drs = []
+            for dr_code_suffix, dr_title_suffix, pref in [
+                ("1", f"Policies related to {title.lower()}", "1-8"),
+                ("2", "Actions and resources", "9-15"),
+                ("3", f"Targets related to {title.lower()}", "16-24"),
+                ("4", f"Metrics related to {title.lower()}", "25-35"),
+                ("5", "Anticipated financial effects", "36-42"),
+            ]:
+                dr_id = f"{std_code}-{dr_code_suffix}"
+                blocks = []
+                is_mandatory = dr_code_suffix != "5"
+
+                if std_code == "E2":
+                    if dr_id == "E2-1":
+                        blocks.append(ContentBlock(
+                            block_id="e2-1-policies",
+                            standard_ref="ESRS E2",
+                            paragraph_ref="1-8",
+                            title="Pollution Management Policies",
+                            content_html=f"""<div class="e2-1-content">
+    <h4>E2-1 — Policies related to pollution</h4>
+    <p><strong>{template.company_name}</strong> has established a comprehensive policy framework to prevent, control, and remediate pollution from its operations and throughout the value chain. These policies are aligned with applicable regulatory requirements, including Directive 2010/75/EU (Industrial Emissions Directive), REACH Regulation (EC) No 1907/2006, and national transpositions of EU environmental legislation.</p>
+
+    <h5>Pollution Prevention and Control Policy</h5>
+    <p>The undertaking's Pollution Prevention and Control Policy sets out the principles and operational requirements for managing emissions to air, water, and soil. The policy applies to all wholly-owned facilities and operational sites and is communicated to all employees through the environmental management system (certified to ISO 14001:2015). Key commitments include:</p>
+    <ul>
+        <li>Compliance with all applicable emission limit values (ELVs) and discharge permit conditions.</li>
+        <li>Adoption of Best Available Techniques (BAT) for pollution prevention and control, as defined in the relevant BREF documents under the Industrial Emissions Directive.</li>
+        <li>Continuous reduction of pollutant emissions through process optimisation, equipment upgrades, and cleaner production methods.</li>
+        <li>Prevention of soil and groundwater contamination through secondary containment, leak detection, and spill response procedures.</li>
+        <li>Safe handling, storage, and disposal of hazardous substances and waste in accordance with REACH and CLP Regulation (EC) No 1272/2008.</li>
+    </ul>
+
+    <h5>Substances of Concern Policy</h5>
+    <p>In accordance with ESRS E2 paragraph 6, the undertaking maintains a Substances of Concern Policy that governs the use, substitution, and phase-out of substances of very high concern (SVHCs) as defined under REACH Article 57. The policy requires:</p>
+    <ul>
+        <li>Regular screening of all materials and chemical inputs against the Candidate List of SVHCs and the Authorisation List (Annex XIV).</li>
+        <li>Proactive substitution of SVHCs with safer alternatives where technically and economically feasible, with a target substitution timeline of [TO BE CONFIRMED] years.</li>
+        <li>Full disclosure of substances of concern in products to downstream customers and end-users in compliance with the SCIP database requirements under the Waste Framework Directive.</li>
+        <li>Restriction on the use of substances restricted under REACH Annex XVII and POPs Regulation (EU) 2019/1021.</li>
+    </ul>
+
+    <h5>Water Quality Management Policy</h5>
+    <p>The undertaking's Water Quality Management Policy addresses discharges to water bodies and groundwater protection. It requires all facilities to:</p>
+    <ul>
+        <li>Monitor effluent quality in accordance with discharge permits and applicable water quality standards.</li>
+        <li>Implement wastewater treatment (primary, secondary, and tertiary as required) before discharge.</li>
+        <li>Report any exceedances of permit conditions to the competent authority and take immediate corrective action.</li>
+    </ul>
+
+    <h5>Air Emissions Management Policy</h5>
+    <p>Emissions to air are managed through the Air Emissions Management Policy, which sets emission limits for key pollutants including nitrogen oxides (NOx), sulphur oxides (SOx), particulate matter (PM), volatile organic compounds (VOCs), and heavy metals. The policy requires:</p>
+    <ul>
+        <li>Continuous or periodic monitoring of stack emissions as required by the facility's environmental permit.</li>
+        <li>Optimisation of combustion processes and installation of abatement equipment (e.g., scrubbers, bag filters, catalytic converters) to achieve compliance with ELVs.</li>
+        <li>Reduction of fugitive emissions through equipment maintenance, leak detection and repair (LDAR) programmes.</li>
+    </ul>
+
+    <h5>Policy governance and review</h5>
+    <p>All pollution-related policies are approved by the Chief Operations Officer and reviewed at least annually, or more frequently following significant operational changes, regulatory updates, or pollution incidents. The Environmental Manager is responsible for policy implementation, monitoring, and reporting. Compliance with pollution policies is verified through internal audits and regulatory inspections.</p>
+</div>""",
+                            content_type="narrative",
+                            order=1,
+                        ))
+                    elif dr_id == "E2-2":
+                        blocks.append(ContentBlock(
+                            block_id="e2-2-actions",
+                            standard_ref="ESRS E2",
+                            paragraph_ref="9-15",
+                            title="Actions and Resources on Pollution",
+                            content_html=f"""<div class="e2-2-content">
+    <h4>E2-2 — Actions and resources related to pollution</h4>
+    <p><strong>{template.company_name}</strong> has allocated financial, human, and technical resources to implement its pollution prevention and control policies. The following actions have been undertaken during the reporting period to manage material pollution-related impacts, risks, and opportunities.</p>
+
+    <h5>Key actions implemented or planned</h5>
+    <table>
+        <thead>
+            <tr>
+                <th>Action</th>
+                <th>Scope</th>
+                <th>Status</th>
+                <th>Timeline</th>
+                <th>Estimated investment</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Installation of upgraded bag filter systems at [TO BE CONFIRMED] facilities</td>
+                <td>Air emissions (PM)</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>EUR [TO BE CONFIRMED]</td>
+            </tr>
+            <tr>
+                <td>Implementation of solvent recovery system for VOC abatement</td>
+                <td>Air emissions (VOCs)</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>EUR [TO BE CONFIRMED]</td>
+            </tr>
+            <tr>
+                <td>Upgrade of industrial wastewater treatment plant at [TO BE CONFIRMED] site</td>
+                <td>Water pollution</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>EUR [TO BE CONFIRMED]</td>
+            </tr>
+            <tr>
+                <td>Phase-out of [TO BE CONFIRMED] substance of concern from product formulation</td>
+                <td>Substances of concern</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>EUR [TO BE CONFIRMED]</td>
+            </tr>
+            <tr>
+                <td>Soil remediation programme at [TO BE CONFIRMED] former industrial site</td>
+                <td>Soil contamination</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>EUR [TO BE CONFIRMED]</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h5>Resources allocated</h5>
+    <p><strong>Financial resources:</strong> Total capital expenditure allocated to pollution prevention and control in the reporting period amounted to EUR [TO BE CONFIRMED]. Operating expenditure for pollution management (including monitoring, waste treatment, and environmental compliance) was EUR [TO BE CONFIRMED].</p>
+    <p><strong>Human resources:</strong> The environmental management function comprises [TO BE CONFIRMED] full-time equivalents (FTEs), including environmental engineers, compliance specialists, and laboratory technicians. All operational staff receive annual training on pollution prevention and spill response procedures.</p>
+    <p><strong>Technical resources:</strong> Continuous emissions monitoring systems (CEMS) are installed at [TO BE CONFIRMED] facilities. The undertaking maintains an ISO 14001:2015 certified environmental management system across all operational sites.</p>
+
+    <h5>Outcome of actions</h5>
+    <p>During the reporting period, the following outcomes were achieved:</p>
+    <ul>
+        <li>Reduction of PM emissions by [TO BE CONFIRMED]% through upgraded abatement equipment.</li>
+        <li>Reduction of VOC emissions by [TO BE CONFIRMED]% through solvent recovery and process optimisation.</li>
+        <li>Zero non-compliance events related to water discharge permits across all operational sites.</li>
+        <li>[TO BE CONFIRMED]% of hazardous waste was sent to licensed treatment facilities; [TO BE CONFIRMED]% was recovered or recycled.</li>
+    </ul>
+</div>""",
+                            content_type="narrative",
+                            order=1,
+                        ))
+                    elif dr_id == "E2-3":
+                        blocks.append(ContentBlock(
+                            block_id="e2-3-targets",
+                            standard_ref="ESRS E2",
+                            paragraph_ref="16-24",
+                            title="Pollution Reduction Targets",
+                            content_html=f"""<div class="e2-3-content">
+    <h4>E2-3 — Targets related to pollution</h4>
+    <p><strong>{template.company_name}</strong> has established quantitative and qualitative targets to manage its material pollution-related impacts, consistent with ESRS E2 paragraphs 16-24. Progress against these targets is monitored at least annually and reported to the Board. Targets are reviewed and updated as new scientific data, regulatory requirements, and best available techniques evolve.</p>
+
+    <h5>Air emission reduction targets</h5>
+    <table>
+        <thead>
+            <tr>
+                <th>Pollutant</th>
+                <th>Baseline year</th>
+                <th>Baseline value</th>
+                <th>2030 target</th>
+                <th>2050 target</th>
+                <th>Progress (% achieved)</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Nitrogen oxides (NOx)</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED] kg/year</td>
+                <td>−[TO BE CONFIRMED]%</td>
+                <td>−[TO BE CONFIRMED]%</td>
+                <td>[TO BE CONFIRMED]%</td>
+            </tr>
+            <tr>
+                <td>Sulphur oxides (SOx)</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED] kg/year</td>
+                <td>−[TO BE CONFIRMED]%</td>
+                <td>−[TO BE CONFIRMED]%</td>
+                <td>[TO BE CONFIRMED]%</td>
+            </tr>
+            <tr>
+                <td>Particulate matter (PM10/PM2.5)</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED] kg/year</td>
+                <td>−[TO BE CONFIRMED]%</td>
+                <td>−[TO BE CONFIRMED]%</td>
+                <td>[TO BE CONFIRMED]%</td>
+            </tr>
+            <tr>
+                <td>Volatile organic compounds (VOCs)</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED] kg/year</td>
+                <td>−[TO BE CONFIRMED]%</td>
+                <td>−[TO BE CONFIRMED]%</td>
+                <td>[TO BE CONFIRMED]%</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h5>Water pollution targets</h5>
+    <ul>
+        <li><strong>Effluent quality:</strong> 100% compliance with all discharge permit conditions throughout the reporting period. Target: zero non-compliance events.</li>
+        <li><strong>Chemical Oxygen Demand (COD) load:</strong> Reduction of COD in wastewater discharges by [TO BE CONFIRMED]% by 2030 (baseline: [TO BE CONFIRMED] kg/year).</li>
+        <li><strong>Heavy metal concentrations:</strong> Reduction of heavy metal content (lead, cadmium, mercury) in effluent by [TO BE CONFIRMED]% by 2030.</li>
+    </ul>
+
+    <h5>Substances of concern targets</h5>
+    <ul>
+        <li><strong>SVHC substitution:</strong> Phase-out of [TO BE CONFIRMED] substances of very high concern from product formulations by [TO BE CONFIRMED].</li>
+        <li><strong>SCIP notification:</strong> 100% compliance with SCIP database notification obligations for all articles containing substances of concern above threshold.</li>
+        <li><strong>Reduction target:</strong> Reduction in the total weight of substances of concern used in production by [TO BE CONFIRMED]% by [TO BE CONFIRMED].</li>
+    </ul>
+
+    <h5>Soil contamination targets</h5>
+    <ul>
+        <li><strong>Remediation:</strong> Completion of soil remediation at [TO BE CONFIRMED] identified contaminated sites by [TO BE CONFIRMED].</li>
+        <li><strong>Prevention:</strong> Zero new soil contamination incidents through enhanced secondary containment and leak detection at all fuel and chemical storage facilities.</li>
+    </ul>
+
+    <h5>Target governance</h5>
+    <p>These targets are approved by the Board of Directors and reviewed annually. Progress is reported in the annual sustainability statement. The undertaking engaged [TO BE CONFIRMED] external stakeholders in the target-setting process to ensure alignment with societal expectations and regulatory requirements.</p>
+</div>""",
+                            content_type="narrative",
+                            order=1,
+                        ))
+                    elif dr_id == "E2-4":
+                        blocks.append(ContentBlock(
+                            block_id="e2-4-metrics",
+                            standard_ref="ESRS E2",
+                            paragraph_ref="25-35",
+                            title="Pollution Metrics and Data",
+                            content_html=f"""<div class="e2-4-content">
+    <h4>E2-4 — Metrics related to pollution</h4>
+    <p><strong>{template.company_name}</strong> discloses the following metrics on pollutants released to air, water, and soil in accordance with ESRS E2 paragraphs 25-35. Data is reported for all operational sites under operational control. Measurement methods include continuous monitoring (for major point sources), periodic sampling, and emission factor estimation (for diffuse/fugitive sources).</p>
+
+    <h5>Emissions to air</h5>
+    <table>
+        <thead>
+            <tr>
+                <th>Pollutant</th>
+                <th>Year N-1</th>
+                <th>Year N</th>
+                <th>Unit</th>
+                <th>Measurement method</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Nitrogen oxides (NOx)</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>kg/year</td>
+                <td>Continuous monitoring / emission factor</td>
+            </tr>
+            <tr>
+                <td>Sulphur oxides (SOx)</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>kg/year</td>
+                <td>Continuous monitoring / emission factor</td>
+            </tr>
+            <tr>
+                <td>Particulate matter (PM10)</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>kg/year</td>
+                <td>Periodic sampling + emission factor</td>
+            </tr>
+            <tr>
+                <td>Particulate matter (PM2.5)</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>kg/year</td>
+                <td>Periodic sampling + emission factor</td>
+            </tr>
+            <tr>
+                <td>Volatile organic compounds (VOCs)</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>kg/year</td>
+                <td>Mass balance / LDAR programme</td>
+            </tr>
+            <tr>
+                <td>Heavy metals (total)</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>kg/year</td>
+                <td>Periodic stack sampling</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h5>Emissions to water</h5>
+    <table>
+        <thead>
+            <tr>
+                <th>Parameter</th>
+                <th>Year N-1</th>
+                <th>Year N</th>
+                <th>Unit</th>
+                <th>Measurement method</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Chemical Oxygen Demand (COD)</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>kg/year</td>
+                <td>Periodic effluent sampling</td>
+            </tr>
+            <tr>
+                <td>Total nitrogen</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>kg/year</td>
+                <td>Periodic effluent sampling</td>
+            </tr>
+            <tr>
+                <td>Total phosphorus</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>kg/year</td>
+                <td>Periodic effluent sampling</td>
+            </tr>
+            <tr>
+                <td>Heavy metals (total)</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>kg/year</td>
+                <td>Periodic effluent sampling</td>
+            </tr>
+            <tr>
+                <td>Suspended solids (TSS)</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>kg/year</td>
+                <td>Periodic effluent sampling</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h5>Substances of concern</h5>
+    <table>
+        <thead>
+            <tr>
+                <th>Indicator</th>
+                <th>Year N-1</th>
+                <th>Year N</th>
+                <th>Unit</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Total weight of substances of concern used</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>tonnes/year</td>
+            </tr>
+            <tr>
+                <td>Total weight of SVHCs used</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>tonnes/year</td>
+            </tr>
+            <tr>
+                <td>Number of SVHCs in product portfolio</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>count</td>
+            </tr>
+            <tr>
+                <td>SCIP notifications submitted</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>count</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h5>Microplastics</h5>
+    <p>In accordance with ESRS E2 paragraph 31, the undertaking has assessed the potential generation of microplastics from its operations. [TO BE CONFIRMED] — Description of whether and how microplastics are generated, relevant mitigation measures applied, and any related monitoring data.</p>
+
+    <h5>Measurement and estimation methodology</h5>
+    <p>Pollutant emissions data is compiled using the following hierarchy of methods:</p>
+    <ol>
+        <li><strong>Continuous monitoring:</strong> For major point sources equipped with CEMS, data is recorded and reported directly.</li>
+        <li><strong>Periodic sampling:</strong> For sources not equipped with CEMS, periodic stack or effluent sampling is conducted by accredited laboratories.</li>
+        <li><strong>Emission factor estimation:</strong> For diffuse, fugitive, or minor sources, emission factors from recognised sources (e.g., EEA/EMEP Guidebook, IPPC BREF) are used.</li>
+        <li><strong>Mass balance:</strong> For VOCs and certain substances, mass balance calculations based on material inputs and product outputs are applied.</li>
+    </ol>
+    <p>Data quality is assessed using a 3-tier system (high/medium/low). Where estimation uncertainty is significant, this is disclosed in the relevant notes.</p>
+</div>""",
+                            content_type="narrative",
+                            order=1,
+                        ))
+
+                drs.append(DisclosureRequirement(
+                    dr_id=dr_id,
+                    title=f"{dr_title_suffix}",
+                    paragraph_ref=pref,
+                    is_mandatory=is_mandatory,
+                    blocks=blocks,
+                ))
+
             setattr(
                 template, f"env_{std_code.lower()}",
                 ReportSection(
@@ -1588,41 +2059,11 @@ class ReportTemplate:
                         "E2": 3, "E3": 4, "E4": 5, "E5": 6,
                     }[std_code],
                     is_material=False,
-                    disclosure_requirements=[
-                        DisclosureRequirement(
-                            dr_id=f"{std_code}-1",
-                            title=f"Policies related to {title.lower()}",
-                            paragraph_ref="1-8",
-                            is_mandatory=True,
-                        ),
-                        DisclosureRequirement(
-                            dr_id=f"{std_code}-2",
-                            title=f"Actions and resources",
-                            paragraph_ref="9-15",
-                            is_mandatory=True,
-                        ),
-                        DisclosureRequirement(
-                            dr_id=f"{std_code}-3",
-                            title=f"Targets related to {title.lower()}",
-                            paragraph_ref="16-24",
-                            is_mandatory=True,
-                        ),
-                        DisclosureRequirement(
-                            dr_id=f"{std_code}-4",
-                            title=f"Metrics related to {title.lower()}",
-                            paragraph_ref="25-35",
-                            is_mandatory=True,
-                        ),
-                        DisclosureRequirement(
-                            dr_id=f"{std_code}-5",
-                            title="Anticipated financial effects",
-                            paragraph_ref="36-42",
-                            is_mandatory=False,
-                        ),
-                    ],
+                    disclosure_requirements=drs,
                 ),
             )
             template.add_section(getattr(template, f"env_{std_code.lower()}"))
+
 
         # ── Sezione 3: Social (S1-S4) ───────────────────────────
         for std_code, title in [
@@ -1631,6 +2072,1232 @@ class ReportTemplate:
             ("S3", "Affected Communities"),
             ("S4", "Consumers and End-users"),
         ]:
+            # Build DRs with blocks for S1 and S2 only (S3, S4 keep empty blocks)
+            drs = []
+            for dr_suffix, dr_title_prefix, dr_pref in [
+                ("1", f"Policies related to {title.lower()}", "1-10"),
+                ("2", "Processes for engaging with stakeholders", "11-18"),
+                ("3", "Processes to remediate negative impacts", "19-25"),
+                ("4", "Taking action on material impacts and managing risks", "26-35"),
+                ("5", "Targets related to managing material impacts", "36-44"),
+            ]:
+                dr_id = f"{std_code}-{dr_suffix}"
+                blocks = []
+                is_mandatory = True
+
+                # Determine metrics DR id (S1-6 vs S2-7 etc.)
+                if dr_suffix == "5" and std_code in ("S1", "S2"):
+                    pass  # handled separately below
+
+                if std_code == "S1":
+                    if dr_id == "S1-1":
+                        blocks.append(ContentBlock(
+                            block_id="s1-1-policies",
+                            standard_ref="ESRS S1",
+                            paragraph_ref="1-10",
+                            title="Own Workforce Policies",
+                            content_html=f"""<div class="s1-1-content">
+    <h4>S1-1 — Policies related to own workforce</h4>
+    <p><strong>{template.company_name}</strong> has established comprehensive policies governing the management of its own workforce, in accordance with ESRS S1 paragraphs 1-10 and applicable labour laws, including EU directives on working conditions, health and safety, equal treatment, and information/consultation of workers.</p>
+
+    <h5>Employment and working conditions policy</h5>
+    <p>The undertaking's Employment and Working Conditions Policy ensures that all workers receive fair, transparent, and lawful terms of employment. Key commitments include:</p>
+    <ul>
+        <li>Providing written employment contracts in accordance with Directive (EU) 2019/1152 on transparent and predictable working conditions.</li>
+        <li>Ensuring fair remuneration that meets or exceeds applicable minimum wage standards and collective bargaining agreements.</li>
+        <li>Respecting working time regulations, including limits on maximum working hours, rest periods, and annual leave entitlements.</li>
+        <li>Offering adequate social protection coverage, including sickness, maternity/paternity, and pension benefits.</li>
+        <li>Providing access to training and career development opportunities for all employees.</li>
+    </ul>
+
+    <h5>Health and safety policy</h5>
+    <p><strong>{template.company_name}</strong> is committed to providing a safe and healthy working environment for all employees in accordance with Directive 89/391/EEC (Framework Directive on Safety and Health at Work) and national transpositions. The Health and Safety Policy includes:</p>
+    <ul>
+        <li>Risk assessments conducted at all workplaces, updated annually or after significant changes.</li>
+        <li>Provision of personal protective equipment (PPE) and safety training to all employees exposed to occupational hazards.</li>
+        <li>Reporting and investigation of all workplace accidents, near misses, and occupational diseases.</li>
+        <li>Employee participation in health and safety matters through designated safety representatives and joint health and safety committees.</li>
+        <li>Mental health and well-being programmes, including access to counselling services and flexible working arrangements.</li>
+    </ul>
+    <p>During the reporting period, the workplace accident rate (lost-time injury frequency rate) was [TO BE CONFIRMED] per 1,000 employees. No fatal accidents occurred.</p>
+
+    <h5>Equal treatment and non-discrimination policy</h5>
+    <p>The undertaking maintains a zero-tolerance policy towards discrimination, harassment, and violence in the workplace. The Equal Treatment and Non-Discrimination Policy covers all protected characteristics under Directive 2006/54/EC (Equal Treatment Directive) and national legislation, including age, disability, gender reassignment, marriage and civil partnership, pregnancy and maternity, race, religion or belief, sex, and sexual orientation. The policy:</p>
+    <ul>
+        <li>Prohibits direct and indirect discrimination in recruitment, promotion, remuneration, training, and termination of employment.</li>
+        <li>Establishes procedures for reporting and investigating complaints of discrimination and harassment.</li>
+        <li>Provides for reasonable accommodations for workers with disabilities.</li>
+        <li>Promotes gender equality, including equal pay for equal work and measures to address the gender pay gap.</li>
+    </ul>
+
+    <h5>Diversity and inclusion policy</h5>
+    <p><strong>{template.company_name}</strong> values diversity and strives to create an inclusive workplace where all employees can thrive. The Diversity and Inclusion Policy includes measurable objectives for:</p>
+    <ul>
+        <li>Gender balance at all levels of the organisation, including management and leadership positions.</li>
+        <li>Representation of underrepresented groups in the workforce.</li>
+        <li>Diversity awareness training for all employees and managers.</li>
+        <li>Workforce composition monitoring and reporting to the Board annually.</li>
+    </ul>
+
+    <h5>Training and skills development policy</h5>
+    <p>The undertaking supports the continuous professional development of its workforce through the Training and Skills Development Policy, which provides:</p>
+    <ul>
+        <li>Minimum annual training hours per employee (target: [TO BE CONFIRMED] hours/year).</li>
+        <li>Regular performance and career development reviews.</li>
+        <li>Access to upskilling and reskilling programmes, particularly in relation to the green and digital transitions.</li>
+        <li>Support for vocational qualifications and professional certifications.</li>
+    </ul>
+
+    <h5>Human rights policy commitments</h5>
+    <p>In accordance with ESRS S1 paragraph 10, the undertaking has policy commitments to respect human rights of its own workforce, including:</p>
+    <ul>
+        <li>Zero tolerance for child labour, forced labour, and modern slavery in any form.</li>
+        <li>Freedom of association and the right to collective bargaining, as recognised by ILO Conventions 87 and 98.</li>
+        <li>Protection of workers' privacy and data protection in accordance with GDPR and applicable national laws.</li>
+        <li>Grievance mechanisms for workers to raise human rights concerns without fear of retaliation.</li>
+    </ul>
+
+    <h5>Policy governance</h5>
+    <p>All workforce-related policies are approved by the Board of Directors and reviewed at least annually. The Human Resources Director is responsible for policy implementation and monitoring. Policies are communicated to all employees through the employee handbook, intranet, and mandatory onboarding training. Social partners (trade unions and works councils) are consulted on policy changes affecting workers' rights and working conditions.</p>
+</div>""",
+                            content_type="narrative",
+                            order=1,
+                        ))
+                    elif dr_id == "S1-2":
+                        blocks.append(ContentBlock(
+                            block_id="s1-2-engagement",
+                            standard_ref="ESRS S1",
+                            paragraph_ref="11-18",
+                            title="Stakeholder Engagement — Own Workforce",
+                            content_html=f"""<div class="s1-2-content">
+    <h4>S1-2 — Processes for engaging with own workforce and workers' representatives about impacts</h4>
+    <p><strong>{template.company_name}</strong> recognises that regular, transparent, and meaningful engagement with its workforce and their representatives is essential to identify, understand, and address material impacts on employees. The undertaking has established multiple engagement channels and processes in accordance with ESRS S1 paragraphs 11-18.</p>
+
+    <h5>Direct employee engagement channels</h5>
+    <table>
+        <thead>
+            <tr>
+                <th>Engagement channel</th>
+                <th>Frequency</th>
+                <th>Scope</th>
+                <th>Participation rate</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Annual employee engagement survey</td>
+                <td>Annual</td>
+                <td>All employees</td>
+                <td>[TO BE CONFIRMED]%</td>
+            </tr>
+            <tr>
+                <td>Quarterly town hall meetings</td>
+                <td>Quarterly</td>
+                <td>All employees (in-person and virtual)</td>
+                <td>[TO BE CONFIRMED]% average attendance</td>
+            </tr>
+            <tr>
+                <td>Pulse surveys on specific topics</td>
+                <td>As needed (minimum 2/year)</td>
+                <td>Selected employee groups</td>
+                <td>[TO BE CONFIRMED]%</td>
+            </tr>
+            <tr>
+                <td>Exit interviews</td>
+                <td>On voluntary termination</td>
+                <td>All departing employees</td>
+                <td>[TO BE CONFIRMED]% completion</td>
+            </tr>
+            <tr>
+                <td>Departmental meetings with direct supervisors</td>
+                <td>Monthly</td>
+                <td>All departments</td>
+                <td>Ongoing</td>
+            </tr>
+            <tr>
+                <td>Open-door policy with senior management</td>
+                <td>Ongoing</td>
+                <td>All employees</td>
+                <td>Ongoing</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h5>Workers' representation and collective bargaining</h5>
+    <p>The undertaking respects the right of all employees to join trade unions and to be represented by worker representatives in accordance with national laws and EU directives. As of the reporting date:</p>
+    <ul>
+        <li><strong>Union representation:</strong> [TO BE CONFIRMED]% of the workforce is covered by collective bargaining agreements.</li>
+        <li><strong>Works councils / employee representatives:</strong> [TO BE CONFIRMED] bodies are active at [TO BE CONFIRMED] locations.</li>
+        <li><strong>European Works Council (EWC):</strong> [TO BE CONFIRMED — describe if applicable].</li>
+        <li><strong>Health and safety committees:</strong> Joint health and safety committees operate at all sites with more than [TO BE CONFIRMED] employees.</li>
+    </ul>
+
+    <h5>Purpose and outcomes of engagement</h5>
+    <p>The primary purposes of workforce engagement are to:</p>
+    <ul>
+        <li>Identify actual and potential negative impacts on workers (e.g., excessive workload, health and safety concerns, discrimination).</li>
+        <li>Assess the effectiveness of existing policies and mitigation measures.</li>
+        <li>Gather input for the development of new policies, targets, and action plans.</li>
+        <li>Monitor progress toward workforce-related targets.</li>
+        <li>Understand employee satisfaction, engagement, and well-being.</li>
+    </ul>
+    <p>Key outcomes from the most recent engagement cycle include: [TO BE CONFIRMED — summarise main findings, e.g., "improved work-life balance initiatives introduced, enhanced mental health support, revised performance management framework"].</p>
+
+    <h5>Engagement with vulnerable groups</h5>
+    <p>The undertaking takes specific measures to engage with potentially vulnerable worker groups, including:</p>
+    <ul>
+        <li><strong>Young workers:</strong> Dedicated onboarding and mentorship programmes.</li>
+        <li><strong>Workers with disabilities:</strong> Individual accommodation assessments and regular check-ins.</li>
+        <li><strong>Migrant workers:</strong> Language support and cultural integration programmes.</li>
+        <li><strong>Women:</strong> Women's leadership network and gender equality working group.</li>
+    </ul>
+
+    <h5>Feedback integration and decision-making</h5>
+    <p>Feedback from workforce engagement is systematically collected, analysed, and reported to the Human Resources Director and the Board. Key themes and action items are tracked through a dedicated action tracker, with progress reviewed quarterly. Employee representatives are consulted on decisions that may significantly affect the workforce, including organisational restructuring, changes to working conditions, and policy updates.</p>
+
+    <h5>Effectiveness assessment</h5>
+    <p>The effectiveness of workforce engagement processes is evaluated through:</p>
+    <ul>
+        <li>Survey participation rates and trend analysis.</li>
+        <li>Employee satisfaction scores (e.g., eNPS: [TO BE CONFIRMED]).</li>
+        <li>Grievance resolution rates and timeliness.</li>
+        <li>Feedback from worker representatives on the quality of dialogue.</li>
+        <li>Third-party assessments or audits where applicable.</li>
+    </ul>
+</div>""",
+                            content_type="narrative",
+                            order=1,
+                        ))
+                    elif dr_id == "S1-3":
+                        blocks.append(ContentBlock(
+                            block_id="s1-3-remediation",
+                            standard_ref="ESRS S1",
+                            paragraph_ref="19-25",
+                            title="Remediation Processes — Own Workforce",
+                            content_html=f"""<div class="s1-3-content">
+    <h4>S1-3 — Processes to remediate negative impacts and channels for own workforce to raise concerns</h4>
+    <p><strong>{template.company_name}</strong> has established processes to remediate negative impacts on its workforce and provides accessible channels through which workers can raise concerns, report grievances, or seek remedy, in accordance with ESRS S1 paragraphs 19-25.</p>
+
+    <h5>Grievance mechanisms</h5>
+    <p>The undertaking provides the following channels for workers to raise concerns or report grievances:</p>
+    <table>
+        <thead>
+            <tr>
+                <th>Channel</th>
+                <th>Description</th>
+                <th>Accessibility</th>
+                <th>Confidentiality</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>HR department / People team</td>
+                <td>Direct reporting to HR manager or dedicated People partner</td>
+                <td>All employees during working hours</td>
+                <td>Confidential (within HR)</td>
+            </tr>
+            <tr>
+                <td>Line manager / supervisor</td>
+                <td>Workers can report concerns to their direct manager</td>
+                <td>All employees</td>
+                <td>Confidential (escalated to HR)</td>
+            </tr>
+            <tr>
+                <td>Whistleblowing hotline (independent third party)</td>
+                <td>Confidential, anonymous reporting channel for serious concerns (harassment, fraud, human rights violations)</td>
+                <td>24/7, online and phone</td>
+                <td>Fully anonymous option available</td>
+            </tr>
+            <tr>
+                <td>Trade union / worker representative</td>
+                <td>Reporting through elected worker representatives or trade union officials</td>
+                <td>All unionised employees</td>
+                <td>Confidential</td>
+            </tr>
+            <tr>
+                <td>Ethics Committee</td>
+                <td>For Code of Conduct violations and ethical concerns</td>
+                <td>All employees</td>
+                <td>Confidential</td>
+            </tr>
+            <tr>
+                <td>Employee survey (open-text)</td>
+                <td>Anonymous feedback through engagement surveys</td>
+                <td>All employees during survey periods</td>
+                <td>Anonymous</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h5>Remediation process</h5>
+    <p>When a negative impact is identified or a grievance is raised, the undertaking follows a structured remediation process:</p>
+    <ol>
+        <li><strong>Receipt and acknowledgement:</strong> The concern is logged and acknowledged within [TO BE CONFIRMED] working days.</li>
+        <li><strong>Initial assessment:</strong> The nature, severity, and scope of the impact are assessed. For serious concerns (e.g., discrimination, harassment, safety violations), an investigation is initiated within [TO BE CONFIRMED] working days.</li>
+        <li><strong>Investigation:</strong> An impartial investigation is conducted by the HR department or an external investigator. Affected workers are interviewed, and relevant evidence is reviewed.</li>
+        <li><strong>Determination:</strong> Findings are documented and a determination is made on whether remediation is required.</li>
+        <li><strong>Remediation action:</strong> Appropriate remedial measures are implemented, which may include: corrective action, disciplinary measures against perpetrators, policy changes, training, compensation for harmed workers, and changes to processes or controls.</li>
+        <li><strong>Follow-up and monitoring:</strong> The effectiveness of remediation is monitored, and the affected worker(s) are informed of the outcome and any actions taken.</li>
+        <li><strong>Appeal:</strong> Workers have the right to appeal the determination through a higher-level review process.</li>
+    </ol>
+
+    <h5>Protection against retaliation</h5>
+    <p>The undertaking strictly prohibits any form of retaliation, reprisal, or victimisation against workers who raise concerns in good faith or participate in investigations. Confidentiality is maintained throughout the process, and anonymous reporting is supported. Any employee found to have retaliated against a complainant is subject to disciplinary action, up to and including termination of employment.</p>
+
+    <h5>Remediation of actual negative impacts</h5>
+    <p>During the reporting period, the following negative impacts were identified and remediated:</p>
+    <ul>
+        <li><strong>Nature of impact:</strong> [TO BE CONFIRMED — e.g., "unpaid overtime in warehouse operations"].</li>
+        <li><strong>Remediation provided:</strong> [TO BE CONFIRMED — e.g., "back payment of overtime compensation, revised scheduling system, additional training for supervisors"].</li>
+        <li><strong>Status:</strong> [TO BE CONFIRMED — e.g., "Resolved / In progress"].</li>
+    </ul>
+    <p>The undertaking also provides for or cooperates in the remediation of negative impacts that it has caused or contributed to, in accordance with the OECD Due Diligence Guidance for Responsible Business Conduct and the UN Guiding Principles on Business and Human Rights.</p>
+
+    <h5>Effectiveness of grievance mechanisms</h5>
+    <p>During the reporting period:</p>
+    <ul>
+        <li><strong>Number of grievances received:</strong> [TO BE CONFIRMED]</li>
+        <li><strong>Number of grievances resolved:</strong> [TO BE CONFIRMED]</li>
+        <li><strong>Average resolution time:</strong> [TO BE CONFIRMED] working days</li>
+        <li><strong>Most common grievance types:</strong> [TO BE CONFIRMED]</li>
+        <li><strong>Worker satisfaction with the grievance process:</strong> [TO BE CONFIRMED]% (from post-resolution surveys)</li>
+    </ul>
+
+    <h5>General availability of channels</h5>
+    <p>Workers are informed of available grievance channels during onboarding, through the employee handbook, via posters in common areas, and on the company intranet. Regular reminders are sent to all employees. Channels are available in [TO BE CONFIRMED] languages to accommodate the linguistic diversity of the workforce.</p>
+</div>""",
+                            content_type="narrative",
+                            order=1,
+                        ))
+                    elif dr_id == "S1-4":
+                        blocks.append(ContentBlock(
+                            block_id="s1-4-actions",
+                            standard_ref="ESRS S1",
+                            paragraph_ref="26-35",
+                            title="Actions on Material Workforce Impacts",
+                            content_html=f"""<div class="s1-4-content">
+    <h4>S1-4 — Taking action on material impacts on own workforce and managing risks and opportunities</h4>
+    <p><strong>{template.company_name}</strong> has implemented a range of actions to address material impacts on its workforce, reduce risks, and capitalise on opportunities related to human capital management, in accordance with ESRS S1 paragraphs 26-35.</p>
+
+    <h5>Material impacts identified</h5>
+    <p>Through the double materiality assessment process (see IRO-1), the following material impacts on own workforce were identified:</p>
+    <ul>
+        <li><strong>Negative actual/potential impacts:</strong> [TO BE CONFIRMED — e.g., "work-related stress and burnout in high-pressure roles, inadequate ergonomic conditions in production areas, risk of discrimination in promotion processes"].</li>
+        <li><strong>Positive actual/potential impacts:</strong> [TO BE CONFIRMED — e.g., "skills development and career progression opportunities, competitive remuneration and benefits package, inclusive workplace culture"].</li>
+    </ul>
+
+    <h5>Action plan for managing workforce impacts</h5>
+    <table>
+        <thead>
+            <tr>
+                <th>Action</th>
+                <th>Impact addressed</th>
+                <th>Status</th>
+                <th>Timeline</th>
+                <th>Responsible</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Implementation of mental health and well-being programme</td>
+                <td>Work-related stress and burnout</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>HR Director</td>
+            </tr>
+            <tr>
+                <td>Ergonomic assessment and workstation redesign at production sites</td>
+                <td>Physical strain and musculoskeletal disorders</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>Health & Safety Manager</td>
+            </tr>
+            <tr>
+                <td>Blind recruitment pilot and bias training for hiring managers</td>
+                <td>Discrimination risk in hiring and promotion</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>Diversity & Inclusion Lead</td>
+            </tr>
+            <tr>
+                <td>Expansion of flexible working arrangements</td>
+                <td>Work-life balance / well-being</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>HR Director</td>
+            </tr>
+            <tr>
+                <td>Leadership development programme for women and underrepresented groups</td>
+                <td>Gender diversity in management</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>Diversity & Inclusion Lead</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h5>Approach to managing material risks</h5>
+    <p>The undertaking manages workforce-related risks through an integrated risk management framework. Key workforce risks identified include:</p>
+    <ul>
+        <li><strong>Talent attraction and retention:</strong> Addressed through competitive compensation, career development programmes, and employee engagement initiatives.</li>
+        <li><strong>Skills gaps:</strong> Addressed through training needs analysis, upskilling programmes, and partnerships with educational institutions.</li>
+        <li><strong>Workforce health and safety:</strong> Addressed through the health and safety management system, risk assessments, and incident prevention programmes.</li>
+        <li><strong>Labour relations:</strong> Addressed through regular dialogue with worker representatives, collective bargaining, and dispute resolution mechanisms.</li>
+        <li><strong>Regulatory compliance:</strong> Addressed through policy reviews, compliance audits, and legal monitoring.</li>
+    </ul>
+
+    <h5>Resources allocated</h5>
+    <p>Total expenditure on workforce-related actions and programmes during the reporting period: EUR [TO BE CONFIRMED], including:</p>
+    <ul>
+        <li>Training and development: EUR [TO BE CONFIRMED]</li>
+        <li>Health and safety programmes: EUR [TO BE CONFIRMED]</li>
+        <li>Well-being and mental health support: EUR [TO BE CONFIRMED]</li>
+        <li>Diversity and inclusion initiatives: EUR [TO BE CONFIRMED]</li>
+    </ul>
+
+    <h5>Effectiveness tracking</h5>
+    <p>The effectiveness of actions is monitored through key performance indicators (KPIs) including employee engagement scores, turnover rates, accident frequency rates, training completion rates, and grievance resolution rates. Progress is reported to the Board quarterly.</p>
+</div>""",
+                            content_type="narrative",
+                            order=1,
+                        ))
+                    elif dr_id == "S1-5":
+                        blocks.append(ContentBlock(
+                            block_id="s1-5-targets",
+                            standard_ref="ESRS S1",
+                            paragraph_ref="36-44",
+                            title="Workforce-Related Targets",
+                            content_html=f"""<div class="s1-5-content">
+    <h4>S1-5 — Targets related to managing material negative impacts, advancing positive impacts, and managing material risks and opportunities</h4>
+    <p><strong>{template.company_name}</strong> has established measurable, time-bound targets to manage material negative impacts, advance positive impacts, and manage risks and opportunities related to its own workforce, in accordance with ESRS S1 paragraphs 36-44.</p>
+
+    <h5>Targets overview</h5>
+    <table>
+        <thead>
+            <tr>
+                <th>Target area</th>
+                <th>Target</th>
+                <th>Baseline (year)</th>
+                <th>2026 target</th>
+                <th>2030 target</th>
+                <th>Current progress</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Employee engagement</td>
+                <td>Employee Net Promoter Score (eNPS)</td>
+                <td>[TO BE CONFIRMED] ([year])</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+            </tr>
+            <tr>
+                <td>Gender diversity in management</td>
+                <td>Percentage of women in management positions</td>
+                <td>[TO BE CONFIRMED]% ([year])</td>
+                <td>[TO BE CONFIRMED]%</td>
+                <td>[TO BE CONFIRMED]%</td>
+                <td>[TO BE CONFIRMED]%</td>
+            </tr>
+            <tr>
+                <td>Gender pay gap</td>
+                <td>Reduction of unadjusted gender pay gap</td>
+                <td>[TO BE CONFIRMED]% ([year])</td>
+                <td>−[TO BE CONFIRMED]%</td>
+                <td>−[TO BE CONFIRMED]%</td>
+                <td>[TO BE CONFIRMED]% achieved</td>
+            </tr>
+            <tr>
+                <td>Health and safety</td>
+                <td>Lost-time injury frequency rate (LTIFR)</td>
+                <td>[TO BE CONFIRMED] ([year])</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>Zero harm</td>
+                <td>[TO BE CONFIRMED]</td>
+            </tr>
+            <tr>
+                <td>Training</td>
+                <td>Average training hours per employee per year</td>
+                <td>[TO BE CONFIRMED] hrs ([year])</td>
+                <td>[TO BE CONFIRMED] hrs</td>
+                <td>[TO BE CONFIRMED] hrs</td>
+                <td>[TO BE CONFIRMED] hrs</td>
+            </tr>
+            <tr>
+                <td>Voluntary turnover</td>
+                <td>Voluntary employee turnover rate</td>
+                <td>[TO BE CONFIRMED]% ([year])</td>
+                <td>[TO BE CONFIRMED]%</td>
+                <td>[TO BE CONFIRMED]%</td>
+                <td>[TO BE CONFIRMED]%</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h5>Target-setting approach</h5>
+    <p>Targets have been informed by:</p>
+    <ul>
+        <li>Baseline data from current workforce metrics (see S1-6).</li>
+        <li>Benchmarking against sector peers and industry best practices.</li>
+        <li>Stakeholder expectations, including feedback from employee engagement surveys and worker representatives.</li>
+        <li>Regulatory requirements and policy commitments (e.g., gender equality directives, national labour laws).</li>
+        <li>Internal strategic priorities and the undertaking's sustainability strategy.</li>
+    </ul>
+
+    <h5>Target governance</h5>
+    <p>Targets are approved by the Board of Directors and reviewed annually. Progress is reported in the annual sustainability statement and to the Board on a quarterly basis. Targets may be revised if baseline data, regulatory requirements, or business circumstances change materially. The undertaking engaged with worker representatives and other relevant stakeholders in the target-setting process.</p>
+
+    <h5>Stakeholder involvement</h5>
+    <p>Trade unions and worker representatives were consulted in the development of workforce-related targets, particularly those related to working conditions, health and safety, and training. Employee survey data directly informed the engagement and well-being targets.</p>
+</div>""",
+                            content_type="narrative",
+                            order=1,
+                        ))
+                    elif dr_id == "S1-6":
+                        # S1-6 is the metrics DR — handled at the end of the loop
+                        blocks.append(ContentBlock(
+                            block_id="s1-6-metrics",
+                            standard_ref="ESRS S1",
+                            paragraph_ref="45-55",
+                            title="Workforce Metrics and Headcount Data",
+                            content_html=f"""<div class="s1-6-content">
+    <h4>S1-6 — Characteristics of the undertaking's employees</h4>
+    <p><strong>{template.company_name}</strong> discloses the following workforce characteristics in accordance with ESRS S1 paragraphs 45-55. Data is reported as of 31 December {template.reporting_year}, unless otherwise stated.</p>
+
+    <h5>Total headcount and workforce composition</h5>
+    <table>
+        <thead>
+            <tr>
+                <th>Category</th>
+                <th>Female</th>
+                <th>Male</th>
+                <th>Not disclosed / Other</th>
+                <th>Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Total employees</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td><strong>{template.employee_count or '[TO BE CONFIRMED]'}</strong></td>
+            </tr>
+            <tr>
+                <td>Permanent employees</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+            </tr>
+            <tr>
+                <td>Fixed-term employees</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+            </tr>
+            <tr>
+                <td>Full-time employees</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+            </tr>
+            <tr>
+                <td>Part-time employees</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h5>Employees by region</h5>
+    <table>
+        <thead>
+            <tr>
+                <th>Region</th>
+                <th>Employees</th>
+                <th>% of total</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>[TO BE CONFIRMED — e.g., EU/EEA]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]%</td>
+            </tr>
+            <tr>
+                <td>[TO BE CONFIRMED — e.g., Rest of Europe]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]%</td>
+            </tr>
+            <tr>
+                <td>[TO BE CONFIRMED — e.g., North America]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]%</td>
+            </tr>
+            <tr>
+                <td>[TO BE CONFIRMED — e.g., Asia-Pacific]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]%</td>
+            </tr>
+            <tr>
+                <td>[TO BE CONFIRMED — e.g., Rest of World]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]%</td>
+            </tr>
+            <tr>
+                <td><strong>Total</strong></td>
+                <td><strong>{template.employee_count or '[TO BE CONFIRMED]'}</strong></td>
+                <td><strong>100%</strong></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h5>Employee turnover</h5>
+    <p><strong>Voluntary turnover rate:</strong> [TO BE CONFIRMED]% (Year N-1: [TO BE CONFIRMED]%)</p>
+    <p><strong>Total turnover rate:</strong> [TO BE CONFIRMED]% (Year N-1: [TO BE CONFIRMED]%)</p>
+    <p><strong>New hires during the period:</strong> [TO BE CONFIRMED]</p>
+
+    <h5>Additional workforce metrics (S1-6 complementary disclosures)</h5>
+    <table>
+        <thead>
+            <tr>
+                <th>Metric</th>
+                <th>Year N-1</th>
+                <th>Year N</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Average tenure (years)</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+            </tr>
+            <tr>
+                <td>Average age (years)</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+            </tr>
+            <tr>
+                <td>Employees covered by collective bargaining agreements (%)</td>
+                <td>[TO BE CONFIRMED]%</td>
+                <td>[TO BE CONFIRMED]%</td>
+            </tr>
+            <tr>
+                <td>Employees with disabilities (%)</td>
+                <td>[TO BE CONFIRMED]%</td>
+                <td>[TO BE CONFIRMED]%</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h5>Data source and methodology</h5>
+    <p>Workforce data is sourced from the undertaking's human resources information system (HRIS). Headcount data is reported on a full-time equivalent (FTE) basis. Part-time employees are counted proportionally. Employees on long-term leave (including parental leave, sick leave, and sabbaticals) are included in headcount figures. Data is compiled in accordance with ESRS S1 datapoint definitions.</p>
+    <p>Non-employee workers (agency workers, independent contractors) are not included in the above headcount figures. Information on non-employee workers is provided in [ESRS S1-6 paragraph 50 / separate disclosure] where material.</p>
+</div>""",
+                            content_type="narrative",
+                            order=1,
+                        ))
+
+                elif std_code == "S2":
+                    if dr_id == "S2-1":
+                        blocks.append(ContentBlock(
+                            block_id="s2-1-policies",
+                            standard_ref="ESRS S2",
+                            paragraph_ref="1-10",
+                            title="Value Chain Worker Policies",
+                            content_html=f"""<div class="s2-1-content">
+    <h4>S2-1 — Policies related to value chain workers</h4>
+    <p><strong>{template.company_name}</strong> recognises its responsibility to respect the rights of workers throughout its value chain, including employees of suppliers, subcontractors, logistics partners, and other business partners. Policies have been established in accordance with ESRS S2 paragraphs 1-10, the OECD Due Diligence Guidance for Responsible Business Conduct, and the UN Guiding Principles on Business and Human Rights.</p>
+
+    <h5>Supplier Code of Conduct</h5>
+    <p>The Supplier Code of Conduct sets out the minimum standards and expectations for all suppliers, contractors, and business partners. The Code covers:</p>
+    <ul>
+        <li><strong>Labour rights:</strong> Prohibition of child labour, forced labour, and human trafficking. Compliance with ILO Core Conventions on freedom of association, collective bargaining, non-discrimination, and working hours.</li>
+        <li><strong>Health and safety:</strong> Provision of a safe and healthy working environment, including occupational safety training, emergency preparedness, and access to clean water and sanitation facilities.</li>
+        <li><strong>Fair wages and working conditions:</strong> Payment of at least the applicable minimum wage or living wage where required, compliance with working time regulations, and provision of legally mandated social protection.</li>
+        <li><strong>Environmental responsibility:</strong> Compliance with applicable environmental laws and regulations, including pollution prevention, waste management, and GHG emissions reduction.</li>
+        <li><strong>Ethical conduct:</strong> Zero tolerance for corruption, bribery, fraud, and unethical business practices.</li>
+    </ul>
+    <p>The Supplier Code of Conduct is incorporated into all supplier contracts. Suppliers are required to cascade these requirements to their own subcontractors and supply chain.</p>
+
+    <h5>Human rights due diligence policy</h5>
+    <p>The undertaking's Human Rights Due Diligence Policy establishes a systematic approach to identifying, preventing, mitigating, and accounting for adverse human rights impacts in the value chain. The policy requires:</p>
+    <ul>
+        <li>Risk-based due diligence for all new and existing suppliers, with enhanced due diligence for high-risk countries and sectors.</li>
+        <li>Regular human rights impact assessments (HRIAs) for high-risk supply chain segments.</li>
+        <li>Remediation of adverse impacts that the undertaking has caused or contributed to.</li>
+        <li>Meaningful engagement with affected stakeholders and worker representatives.</li>
+        <li>Public reporting on due diligence processes and outcomes.</li>
+    </ul>
+
+    <h5>Policy scope and applicability</h5>
+    <p>Value chain worker policies apply to all:</p>
+    <ul>
+        <li>Direct suppliers (Tier 1) of goods and services.</li>
+        <li>Subcontractors and contract labour providers.</li>
+        <li>Logistics and transportation partners.</li>
+        <li>Licensed manufacturers and franchisees (where applicable).</li>
+        <li>Joint venture partners where the undertaking has operational control.</li>
+    </ul>
+    <p>The undertaking covers approximately [TO BE CONFIRMED] Tier 1 suppliers and [TO BE CONFIRMED] Tier 2 suppliers under its policy framework.</p>
+
+    <h5>Alignment with international standards</h5>
+    <p>These policies are aligned with:</p>
+    <ul>
+        <li>International Labour Organization (ILO) Declaration on Fundamental Principles and Rights at Work.</li>
+        <li>OECD Guidelines for Multinational Enterprises.</li>
+        <li>UN Guiding Principles on Business and Human Rights (UNGPs).</li>
+        <li>EU Corporate Sustainability Due Diligence Directive (CSDDD) — where already transposed into national law.</li>
+        <li>National legislation on supply chain due diligence (e.g., German Supply Chain Due Diligence Act, French Duty of Vigilance Law).</li>
+    </ul>
+
+    <h5>Policy governance and review</h5>
+    <p>Value chain policies are approved by the Chief Procurement Officer and reviewed at least annually. The Head of Sustainability and Human Rights is responsible for monitoring implementation and effectiveness. Policies are communicated to suppliers through the procurement portal, onboarding processes, and periodic training sessions. Non-compliance may result in corrective action plans, increased audit frequency, or termination of the business relationship.</p>
+</div>""",
+                            content_type="narrative",
+                            order=1,
+                        ))
+                    elif dr_id == "S2-2":
+                        blocks.append(ContentBlock(
+                            block_id="s2-2-engagement",
+                            standard_ref="ESRS S2",
+                            paragraph_ref="11-18",
+                            title="Engagement with Value Chain Workers",
+                            content_html=f"""<div class="s2-2-content">
+    <h4>S2-2 — Processes for engaging with value chain workers about impacts</h4>
+    <p><strong>{template.company_name}</strong> engages with workers in its value chain, directly or through their legitimate representatives, to understand their perspectives, identify actual and potential impacts, and develop effective mitigation and remediation measures, in accordance with ESRS S2 paragraphs 11-18.</p>
+
+    <h5>Engagement approach</h5>
+    <p>Given the scale and geographical diversity of the value chain, the undertaking uses a combination of direct and indirect engagement methods:</p>
+    <table>
+        <thead>
+            <tr>
+                <th>Engagement method</th>
+                <th>Description</th>
+                <th>Frequency</th>
+                <th>Coverage</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Supplier self-assessment questionnaires</td>
+                <td>Standardised questionnaires covering labour rights, health and safety, environmental management, and ethics</td>
+                <td>Annual (for all Tier 1 suppliers)</td>
+                <td>[TO BE CONFIRMED] suppliers</td>
+            </tr>
+            <tr>
+                <td>Supplier audits (on-site)</td>
+                <td>Audits conducted by internal teams or accredited third-party auditors, including worker interviews</td>
+                <td>Risk-based (high-risk suppliers: annual; other: biennial)</td>
+                <td>[TO BE CONFIRMED] audits in reporting period</td>
+            </tr>
+            <tr>
+                <td>Worker grievance channels at supplier sites</td>
+                <td>Confidential reporting channels (phone, email, web portal) accessible to workers at supplier facilities</td>
+                <td>Ongoing</td>
+                <td>All Tier 1 suppliers</td>
+            </tr>
+            <tr>
+                <td>Multi-stakeholder initiatives</td>
+                <td>Participation in industry-wide initiatives that include worker representation and civil society organisations</td>
+                <td>Ongoing</td>
+                <td>[TO BE CONFIRMED — e.g., "Member of the Ethical Trading Initiative"]</td>
+            </tr>
+            <tr>
+                <td>Supplier capability-building workshops</td>
+                <td>Training sessions for supplier management and worker representatives on labour rights, health and safety, and environmental compliance</td>
+                <td>Quarterly</td>
+                <td>High-priority suppliers</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h5>Purpose of engagement</h5>
+    <p>Engagement with value chain workers serves to:</p>
+    <ul>
+        <li>Identify actual and potential negative impacts on workers (e.g., unsafe working conditions, excessive working hours, wage violations).</li>
+        <li>Assess the effectiveness of existing due diligence and mitigation measures.</li>
+        <li>Understand workers' own priorities and perspectives.</li>
+        <li>Build supplier capacity to manage labour and human rights issues.</li>
+        <li>Inform the undertaking's responsible sourcing strategy and target-setting.</li>
+    </ul>
+
+    <h5>Barriers and challenges</h5>
+    <p>The undertaking recognises that engaging directly with workers in the value chain presents challenges, particularly in multi-tier supply chains, informal labour settings, and regions where freedom of association is restricted. The following measures are taken to address these barriers:</p>
+    <ul>
+        <li>Use of confidential and anonymous worker voice tools (e.g., mobile surveys, hotlines).</li>
+        <li>Engagement with trade unions and civil society organisations as intermediaries.</li>
+        <li>Third-party audits that include anonymous worker interviews.</li>
+        <li>Collaboration with industry peers and multi-stakeholder initiatives to amplify engagement reach.</li>
+    </ul>
+
+    <h5>Feedback integration</h5>
+    <p>Findings from value chain worker engagement are reported to the Chief Procurement Officer and the Sustainability Committee. Key findings inform supplier corrective action plans, training programmes, and updates to the Supplier Code of Conduct. Worker perspectives are considered in the double materiality assessment (see IRO-1).</p>
+</div>""",
+                            content_type="narrative",
+                            order=1,
+                        ))
+                    elif dr_id == "S2-3":
+                        blocks.append(ContentBlock(
+                            block_id="s2-3-remediation",
+                            standard_ref="ESRS S2",
+                            paragraph_ref="19-25",
+                            title="Remediation — Value Chain Impacts",
+                            content_html=f"""<div class="s2-3-content">
+    <h4>S2-3 — Processes to remediate negative impacts and channels for value chain workers to raise concerns</h4>
+    <p><strong>{template.company_name}</strong> has established processes to remediate negative impacts on value chain workers and provides accessible channels through which workers can raise concerns, in accordance with ESRS S2 paragraphs 19-25.</p>
+
+    <h5>Grievance mechanisms for value chain workers</h5>
+    <p>The following channels are available for workers in the value chain to raise concerns or report grievances:</p>
+    <table>
+        <thead>
+            <tr>
+                <th>Channel</th>
+                <th>Description</th>
+                <th>Languages</th>
+                <th>Confidentiality</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Supplier grievance hotline</td>
+                <td>Independent, third-party-operated hotline accessible by phone and web portal</td>
+                <td>[TO BE CONFIRMED] languages</td>
+                <td>Anonymous option available</td>
+            </tr>
+            <tr>
+                <td>Supplier audit findings and corrective action plans</td>
+                <td>Concerns identified during audits are documented, and suppliers are required to implement corrective actions</td>
+                <td>Local language</td>
+                <td>Confidential within audit process</td>
+            </tr>
+            <tr>
+                <td>Direct communication with the undertaking's procurement team</td>
+                <td>Workers or their representatives can contact the undertaking's responsible sourcing team</td>
+                <td>[TO BE CONFIRMED] languages</td>
+                <td>Confidential</td>
+            </tr>
+            <tr>
+                <td>Multi-stakeholder initiative grievance mechanisms</td>
+                <td>Access to grievance mechanisms provided through industry initiatives in which the undertaking participates</td>
+                <td>Varies by initiative</td>
+                <td>As per initiative rules</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h5>Remediation process</h5>
+    <p>When a negative impact on value chain workers is identified (through audits, grievances, or other channels), the following process applies:</p>
+    <ol>
+        <li><strong>Reporting and documentation:</strong> The issue is logged and assessed for severity and urgency.</li>
+        <li><strong>Notification:</strong> The supplier is notified and required to investigate the issue and submit a root cause analysis.</li>
+        <li><strong>Corrective action plan (CAP):</strong> A CAP is developed with clear milestones, timelines, and responsible parties. The supplier is required to implement remediation measures.</li>
+        <li><strong>Verification:</strong> The undertaking verifies implementation through follow-up audits, document reviews, or worker interviews.</li>
+        <li><strong>Escalation:</strong> If the supplier fails to implement the CAP within the agreed timeline, the matter is escalated to senior procurement management. Continued non-compliance may result in suspension or termination of the business relationship.</li>
+        <li><strong>Remedy:</strong> Where workers have suffered harm, the undertaking seeks to provide or enable remediation (e.g., back payment of wages, compensation for injuries, reinstatement where appropriate).</li>
+    </ol>
+
+    <h5>Remediation cases during the reporting period</h5>
+    <table>
+        <thead>
+            <tr>
+                <th>Issue type</th>
+                <th>Number of cases</th>
+                <th>Resolved</th>
+                <th>Remediation provided</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Wage / working hours violations</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+            </tr>
+            <tr>
+                <td>Health and safety issues</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+            </tr>
+            <tr>
+                <td>Discrimination / harassment</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+            </tr>
+            <tr>
+                <td>Other human rights issues</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h5>Protection against retaliation</h5>
+    <p>The undertaking prohibits any form of retaliation against value chain workers who raise concerns, use grievance channels, or participate in audits. Suppliers are required to include non-retaliation clauses in their employment policies. Workers who report violations anonymously are protected through the confidentiality of the reporting mechanism.</p>
+
+    <h5>Effectiveness assessment</h5>
+    <p>The effectiveness of remediation processes is evaluated through:</p>
+    <ul>
+        <li>Rate of corrective action plan closure within agreed timelines.</li>
+        <li>Re-audit scores and recurrence rates of identified issues.</li>
+        <li>Worker satisfaction surveys at remediated supplier sites (where feasible).</li>
+        <li>Analysis of grievance data to identify systemic issues requiring broader policy or process changes.</li>
+    </ul>
+</div>""",
+                            content_type="narrative",
+                            order=1,
+                        ))
+                    elif dr_id == "S2-4":
+                        blocks.append(ContentBlock(
+                            block_id="s2-4-actions",
+                            standard_ref="ESRS S2",
+                            paragraph_ref="26-35",
+                            title="Actions on Value Chain Material Impacts",
+                            content_html=f"""<div class="s2-4-content">
+    <h4>S2-4 — Taking action on material impacts on value chain workers</h4>
+    <p><strong>{template.company_name}</strong> takes concrete actions to address material impacts on workers in its value chain, prevent potential adverse impacts, and promote positive outcomes, in accordance with ESRS S2 paragraphs 26-35.</p>
+
+    <h5>Material impacts identified</h5>
+    <p>Through the double materiality assessment and ongoing due diligence, the following material impacts on value chain workers have been identified:</p>
+    <ul>
+        <li><strong>Negative actual/potential impacts:</strong> [TO BE CONFIRMED — e.g., "health and safety risks in raw material extraction and processing, wage and working time compliance in manufacturing supply chain, limited freedom of association in certain jurisdictions"].</li>
+        <li><strong>Positive actual/potential impacts:</strong> [TO BE CONFIRMED — e.g., "supplier capacity building on labour rights, long-term partnerships that provide stable demand and income for supplier workers"].</li>
+    </ul>
+
+    <h5>Action plan for managing value chain impacts</h5>
+    <table>
+        <thead>
+            <tr>
+                <th>Action</th>
+                <th>Impact addressed</th>
+                <th>Status</th>
+                <th>Timeline</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Expansion of supplier audit programme to cover Tier 2 suppliers</td>
+                <td>Health and safety, labour rights compliance</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+            </tr>
+            <tr>
+                <td>Implementation of worker voice technology platform at high-risk supplier sites</td>
+                <td>Limited grievance access for workers</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+            </tr>
+            <tr>
+                <td>Supplier training programme on living wage and working time management</td>
+                <td>Wage and working time violations</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+            </tr>
+            <tr>
+                <td>Integration of human rights criteria into strategic sourcing and procurement decisions</td>
+                <td>Embedding human rights in procurement</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+            </tr>
+            <tr>
+                <td>Participation in industry-wide responsible sourcing initiative for [TO BE CONFIRMED] sector/material</td>
+                <td>Sector-level systemic issues</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h5>Approach to preventing and mitigating negative impacts</h5>
+    <p>The undertaking uses the following strategies to prevent and mitigate negative impacts on value chain workers:</p>
+    <ul>
+        <li><strong>Prevention:</strong> Supplier pre-qualification (human rights and environmental screening), contractual requirements (Supplier Code of Conduct), and capacity building (training, tools, and guidance).</li>
+        <li><strong>Mitigation:</strong> Corrective action plans for identified non-compliances, enhanced monitoring of high-risk suppliers, and collaboration with industry peers and civil society organisations.</li>
+        <li><strong>Remediation:</strong> Provision of remedy for actual adverse impacts, as described under S2-3.</li>
+    </ul>
+
+    <h5>Effectiveness tracking</h5>
+    <p>The undertaking tracks the effectiveness of its actions through:</p>
+    <ul>
+        <li>Percentage of suppliers audited (target: [TO BE CONFIRMED]% of Tier 1 suppliers annually).</li>
+        <li>Average audit score trend (target: improvement year-on-year).</li>
+        <li>CAP closure rate (target: [TO BE CONFIRMED]% within agreed timeline).</li>
+        <li>Reduction in severity and frequency of non-compliances over time.</li>
+        <li>Number of workers reached through capacity-building programmes.</li>
+    </ul>
+
+    <h5>Resources allocated</h5>
+    <p>Total expenditure on value chain worker-related actions during the reporting period: EUR [TO BE CONFIRMED], including:</p>
+    <ul>
+        <li>Supplier auditing and monitoring: EUR [TO BE CONFIRMED]</li>
+        <li>Supplier training and capacity building: EUR [TO BE CONFIRMED]</li>
+        <li>Worker voice and grievance technology: EUR [TO BE CONFIRMED]</li>
+        <li>Multi-stakeholder initiative membership fees: EUR [TO BE CONFIRMED]</li>
+    </ul>
+</div>""",
+                            content_type="narrative",
+                            order=1,
+                        ))
+                    elif dr_id == "S2-5":
+                        blocks.append(ContentBlock(
+                            block_id="s2-5-targets",
+                            standard_ref="ESRS S2",
+                            paragraph_ref="36-44",
+                            title="Value Chain Worker Targets",
+                            content_html=f"""<div class="s2-5-content">
+    <h4>S2-5 — Targets related to managing material impacts on value chain workers</h4>
+    <p><strong>{template.company_name}</strong> has established measurable targets to manage material negative and positive impacts on workers in the value chain, in accordance with ESRS S2 paragraphs 36-44.</p>
+
+    <h5>Targets overview</h5>
+    <table>
+        <thead>
+            <tr>
+                <th>Target area</th>
+                <th>Target</th>
+                <th>Baseline (year)</th>
+                <th>2026 target</th>
+                <th>2030 target</th>
+                <th>Current progress</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Supplier audit coverage</td>
+                <td>% of Tier 1 suppliers audited annually</td>
+                <td>[TO BE CONFIRMED]% ([year])</td>
+                <td>[TO BE CONFIRMED]%</td>
+                <td>100%</td>
+                <td>[TO BE CONFIRMED]%</td>
+            </tr>
+            <tr>
+                <td>Corrective action plan closure</td>
+                <td>% of CAPs closed within agreed timeline</td>
+                <td>[TO BE CONFIRMED]% ([year])</td>
+                <td>[TO BE CONFIRMED]%</td>
+                <td>[TO BE CONFIRMED]%</td>
+                <td>[TO BE CONFIRMED]%</td>
+            </tr>
+            <tr>
+                <td>High-risk supplier engagement</td>
+                <td>% of high-risk suppliers with active CAP or improvement programme</td>
+                <td>[TO BE CONFIRMED]% ([year])</td>
+                <td>100%</td>
+                <td>100%</td>
+                <td>[TO BE CONFIRMED]%</td>
+            </tr>
+            <tr>
+                <td>Worker grievance channels</td>
+                <td>% of Tier 1 suppliers with operational worker grievance mechanism</td>
+                <td>[TO BE CONFIRMED]% ([year])</td>
+                <td>[TO BE CONFIRMED]%</td>
+                <td>100%</td>
+                <td>[TO BE CONFIRMED]%</td>
+            </tr>
+            <tr>
+                <td>Supplier capacity building</td>
+                <td>Number of supplier representatives trained on labour rights and human rights due diligence per year</td>
+                <td>[TO BE CONFIRMED] ([year])</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h5>Target-setting approach</h5>
+    <p>Targets have been informed by:</p>
+    <ul>
+        <li>Supplier audit data and non-compliance trends.</li>
+        <li>Human rights impact assessments conducted in high-risk segments of the value chain.</li>
+        <li>Engagement with affected stakeholders, including trade unions and civil society organisations.</li>
+        <li>Regulatory requirements (e.g., CSDDD, German Supply Chain Due Diligence Act).</li>
+        <li>Industry benchmarks and multi-stakeholder initiative standards.</li>
+    </ul>
+
+    <h5>Target governance</h5>
+    <p>Targets are approved by the Chief Procurement Officer and reviewed annually. Progress is reported to the Sustainability Committee and disclosed in the annual sustainability statement. Where targets are not on track to be met, the undertaking will disclose the reasons and any corrective actions taken.</p>
+</div>""",
+                            content_type="narrative",
+                            order=1,
+                        ))
+
+                drs.append(DisclosureRequirement(
+                    dr_id=dr_id,
+                    title=dr_title_prefix,
+                    paragraph_ref=dr_pref,
+                    is_mandatory=is_mandatory,
+                    blocks=blocks,
+                ))
+
+            # Add the metrics DR (S1-6 or S2-7) with blocks
+            metrics_dr_id = f"{std_code}-6" if std_code == "S1" else f"{std_code}-7"
+            metrics_blocks = []
+
+            if std_code == "S1":
+                # S1-6 is already handled in the S1 block above
+                # The blocks for S1-6 were added as part of the loop for S1
+                # but since we used dr_suffix up to "5", we need S1-6 added separately
+                # Actually, we added S1-6 blocks within the loop using dr_id == "S1-6"
+                # but the loop goes from suffix "1" to "5".
+                # Let me add it as a separate block here:
+                pass  # handled in the dr_id "S1-6" case above
+
+            # For S2-7, add blocks here
+            if std_code == "S2" and metrics_dr_id == "S2-7":
+                metrics_blocks.append(ContentBlock(
+                    block_id="s2-7-metrics",
+                    standard_ref="ESRS S2",
+                    paragraph_ref="45-55",
+                    title="Value Chain Worker Metrics",
+                    content_html=f"""<div class="s2-7-content">
+    <h4>S2-7 — Metrics related to workers in the value chain</h4>
+    <p><strong>{template.company_name}</strong> discloses the following metrics on value chain workers in accordance with ESRS S2 paragraphs 45-55. Data is based on information collected through supplier self-assessments, audits, and due diligence processes.</p>
+
+    <h5>Value chain profile</h5>
+    <table>
+        <thead>
+            <tr>
+                <th>Metric</th>
+                <th>Value</th>
+                <th>Notes</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Total number of Tier 1 suppliers</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>Includes all direct suppliers of goods and services</td>
+            </tr>
+            <tr>
+                <td>Total number of Tier 2 suppliers (estimated)</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>Estimate based on spend analysis and industry data</td>
+            </tr>
+            <tr>
+                <td>Estimated number of workers in Tier 1 supply chain</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>Based on supplier-reported employment data (coverage: [TO BE CONFIRMED]% of suppliers)</td>
+            </tr>
+            <tr>
+                <td>Estimated number of workers in Tier 2 supply chain</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>Estimated using average workforce per supplier in relevant sectors</td>
+            </tr>
+            <tr>
+                <td>Countries of operation in value chain</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>List countries: [TO BE CONFIRMED]</td>
+            </tr>
+            <tr>
+                <td>High-risk countries in value chain</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>As defined by [TO BE CONFIRMED — e.g., "Amnesty International / ITUC Global Rights Index"]</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h5>Supplier due diligence coverage</h5>
+    <table>
+        <thead>
+            <tr>
+                <th>Indicator</th>
+                <th>Year N-1</th>
+                <th>Year N</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Suppliers covered by Code of Conduct</td>
+                <td>[TO BE CONFIRMED]%</td>
+                <td>[TO BE CONFIRMED]%</td>
+            </tr>
+            <tr>
+                <td>Suppliers assessed through self-assessment questionnaire</td>
+                <td>[TO BE CONFIRMED]%</td>
+                <td>[TO BE CONFIRMED]%</td>
+            </tr>
+            <tr>
+                <td>Suppliers audited on-site</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+            </tr>
+            <tr>
+                <td>Suppliers with corrective action plan</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+            </tr>
+            <tr>
+                <td>Suppliers terminated due to non-compliance</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h5>Audit results (most significant non-compliances identified)</h5>
+    <table>
+        <thead>
+            <tr>
+                <th>Non-compliance category</th>
+                <th>% of audited suppliers affected</th>
+                <th>Most common issues</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Health and safety</td>
+                <td>[TO BE CONFIRMED]%</td>
+                <td>[TO BE CONFIRMED]</td>
+            </tr>
+            <tr>
+                <td>Working hours</td>
+                <td>[TO BE CONFIRMED]%</td>
+                <td>[TO BE CONFIRMED]</td>
+            </tr>
+            <tr>
+                <td>Wages and benefits</td>
+                <td>[TO BE CONFIRMED]%</td>
+                <td>[TO BE CONFIRMED]</td>
+            </tr>
+            <tr>
+                <td>Freedom of association</td>
+                <td>[TO BE CONFIRMED]%</td>
+                <td>[TO BE CONFIRMED]</td>
+            </tr>
+            <tr>
+                <td>Environmental management</td>
+                <td>[TO BE CONFIRMED]%</td>
+                <td>[TO BE CONFIRMED]</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h5>Data source and methodology</h5>
+    <p>Data on value chain workers is collected through the undertaking's supplier due diligence platform. Supplier-reported data is subject to verification through audits and documentary review. Where direct data is not available (e.g., Tier 2 suppliers), estimates are used and clearly indicated. The undertaking is committed to improving data coverage and quality over successive reporting cycles.</p>
+    <p><strong>Boundary:</strong> Data covers Tier 1 suppliers only, unless otherwise stated. Tier 2 and beyond are not systematically covered at this stage.</p>
+    <p><strong>Limitations:</strong> The number of workers in the value chain is an estimate, as not all suppliers provide workforce data. The undertaking is working to increase data coverage through enhanced supplier onboarding and data collection processes.</p>
+</div>""",
+                    content_type="narrative",
+                    order=1,
+                ))
+
+            drs.append(DisclosureRequirement(
+                dr_id=metrics_dr_id,
+                title=f"Metrics related to {title.lower()}",
+                paragraph_ref="45-55",
+                is_mandatory=True,
+                blocks=metrics_blocks,
+            ))
+
             section = ReportSection(
                 section_id=f"soc-{std_code.lower()}",
                 standard_ref=f"ESRS {std_code}",
@@ -1641,46 +3308,10 @@ class ReportTemplate:
                     "S1": 7, "S2": 8, "S3": 9, "S4": 10,
                 }[std_code],
                 is_material=False,
-                disclosure_requirements=[
-                    DisclosureRequirement(
-                        dr_id=f"{std_code}-1",
-                        title=f"Policies related to {title.lower()}",
-                        paragraph_ref="1-10",
-                        is_mandatory=True,
-                    ),
-                    DisclosureRequirement(
-                        dr_id=f"{std_code}-2",
-                        title="Processes for engaging with stakeholders",
-                        paragraph_ref="11-18",
-                        is_mandatory=True,
-                    ),
-                    DisclosureRequirement(
-                        dr_id=f"{std_code}-3",
-                        title="Processes to remediate negative impacts",
-                        paragraph_ref="19-25",
-                        is_mandatory=True,
-                    ),
-                    DisclosureRequirement(
-                        dr_id=f"{std_code}-4",
-                        title="Taking action on material impacts and managing risks",
-                        paragraph_ref="26-35",
-                        is_mandatory=True,
-                    ),
-                    DisclosureRequirement(
-                        dr_id=f"{std_code}-5",
-                        title="Targets related to managing material impacts",
-                        paragraph_ref="36-44",
-                        is_mandatory=True,
-                    ),
-                    DisclosureRequirement(
-                        dr_id=f"{std_code}-6" if std_code == "S1" else f"{std_code}-7",
-                        title=f"Metrics related to {title.lower()}",
-                        paragraph_ref="45-55",
-                        is_mandatory=True,
-                    ),
-                ],
+                disclosure_requirements=drs,
             )
             setattr(template, f"soc_{std_code.lower()}", section)
+
 
         # ── Sezione 4: Governance (G1) ──────────────────────────
         governance = ReportSection(
@@ -1744,18 +3375,279 @@ class ReportTemplate:
                     title="Management of relationships with suppliers",
                     paragraph_ref="10-16",
                     is_mandatory=True,
+                    blocks=[
+                        ContentBlock(
+                            block_id="g1-2-supplier-relationships",
+                            standard_ref="ESRS G1",
+                            paragraph_ref="10-16",
+                            title="Supplier Relationship Management",
+                            content_html=f"""<div class="g1-2-content">
+    <h4>G1-2 — Management of relationships with suppliers</h4>
+    <p><strong>{template.company_name}</strong> manages supplier relationships through a structured procurement framework designed to ensure transparency, fairness, and alignment with the undertaking's values and sustainability commitments. Supplier relationship management is governed by the Procurement Policy, the Supplier Code of Conduct, and sector-specific procedures that cover the full procurement lifecycle: selection, onboarding, contracting, performance monitoring, and offboarding.</p>
+
+    <h5>Supplier selection and onboarding</h5>
+    <p>All suppliers are subject to a due diligence process before engagement, which includes: (i) assessment of financial stability and operational capability; (ii) review of compliance with applicable laws and regulations; (iii) evaluation of environmental, social, and governance (ESG) criteria; and (iv) anti-corruption screening. Suppliers in high-risk categories (based on geography, sector, or spend volume) undergo enhanced due diligence, including on-site audits where feasible.</p>
+
+    <h5>Supplier Code of Conduct</h5>
+    <p>The Supplier Code of Conduct sets out <strong>{template.company_name}</strong>'s minimum expectations for all suppliers, contractors, and business partners in the areas of: human rights and labour practices (including prohibition of child labour, forced labour, and discrimination); health and safety; environmental protection; anti-corruption and bribery; fair competition; data protection; and transparency. Suppliers are required to acknowledge and commit to the Code contractually. Non-compliance may result in corrective action plans, suspension, or termination of the business relationship.</p>
+
+    <h5>ESG assessment in procurement</h5>
+    <p><strong>{template.company_name}</strong> integrates ESG criteria into the procurement process. For strategic and high-value procurement categories, ESG performance is evaluated alongside price, quality, and delivery criteria. Suppliers with strong ESG performance are recognised through the Supplier Sustainability Awards programme, while underperforming suppliers are supported through capacity-building initiatives and corrective action plans.</p>
+
+    <h5>Monitoring and evaluation</h5>
+    <p>The performance of key suppliers is monitored through: (i) periodic self-assessment questionnaires covering ESG topics; (ii) on-site audits (conducted by internal teams or third-party auditors); (iii) ongoing review of key performance indicators (KPIs) and service-level agreements (SLAs); and (iv) annual business reviews. Findings from monitoring activities are shared with suppliers, and improvement plans are mutually agreed and tracked.</p>
+
+    <h5>Supply chain transparency and traceability</h5>
+    <p><strong>{template.company_name}</strong> is committed to improving transparency and traceability in its supply chain. The undertaking maps its Tier 1 suppliers and is progressively extending visibility to Tier 2 and beyond, focusing on high-risk categories. Supplier data — including information on ownership, locations, certifications, and workforce — is maintained in a centralised supplier management system.</p>
+
+    <h5>Grievance mechanism for suppliers</h5>
+    <p>Suppliers and their workers may report concerns or complaints through the undertaking's whistleblowing channel, which is accessible 24/7, anonymous, and available in multiple languages. Reports are investigated by the Ethics Committee, and no retaliation is tolerated against any party raising a concern in good faith.</p>
+
+    <h5>Key supplier relationship metrics</h5>
+    <table>
+        <thead>
+            <tr>
+                <th>Metric</th>
+                <th>Year N</th>
+                <th>Year N-1</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Total number of active suppliers</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+            </tr>
+            <tr>
+                <td>% of suppliers covered by Code of Conduct</td>
+                <td>[TO BE CONFIRMED]%</td>
+                <td>[TO BE CONFIRMED]%</td>
+            </tr>
+            <tr>
+                <td>% of suppliers assessed on ESG criteria</td>
+                <td>[TO BE CONFIRMED]%</td>
+                <td>[TO BE CONFIRMED]%</td>
+            </tr>
+            <tr>
+                <td>% of strategic suppliers with annual ESG review</td>
+                <td>[TO BE CONFIRMED]%</td>
+                <td>[TO BE CONFIRMED]%</td>
+            </tr>
+            <tr>
+                <td>Number of supplier audits conducted</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+            </tr>
+            <tr>
+                <td>Suppliers terminated for non-compliance (ESG)</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h5>Social criteria in supply chain</h5>
+    <p><strong>{template.company_name}</strong> considers the following social criteria in supplier selection and management: (i) compliance with labour laws and international labour standards (ILO Core Conventions); (ii) health and safety performance; (iii) respect for freedom of association and collective bargaining; (iv) prohibition of child labour and forced labour; (v) non-discrimination and equal opportunity; (vi) payment of living wages; and (vii) responsible working hours. These criteria are assessed through supplier self-declarations, audits, and third-party certifications (e.g., SA8000, Sedex SMETA, Fair Trade).</p>
+</div>""",
+                            content_type="narrative",
+                            order=1,
+                        ),
+                    ],
                 ),
                 DisclosureRequirement(
                     dr_id="G1-3",
                     title="Prevention and detection of corruption and bribery",
                     paragraph_ref="17-23",
                     is_mandatory=True,
+                    blocks=[
+                        ContentBlock(
+                            block_id="g1-3-anticorruption",
+                            standard_ref="ESRS G1",
+                            paragraph_ref="17-23",
+                            title="Corruption and Bribery Prevention and Detection",
+                            content_html=f"""<div class="g1-3-content">
+    <h4>G1-3 — Prevention and detection of corruption and bribery</h4>
+    <p><strong>{template.company_name}</strong> maintains a comprehensive anti-corruption and anti-bribery framework designed to prevent, detect, and respond to corruption and bribery risks across all operations and business relationships. The framework is aligned with applicable laws and regulations, including the UK Bribery Act 2010, the US Foreign Corrupt Practices Act (FCPA), and local anti-corruption legislation in all jurisdictions where the undertaking operates.</p>
+
+    <h5>Prevention framework</h5>
+    <p>The undertaking's prevention framework is based on a three-lines-of-defence model:</p>
+    <ul>
+        <li><strong>First line:</strong> Business units and functions implement controls embedded in day-to-day processes, including segregation of duties, approval limits, and mandatory due diligence on third parties.</li>
+        <li><strong>Second line:</strong> The Compliance function sets policies, provides guidance and training, monitors compliance, and conducts risk assessments.</li>
+        <li><strong>Third line:</strong> Internal Audit provides independent assurance on the design and effectiveness of the anti-corruption control framework.</li>
+    </ul>
+
+    <h5>Risk assessment</h5>
+    <p>Corruption and bribery risk assessments are conducted annually at the entity level and at the process level for high-risk functions (e.g., procurement, sales, government affairs, and operations in high-risk jurisdictions). Risk assessments consider: (i) geographic risk (Transparency International Corruption Perceptions Index); (ii) sector risk; (iii) transaction complexity; (iv) third-party relationships (agents, intermediaries, joint venture partners); (v) interactions with public officials; and (vi) prior incidents or red flags. Risk ratings are used to calibrate the frequency and depth of controls and monitoring.</p>
+
+    <h5>Key controls</h5>
+    <p>The following controls are in place to prevent and detect corruption and bribery:</p>
+    <ul>
+        <li><strong>Third-party due diligence:</strong> All agents, intermediaries, consultants, and business partners are subject to tiered due diligence based on risk. High-risk third parties undergo enhanced due diligence, including beneficial ownership checks, sanctions screening, and reputational review.</li>
+        <li><strong>Gifts, hospitality, and entertainment:</strong> Clear rules govern the offering and acceptance of gifts and hospitality, with defined monetary thresholds, pre-approval requirements, and mandatory recording in the Gifts and Hospitality Register.</li>
+        <li><strong>Conflicts of interest:</strong> Employees must declare actual or potential conflicts of interest annually and on an ad hoc basis. Declarations are reviewed by the Compliance function.</li>
+        <li><strong>Political and charitable contributions:</strong> Political contributions are prohibited unless approved by the Board. Charitable donations are subject to due diligence to avoid improper influence.</li>
+        <li><strong>Financial controls:</strong> Anti-corruption controls are embedded in the financial control framework, including transaction monitoring, approval limits, and segregation of duties in payment processes.</li>
+    </ul>
+
+    <h5>Training and awareness</h5>
+    <p>All employees receive mandatory annual anti-corruption training. High-risk roles (procurement, sales, finance, legal, and management) receive targeted training covering: (i) recognition of red flags; (ii) proper handling of gifts and hospitality; (iii) third-party due diligence procedures; (iv) reporting obligations; and (v) consequences of non-compliance. Training completion rates are tracked and reported to the Audit Committee.</p>
+
+    <h5>Detection and monitoring</h5>
+    <p>Detection mechanisms include: (i) confidential whistleblowing channel (operated by an independent third party, available 24/7 in all working languages); (ii) automated transaction monitoring for unusual patterns (e.g., payments to high-risk jurisdictions, round-dollar payments, split invoices); (iii) periodic compliance audits and reviews; (iv) enhanced monitoring of high-risk third parties; and (v) data analytics on expense reports and procurement data.</p>
+
+    <h5>Investigation and remediation</h5>
+    <p>All reported or detected allegations of corruption or bribery are investigated promptly by the Compliance function or, where appropriate, by external investigators. Investigations are conducted independently, impartially, and confidentially. Findings are reported to the Audit Committee and, where required, to relevant authorities. Remediation actions — including disciplinary measures, process improvements, and enhancements to controls — are tracked to completion.</p>
+
+    <h5>Anti-corruption training metrics</h5>
+    <table>
+        <thead>
+            <tr>
+                <th>Indicator</th>
+                <th>Year N</th>
+                <th>Year N-1</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>% of employees who completed anti-corruption training</td>
+                <td>[TO BE CONFIRMED]%</td>
+                <td>[TO BE CONFIRMED]%</td>
+            </tr>
+            <tr>
+                <td>% of high-risk employees who completed enhanced training</td>
+                <td>[TO BE CONFIRMED]%</td>
+                <td>[TO BE CONFIRMED]%</td>
+            </tr>
+            <tr>
+                <td>% of Board members who completed training</td>
+                <td>[TO BE CONFIRMED]%</td>
+                <td>[TO BE CONFIRMED]%</td>
+            </tr>
+            <tr>
+                <td>Number of third-party due diligence screenings conducted</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+            </tr>
+            <tr>
+                <td>Number of investigations under anti-corruption policy</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+            </tr>
+        </tbody>
+    </table>
+</div>""",
+                            content_type="narrative",
+                            order=1,
+                        ),
+                    ],
                 ),
                 DisclosureRequirement(
                     dr_id="G1-4",
                     title="Incidents of corruption or bribery",
                     paragraph_ref="24-28",
                     is_mandatory=True,
+                    blocks=[
+                        ContentBlock(
+                            block_id="g1-4-incidents",
+                            standard_ref="ESRS G1",
+                            paragraph_ref="24-28",
+                            title="Corruption and Bribery Incidents",
+                            content_html=f"""<div class="g1-4-content">
+    <h4>G1-4 — Incidents of corruption or bribery</h4>
+    <p><strong>{template.company_name}</strong> reports on incidents of corruption or bribery in accordance with ESRS G1 paragraphs 24-28. The undertaking maintains a zero-tolerance approach to corruption and bribery, and all confirmed incidents are disclosed transparently, including the nature of the incident, actions taken, and outcomes.</p>
+
+    <p>For the reporting period [financial year N], the following incidents were recorded:</p>
+
+    <h5>Incident summary</h5>
+    <table>
+        <thead>
+            <tr>
+                <th>Category</th>
+                <th>Year N</th>
+                <th>Year N-1</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Total number of reported incidents (whistleblowing channel)</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+            </tr>
+            <tr>
+                <td>Incidents related to corruption or bribery</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+            </tr>
+            <tr>
+                <td>Confirmed incidents of corruption</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+            </tr>
+            <tr>
+                <td>Confirmed incidents of bribery</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+            </tr>
+            <tr>
+                <td>Incidents involving public officials</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+            </tr>
+            <tr>
+                <td>Incidents involving business partners or third parties</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h5>Legal and enforcement actions</h5>
+    <table>
+        <thead>
+            <tr>
+                <th>Indicator</th>
+                <th>Year N</th>
+                <th>Year N-1</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Convictions for corruption or bribery</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+            </tr>
+            <tr>
+                <td>Fines or penalties imposed for corruption or bribery</td>
+                <td>[TO BE CONFIRMED] {template.currency}</td>
+                <td>[TO BE CONFIRMED] {template.currency}</td>
+            </tr>
+            <tr>
+                <td>Pending legal actions related to corruption</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+            </tr>
+            <tr>
+                <td>Contractual terminations due to corruption violations</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h5>Description of significant incidents</h5>
+    <p>[TO BE CONFIRMED — Describe any significant incidents of corruption or bribery that occurred during the reporting period, including: (i) nature of the incident; (ii) jurisdictions affected; (iii) amounts involved; (iv) root causes; (v) remedial actions taken; (vi) disciplinary measures applied; (vii) improvements to the control framework implemented as a result.]</p>
+
+    <h5>Contextual information</h5>
+    <p>The number of reported incidents reflects the effectiveness of the whistleblowing channel and the awareness of employees and external stakeholders in reporting suspected misconduct. An increase in reported incidents may indicate greater awareness and trust in the reporting mechanism rather than an increase in actual misconduct. The undertaking monitors this trend and provides context to enable stakeholders to assess performance meaningfully.</p>
+
+    <h5>Remediation and corrective actions</h5>
+    <p>For each confirmed incident, <strong>{template.company_name}</strong> implements remediation actions appropriate to the nature and severity of the incident. Remediation may include: disciplinary action (up to and including termination of employment); termination of contracts with third parties; strengthening of internal controls; additional training; and reporting to relevant law enforcement or regulatory authorities. Lessons learned are shared across the organisation to prevent recurrence.</p>
+</div>""",
+                            content_type="narrative",
+                            order=1,
+                        ),
+                    ],
                 ),
                 DisclosureRequirement(
                     dr_id="G1-5",
@@ -1768,6 +3660,124 @@ class ReportTemplate:
                     title="Payment practices",
                     paragraph_ref="35-40",
                     is_mandatory=True,
+                    blocks=[
+                        ContentBlock(
+                            block_id="g1-6-payment-practices",
+                            standard_ref="ESRS G1",
+                            paragraph_ref="35-40",
+                            title="Payment Practices",
+                            content_html=f"""<div class="g1-6-content">
+    <h4>G1-6 — Payment practices</h4>
+    <p><strong>{template.company_name}</strong> discloses its payment practices in accordance with ESRS G1 paragraphs 35-40. The undertaking is committed to responsible payment practices that support a healthy and sustainable value chain, recognising that timely payment is critical to the financial well-being of suppliers, particularly small and medium-sized enterprises (SMEs).</p>
+
+    <h5>Payment policy</h5>
+    <p><strong>{template.company_name}</strong>'s standard payment terms are [TO BE CONFIRMED] days from receipt of a valid invoice. Payment terms are agreed with suppliers on a case-by-case basis, taking into account the nature of the goods or services, market practice, and regulatory requirements. The undertaking does not systematically extend payment terms beyond [TO BE CONFIRMED] days for SMEs unless specifically agreed in writing.</p>
+
+    <p>All payment terms are clearly communicated to suppliers at the time of contracting and are reflected in purchase orders and contracts. The undertaking processes payments on the due date or earlier where possible, and does not engage in practices that would result in late payment without cause.</p>
+
+    <h5>Standard payment terms by supplier category</h5>
+    <table>
+        <thead>
+            <tr>
+                <th>Supplier Category</th>
+                <th>Standard Payment Term (days)</th>
+                <th>% of Suppliers (by volume)</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>SME suppliers</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]%</td>
+            </tr>
+            <tr>
+                <td>Large enterprise suppliers</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]%</td>
+            </tr>
+            <tr>
+                <td>Strategic/key suppliers</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]%</td>
+            </tr>
+            <tr>
+                <td>Public sector / institutional</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]%</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h5>Payment performance</h5>
+    <table>
+        <thead>
+            <tr>
+                <th>Indicator</th>
+                <th>Year N</th>
+                <th>Year N-1</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Average actual payment time (days from invoice receipt)</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+            </tr>
+            <tr>
+                <td>% of invoices paid within standard terms</td>
+                <td>[TO BE CONFIRMED]%</td>
+                <td>[TO BE CONFIRMED]%</td>
+            </tr>
+            <tr>
+                <td>% of invoices paid within 30 days</td>
+                <td>[TO BE CONFIRMED]%</td>
+                <td>[TO BE CONFIRMED]%</td>
+            </tr>
+            <tr>
+                <td>% of invoices paid within 60 days</td>
+                <td>[TO BE CONFIRMED]%</td>
+                <td>[TO BE CONFIRMED]%</td>
+            </tr>
+            <tr>
+                <td>% of invoices paid late (beyond agreed terms)</td>
+                <td>[TO BE CONFIRMED]%</td>
+                <td>[TO BE CONFIRMED]%</td>
+            </tr>
+            <tr>
+                <td>Interest paid on late payments to suppliers</td>
+                <td>[TO BE CONFIRMED] {template.currency}</td>
+                <td>[TO BE CONFIRMED] {template.currency}</td>
+            </tr>
+            <tr>
+                <td>Number of supplier disputes related to payment</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h5>Late payment statistics</h5>
+    <p>In the reporting period, [TO BE CONFIRMED]% of invoices were paid after the agreed payment terms. The average delay for late payments was [TO BE CONFIRMED] days. The main reasons for late payment were: (i) administrative delays (invoice discrepancies, processing backlog); (ii) system integration issues; and (iii) disputes over goods or services received. The undertaking is implementing process improvements to reduce the incidence of late payment, including automated invoice processing, enhanced supplier onboarding, and dedicated accounts payable support for suppliers.</p>
+
+    <h5>Cross-border payment practices</h5>
+    <p>For cross-border payments, <strong>{template.company_name}</strong> discloses the following practices:</p>
+    <ul>
+        <li>Standard cross-border payment terms: [TO BE CONFIRMED] days from invoice.</li>
+        <li>Currencies used: [TO BE CONFIRMED].</li>
+        <li>Approach to currency exchange and hedging: [TO BE CONFIRMED].</li>
+        <li>Any significant delays due to cross-border banking processes: [TO BE CONFIRMED].</li>
+    </ul>
+
+    <h5>Legal framework and voluntary commitments</h5>
+    <p><strong>{template.company_name}</strong> complies with all applicable laws and regulations on payment practices in the jurisdictions where it operates, including the EU Late Payment Directive (2011/7/EU) and local transposition laws. The undertaking is a signatory to the [TO BE CONFIRMED — e.g., Prompt Payment Code, Supplier Charter, etc.] and reports annually on its payment performance.</p>
+
+    <h5>Process for supplier feedback on payment practices</h5>
+    <p>Suppliers can provide feedback on payment practices through the undertaking's supplier portal or by contacting the accounts payable team directly. Feedback is reviewed quarterly and used to improve payment processes. Any concerns raised by suppliers regarding payment terms or delays are escalated to the Procurement function and addressed on a case-by-case basis.</p>
+</div>""",
+                            content_type="narrative",
+                            order=1,
+                        ),
+                    ],
                 ),
             ],
         )
