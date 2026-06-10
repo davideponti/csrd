@@ -361,15 +361,15 @@ def _compile_esrs_data(report, db):
             "operational_sites_count": str(ctx.operational_sites_count or ""),
             # GHG Emissions
             "scope1_emissions": str(ctx.scope1_emissions or ""),
-            "scope2_location_emissions": str(ctx.scope2_location_emissions or ""),
-            "scope2_market_emissions": str(ctx.scope2_market_emissions or ""),
-            "scope3_total_emissions": str(ctx.scope3_total_emissions or ""),
+        "scope2_location_emissions": str(ctx.scope2_location_based or ""),
+        "scope2_market_emissions": str(ctx.scope2_market_based or ""),
+        "scope3_total_emissions": str(ctx.scope3_total or ""),
             "scope3_material_categories": ctx.scope3_material_categories or "",
             "emissions_baseline_year": str(ctx.emissions_baseline_year or ""),
             "emissions_methodology": ctx.emissions_methodology or "",
             # Supply Chain
             "tier1_suppliers_count": str(ctx.tier1_suppliers_count or ""),
-            "tier2_suppliers_estimated": str(ctx.tier2_suppliers_estimated or ""),
+            "tier2_suppliers_estimated": str(ctx.tier2_suppliers_count or ""),
             "value_chain_countries": ctx.value_chain_countries or "",
             "high_risk_countries": ctx.high_risk_countries or "",
             "suppliers_code_of_conduct_pct": str(ctx.suppliers_code_of_conduct_pct or ""),
@@ -378,7 +378,7 @@ def _compile_esrs_data(report, db):
             "ltifr": str(ctx.ltifr or ""),
             "fatal_accidents": str(ctx.fatal_accidents or ""),
             "voluntary_turnover_pct": str(ctx.voluntary_turnover_pct or ""),
-            "avg_training_hours_per_employee": str(ctx.avg_training_hours_per_employee or ""),
+            "avg_training_hours_per_employee": str(ctx.avg_training_hours_per_year or ""),
             "women_in_management_pct": str(ctx.women_in_management_pct or ""),
             "gender_pay_gap_pct": str(ctx.gender_pay_gap_pct or ""),
             "union_coverage_pct": str(ctx.union_coverage_pct or ""),
@@ -390,8 +390,8 @@ def _compile_esrs_data(report, db):
             "invoices_paid_late_pct": str(ctx.invoices_paid_late_pct or ""),
             # Governance
             "anti_corruption_training_pct": str(ctx.anti_corruption_training_pct or ""),
-            "corruption_incidents_count": str(ctx.corruption_incidents_count or ""),
-            "whistleblowing_reports_count": str(ctx.whistleblowing_reports_count or ""),
+        "corruption_incidents_count": str(ctx.corruption_incidents_last_year or ""),
+        "whistleblowing_reports_count": str(ctx.whistleblowing_reports_received or ""),
         }
         template.set_company_context(context_data)
 
