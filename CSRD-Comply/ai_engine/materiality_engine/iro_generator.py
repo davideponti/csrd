@@ -62,6 +62,11 @@ IRO_DATABASE: Dict[str, List[Dict]] = {
          "description": "Riduzione costi e impatti tramite riciclo e recupero materiali",
          "default_impact_scale": 3, "default_financial_magnitude": 4, "severity": "high",
          "applicability_factors": {"min_employees": 0, "sectors": ["C", "E", "F"]}},
+        {"id": "C_E4_IRO_001", "type": "impact", "topic": "ESRS E4",
+         "name": "Impatto su biodiversità da approvvigionamento materie prime",
+         "description": "Impatto su ecosistemi e biodiversità lungo la catena di approvvigionamento delle materie prime",
+         "default_impact_scale": 3, "default_financial_magnitude": 2, "severity": "medium",
+         "applicability_factors": {"min_employees": 0, "sectors": ["C", "F", "G"]}},
         {"id": "C_S1_IRO_001", "type": "impact", "topic": "ESRS S1",
          "name": "Salute e sicurezza dei lavoratori",
          "description": "Rischi per salute e sicurezza in ambiente produttivo",
@@ -186,23 +191,79 @@ IRO_DATABASE: Dict[str, List[Dict]] = {
 }
 
 # ── IRO generici applicabili a tutte le aziende ────────────────
+# Copertura completa di TUTTI i topic ESRS (E1-E5, S1-S4, G1)
+# per garantire che ogni standard abbia almeno un IRO di riferimento.
 GENERIC_IROS = [
+    # ─ ESRS E1: Climate Change ─
     {"id": "GEN_E1_IRO_001", "type": "impact", "topic": "ESRS E1",
      "name": "Emissioni indirette GHG (Scope 3)",
      "description": "Emissioni GHG indirette dalla catena del valore (fornitori, clienti, trasporti)",
      "default_impact_scale": 2, "default_financial_magnitude": 2, "severity": "medium"},
+    {"id": "GEN_E1_IRO_002", "type": "risk", "topic": "ESRS E1",
+     "name": "Rischio transizione climatica",
+     "description": "Rischio di transizione verso economia low-carbon (regolatorio, mercato, tecnologico)",
+     "default_impact_scale": 2, "default_financial_magnitude": 3, "severity": "medium"},
+    # ─ ESRS E2: Pollution ─
+    {"id": "GEN_E2_IRO_001", "type": "impact", "topic": "ESRS E2",
+     "name": "Inquinamento da operazioni aziendali",
+     "description": "Potenziale inquinamento di aria, acqua e suolo derivante dalle attività aziendali e della catena del valore",
+     "default_impact_scale": 2, "default_financial_magnitude": 2, "severity": "low"},
+    # ─ ESRS E3: Water and Marine Resources ─
+    {"id": "GEN_E3_IRO_001", "type": "impact", "topic": "ESRS E3",
+     "name": "Consumo idrico operativo",
+     "description": "Consumo acqua nelle operations aziendali e impatto su risorse idriche locali",
+     "default_impact_scale": 2, "default_financial_magnitude": 1, "severity": "low"},
+    # ─ ESRS E4: Biodiversity and Ecosystems ─
+    {"id": "GEN_E4_IRO_001", "type": "impact", "topic": "ESRS E4",
+     "name": "Dipendenza da servizi ecosistemici",
+     "description": "Dipendenza delle operazioni aziendali da servizi ecosistemici (acqua pulita, suolo fertile, impollinazione)",
+     "default_impact_scale": 2, "default_financial_magnitude": 2, "severity": "low"},
+    {"id": "GEN_E4_IRO_002", "type": "risk", "topic": "ESRS E4",
+     "name": "Rischio biodiversità nella supply chain",
+     "description": "Rischio reputazionale e operativo da impatti su biodiversità lungo la catena di fornitura",
+     "default_impact_scale": 2, "default_financial_magnitude": 2, "severity": "low"},
+    # ─ ESRS E5: Resource Use and Circular Economy ─
+    {"id": "GEN_E5_IRO_001", "type": "impact", "topic": "ESRS E5",
+     "name": "Consumo di risorse e rifiuti",
+     "description": "Utilizzo di materie prime vergini e generazione di rifiuti nelle operations",
+     "default_impact_scale": 2, "default_financial_magnitude": 2, "severity": "low"},
+    {"id": "GEN_E5_IRO_002", "type": "opportunity", "topic": "ESRS E5",
+     "name": "Opportunità di economia circolare",
+     "description": "Riduzione costi e differenziazione competitiva tramite design circolare e riciclo",
+     "default_impact_scale": 2, "default_financial_magnitude": 3, "severity": "medium"},
+    # ─ ESRS S1: Own Workforce ─
+    {"id": "GEN_S1_IRO_001", "type": "impact", "topic": "ESRS S1",
+     "name": "Condizioni di lavoro e diritti dei dipendenti",
+     "description": "Impatto su condizioni di lavoro, salute, sicurezza e diritti del personale dipendente",
+     "default_impact_scale": 2, "default_financial_magnitude": 2, "severity": "medium"},
+    {"id": "GEN_S1_IRO_002", "type": "risk", "topic": "ESRS S1",
+     "name": "Rischio attrazione e retention talenti",
+     "description": "Difficoltà nel attrarre e trattenere personale qualificato in un mercato competitivo",
+     "default_impact_scale": 2, "default_financial_magnitude": 3, "severity": "medium"},
+    # ─ ESRS S2: Workers in the Value Chain ─
+    {"id": "GEN_S2_IRO_001", "type": "risk", "topic": "ESRS S2",
+     "name": "Rischio diritti umani nella supply chain",
+     "description": "Rischio di violazione dei diritti umani dei lavoratori nella catena di fornitura",
+     "default_impact_scale": 3, "default_financial_magnitude": 3, "severity": "high"},
+    # ─ ESRS S3: Affected Communities ─
     {"id": "GEN_S3_IRO_001", "type": "impact", "topic": "ESRS S3",
      "name": "Impatto sulle comunità locali",
      "description": "Impatto delle operazioni aziendali sulle comunità locali circostanti",
      "default_impact_scale": 2, "default_financial_magnitude": 1, "severity": "low"},
+    # ─ ESRS S4: Consumers and End-users ─
+    {"id": "GEN_S4_IRO_001", "type": "impact", "topic": "ESRS S4",
+     "name": "Impatto su consumatori e utenti finali",
+     "description": "Impatto dei prodotti/servizi su salute, sicurezza e benessere di consumatori e utenti finali",
+     "default_impact_scale": 2, "default_financial_magnitude": 2, "severity": "low"},
+    # ─ ESRS G1: Business Conduct ─
     {"id": "GEN_G1_IRO_001", "type": "risk", "topic": "ESRS G1",
      "name": "Rischio reputazionale da non conformità ESG",
-     "description": "Danno reputazionale da mancata conformità a standard ESG",
+     "description": "Danno reputazionale da mancata conformità a standard ESG e norme di business conduct",
      "default_impact_scale": 2, "default_financial_magnitude": 3, "severity": "medium"},
-    {"id": "GEN_E3_IRO_001", "type": "impact", "topic": "ESRS E3",
-     "name": "Consumo idrico operativo",
-     "description": "Consumo acqua nelle operations aziendali",
-     "default_impact_scale": 1, "default_financial_magnitude": 1, "severity": "low"},
+    {"id": "GEN_G1_IRO_002", "type": "risk", "topic": "ESRS G1",
+     "name": "Rischio corruzione e trasparenza",
+     "description": "Rischio sanzioni e danno reputazionale da pratiche di corruzione o mancata trasparenza",
+     "default_impact_scale": 3, "default_financial_magnitude": 4, "severity": "high"},
 ]
 
 # ── IRO di fallback per settori non coperti nel database ──────

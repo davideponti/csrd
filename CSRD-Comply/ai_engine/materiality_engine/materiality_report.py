@@ -326,6 +326,307 @@ class MaterialityReportGenerator:
         }
 
     @staticmethod
+    def generate_non_material_justifications(
+        company: Company,
+        context: Optional[CompanyContext],
+        assessment: MaterialityAssessment,
+        db: Session,
+        material_standards: List[str],
+    ) -> Dict[str, Any]:
+        """
+        CRITICAL CSRD COMPLIANCE SECTION
+        ESRS 1 — Per ogni topic ESRS valutato come non materiale, fornisce una
+        giustificazione documentata di WHY è stato escluso.
+        
+        Requisito EFRAG IG 1 (par. 56-58): l'impresa deve documentare le ragioni
+        per cui un topic è considerato non materiale, inclusa l'analisi di:
+        - Criteri di impact materiality (scale, scope, irremediability, likelihood)
+        - Criteri di financial materiality (magnitude, likelihood)
+        - Specificità del settore e del modello di business
+        - Evidenze a supporto dell'esclusione
+        """
+        all_standards = list(MaterialityReportGenerator.STANDARD_NAMES.keys())
+        non_material = [s for s in all_standards if s not in material_standards]
+        
+        # Recupera gli score medi per ogni topic non materiale
+        scores = db.query(MaterialityScore).filter(
+            MaterialityScore.assessment_id == assessment.id,
+        ).all()
+        
+        # Raccogli statistiche per topic
+        topic_stats: Dict[str, Dict] = {}
+        for score in scores:
+            datapoint = db.query(EsrsDatapoint).filter(
+                EsrsDatapoint.id == score.datapoint_id
+            ).first()
+            if datapoint:
+                topic = MaterialityReportGenerator._extract_topic(datapoint.standard_ref)
+                if topic not in topic_stats:
+                    topic_stats[topic] = {
+                        "impact_scores": [],
+                        "financial_scores": [],
+                        "total_datapoints": 0,
+                        "max_impact": 0.0,
+                        "max_financial": 0.0,
+                    }
+                imp = score.total_impact_score or 0
+                fin = score.total_financial_score or 0
+                topic_stats[topic]["impact_scores"].append(imp)
+                topic_stats[topic]["financial_scores"].append(fin)
+                topic_stats[topic]["total_datapoints"] += 1
+                topic_stats[topic]["max_impact"] = max(topic_stats[topic]["max_impact"], imp)
+                topic_stats[topic]["max_financial"] = max(topic_stats[topic]["max_financial"], fin)
+
+        sector_code = company.sector[0] if company.sector else ""
+        
+        # Template di giustificazione per topic non materiali
+        JUSTIFICATION_TEMPLATES = {
+            "ESRS E1": {
+                "low_relevance_reason": (
+                    "L'azienda opera in un settore a bassa intensità carbonica "
+                    "con emissioni GHG dirette e indirette limitate. "
+                    "Il consumo energetico è prevalentemente da fonti rinnovabili "
+                    "e non sono presenti attività ad alto impatto climatico."
+                ),
+                "threshold_explanation": (
+                    "Nonostante siano stati identificati potenziali impatti climatici, "
+                    "i punteggi di materialità di impatto e finanziaria non hanno "
+                    "raggiunto la soglia di {threshold}/5.0. "
+                    "La scala degli impatti potenziali è limitata data la natura "
+                    "delle attività aziendali e l'assenza di fonti di emissione significative."
+                ),
+                "sector_specific": (
+                    "Per il settore {sector_name}, il climate change è generalmente "
+                    "considerato un topic con rilevanza medio-bassa, salvo la presenza "
+                    "di attività ad alta intensità energetica non presenti in questo caso."
+                ),
+            },
+            "ESRS E2": {
+                "low_relevance_reason": (
+                    "Le attività aziendali non generano emissioni significative "
+                    "di inquinanti atmosferici, idrici o del suolo. "
+                    "Non sono utilizzate sostanze preoccupanti o estremamente "
+                    "preoccupanti nei processi produttivi."
+                ),
+                "threshold_explanation": (
+                    "I punteggi ottenuti per pollution sono inferiori alla soglia "
+                    "di {threshold}/5.0 sia per l'impatto materiality che per la "
+                    "financial materiality, in assenza di fonti di inquinamento significative."
+                ),
+                "sector_specific": (
+                    "Per il settore {sector_name}, il rischio di inquinamento è "
+                    "generalmente limitato ad attività industriali specifiche "
+                    "non presenti nel modello di business dell'azienda."
+                ),
+            },
+            "ESRS E3": {
+                "low_relevance_reason": (
+                    "Il consumo idrico aziendale è limitato a utilizzi civili "
+                    "e non sono presenti processi produttivi water-intensive. "
+                    "L'azienda non opera in aree con stress idrico significativo "
+                    "e non ha impatti rilevanti sulle risorse marine."
+                ),
+                "threshold_explanation": (
+                    "I punteggi per water and marine resources sono risultati "
+                    "inferiori alla soglia di {threshold}/5.0, confermando "
+                    "la bassa rilevanza del topic per il modello di business attuale."
+                ),
+                "sector_specific": (
+                    "Nel settore {sector_name}, il consumption idrico è rilevante "
+                    "principalmente per aziende con processi produttivi water-intensive "
+                    "o con operations in aree a stress idrico."
+                ),
+            },
+            "ESRS E4": {
+                "low_relevance_reason": (
+                    "Le attività aziendali non hanno impatti diretti significativi "
+                    "su biodiversità ed ecosistemi. Le operations non sono localizzate "
+                    "in aree sensibili o protette e la dipendenza da servizi ecosistemici "
+                    "è limitata. La catena di approvvigionamento non coinvolge materie prime "
+                    "con impatti critici sulla biodiversità."
+                ),
+                "threshold_explanation": (
+                    "Nonostante la rilevanza generale del topic biodiversità, "
+                    "i punteggi specifici per l'azienda non hanno raggiunto la soglia "
+                    "di {threshold}/5.0, in assenza di impatti diretti significativi "
+                    "su specie, ecosistemi o servizi ecosistemici."
+                ),
+                "sector_specific": (
+                    "Per il settore {sector_name}, la biodiversità è generalmente "
+                    "un topic materiale solo per aziende con operazioni in aree "
+                    "ecosensitive o con dipendenza diretta da risorse naturali."
+                ),
+            },
+            "ESRS E5": {
+                "low_relevance_reason": (
+                    "L'azienda genera volumi limitati di rifiuti, prevalentemente "
+                    "assimilabili agli urbani. I materiali utilizzati non includono "
+                    "risorse critiche o scarse e il modello di business non è basato "
+                    "su processi produttivi ad alto consumo di risorse."
+                ),
+                "threshold_explanation": (
+                    "I punteggi per circular economy sono risultati inferiori "
+                    "alla soglia di {threshold}/5.0. Le opportunità di economia "
+                    "circolare sono state valutate ma non hanno raggiunto la "
+                    "materialità per il modello di business attuale."
+                ),
+                "sector_specific": (
+                    "Il settore {sector_name} presenta tipicamente una rilevanza "
+                    "medio-bassa per circular economy, salvo per aziende con "
+                    "produzioni ad alto consumo di materiali."
+                ),
+            },
+            "ESRS S1": {
+                "low_relevance_reason": (
+                    "L'azienda ha un numero limitato di dipendenti con condizioni "
+                    "di lavoro regolate da CCNL di riferimento. Le politiche HR "
+                    "includono tutele per salute, sicurezza, pari opportunità "
+                    "e work-life balance. Non sono emerse criticità significative "
+                    "da audit interni o esterni."
+                ),
+                "threshold_explanation": (
+                    "I punteggi per own workforce non hanno raggiunto la soglia "
+                    "di {threshold}/5.0 in quanto le condizioni di lavoro sono "
+                    "giudicate adeguate e non sono state identificate criticità "
+                    "materiali per la forza lavoro propria."
+                ),
+                "sector_specific": (
+                    "Per il settore {sector_name}, il topic S1 è generalmente "
+                    "rilevante in presenza di forza lavoro numerosa, condizioni "
+                    "di lavoro critiche o processi produttivi ad alto rischio."
+                ),
+            },
+            "ESRS S3": {
+                "low_relevance_reason": (
+                    "Le operations aziendali non hanno impatti significativi "
+                    "sulle comunità locali. Non sono presenti siti produttivi "
+                    "in aree con comunità vulnerabili o indigene e non sono "
+                    "stati identificati conflitti con le comunità locali."
+                ),
+                "threshold_explanation": (
+                    "I punteggi per affected communities sono risultati "
+                    "inferiori alla soglia di {threshold}/5.0, non essendo "
+                    "stati identificati impatti materiali sulle comunità locali."
+                ),
+                "sector_specific": (
+                    "Per il settore {sector_name}, S3 è materiale principalmente "
+                    "per aziende con operazioni in prossimità di comunità o "
+                    "con impatti territoriali significativi."
+                ),
+            },
+            "ESRS S4": {
+                "low_relevance_reason": (
+                    "I prodotti/servizi dell'azienda non hanno impatti significativi "
+                    "su consumatori e utenti finali in termini di salute, sicurezza "
+                    "o privacy. Le pratiche di informazione e marketing sono conformi "
+                    "alle normative di settore."
+                ),
+                "threshold_explanation": (
+                    "I punteggi per consumers and end-users non hanno raggiunto "
+                    "la soglia di {threshold}/5.0, in assenza di impatti "
+                    "significativi su salute, sicurezza o privacy dei consumatori."
+                ),
+                "sector_specific": (
+                    "Il settore {sector_name} presenta rilevanza per S4 "
+                    "principalmente in relazione a prodotti con impatti sulla "
+                    "salute dei consumatori o gestione dati personali."
+                ),
+            },
+        }
+
+        sector_name = "Generico"
+        from ai_engine.materiality_engine.iro_generator import IROGenerator
+        benchmark = IROGenerator.get_sector_benchmark(company.sector)
+        sector_name = benchmark.get("name", "Generico")
+        
+        justifications = []
+        for standard in non_material:
+            stats = topic_stats.get(standard, {})
+            template = JUSTIFICATION_TEMPLATES.get(standard, {
+                "low_relevance_reason": (
+                    "Il topic non è risultato materiale in base alla valutazione "
+                    "di doppia materialità condotta secondo EFRAG IG 1."
+                ),
+                "threshold_explanation": (
+                    "I punteggi non hanno raggiunto la soglia di {threshold}/5.0 "
+                    "né per l'impact materiality né per la financial materiality."
+                ),
+                "sector_specific": (
+                    "La valutazione è coerente con il profilo di rischio/opportunità "
+                    "del settore {sector_name}."
+                ),
+            })
+            
+            avg_impact = round(
+                sum(stats.get("impact_scores", [0])) / len(stats.get("impact_scores", [1]))
+                if stats.get("impact_scores") else 0, 2
+            )
+            avg_financial = round(
+                sum(stats.get("financial_scores", [0])) / len(stats.get("financial_scores", [1]))
+                if stats.get("financial_scores") else 0, 2
+            )
+            
+            justification = {
+                "standard": standard,
+                "standard_name": MaterialityReportGenerator.STANDARD_NAMES.get(standard, ""),
+                "subtopics": MaterialityReportGenerator.STANDARD_SUBTOPICS.get(standard, []),
+                "is_material": False,
+                "total_datapoints_assessed": stats.get("total_datapoints", 0),
+                "average_impact_score": avg_impact,
+                "average_financial_score": avg_financial,
+                "max_impact_score": stats.get("max_impact", 0),
+                "max_financial_score": stats.get("max_financial", 0),
+                "threshold": ScoringEngine.MATERIALITY_THRESHOLD,
+                "justification_low_relevance": template["low_relevance_reason"],
+                "justification_threshold": template["threshold_explanation"].format(
+                    threshold=ScoringEngine.MATERIALITY_THRESHOLD
+                ),
+                "justification_sector_specific": template["sector_specific"].format(
+                    sector_name=sector_name
+                ),
+                "conclusion": (
+                    f"Based on the analysis above, {standard} ({MaterialityReportGenerator.STANDARD_NAMES.get(standard, '')}) "
+                    f"is considered non-material for {company.company_name} for the reporting year {company.reporting_year}. "
+                    f"This conclusion will be reviewed annually or when significant changes in the company's "
+                    f"business model, operations, or stakeholder expectations occur."
+                ),
+            }
+            justifications.append(justification)
+
+        return {
+            "section": "ESRS 2 IRO-2 — Non-Material Topics Justifications",
+            "title": "Justification for Exclusion of Non-Material ESRS Topics",
+            "content": {
+                "introduction": (
+                    "In accordance with ESRS 1 (Chapter 3.2) and EFRAG IG 1 Materiality Assessment "
+                    "implementation guidance (paragraphs 56-58), the undertaking shall provide clear "
+                    "and reasoned justifications for each ESRS topic assessed as non-material. "
+                    "The following justifications document the analysis performed and the evidence "
+                    "supporting the conclusion that these topics do not meet the materiality threshold "
+                    f"of {ScoringEngine.MATERIALITY_THRESHOLD}/5.0 for either impact materiality "
+                    "or financial materiality."
+                ),
+                "regulatory_reference": (
+                    "ESRS 1 paragraph 32: 'Where the undertaking concludes that a topic is not material, "
+                    "it shall provide a brief explanation of the conclusions reached in its sustainability statement.' "
+                    "EFRAG IG 1 paragraph 57: 'The undertaking should document the reasons for concluding "
+                    "that a topic is not material, including the analysis of the criteria used and the "
+                    "threshold applied.'"
+                ),
+                "justifications": justifications,
+                "total_non_material_topics": len(justifications),
+                "review_statement": (
+                    "The materiality assessment and these justifications will be reviewed at least annually, "
+                    "or more frequently if significant changes occur in the company's business model, "
+                    "value chain, regulatory environment, or stakeholder expectations. "
+                    "Changes in the company's operations, such as entry into new markets, "
+                    "acquisition of new activities, or regulatory developments, may trigger a "
+                    "re-assessment of previously non-material topics."
+                ),
+            },
+        }
+
+    @staticmethod
     def generate_full_materiality_report(
         company: Company,
         context: Optional[CompanyContext],
@@ -351,6 +652,11 @@ class MaterialityReportGenerator:
 
         total_in_db = scores_summary.get("total_datapoints_available_in_db", 0)
         
+        # CRITICAL: Generate non-material justifications per CSRD compliance
+        non_material_section = MaterialityReportGenerator.generate_non_material_justifications(
+            company, context, assessment, db, material_standard_refs
+        )
+
         return {
             "report_title": f"Double Materiality Assessment - {company.company_name}",
             "company_name": company.company_name,
@@ -363,7 +669,9 @@ class MaterialityReportGenerator:
                 f"across all standards. "
                 f"Of these, {scores_summary['material_datapoints']} were identified as material "
                 f"({scores_summary['completion_percentage']}% completion rate). "
-                f"Material topics identified: {', '.join(scores_summary['material_topics'])}."
+                f"Material topics identified: {', '.join(scores_summary['material_topics'])}. "
+                f"For each non-material topic, a documented justification is provided in accordance "
+                f"with ESRS 1 and EFRAG IG 1 requirements."
             ),
             "executive_summary_detailed": {
                 "total_datapoints": scores_summary["total_datapoints"],
@@ -386,6 +694,7 @@ class MaterialityReportGenerator:
                 iro1,                           # ESRS 2 IRO-1
                 iro2,                           # ESRS 2 IRO-2
                 matrix,                         # Materiality Matrix
+                non_material_section,           # ⭐ Critical CSRD: non-material justifications
             ] + standard_sections + [           # Per-standard sections (E1, E2, ..., G1)
                 {
                     "section": "ESRS Datapoints Coverage",
@@ -395,7 +704,7 @@ class MaterialityReportGenerator:
                         "material_standards": material_standard_refs,
                         "non_material_standards": non_material_standards,
                         "total_esrs_datapoints_available": scores_summary["total_datapoints"],
-                        "note": "Non-material standards are excluded from detailed reporting per ESRS 1 principle of materiality.",
+                        "note": "Non-material standards are excluded from detailed reporting per ESRS 1 principle of materiality. See 'Non-Material Topics Justifications' section for detailed rationale.",
                     },
                 },
             ],
