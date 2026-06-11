@@ -330,11 +330,28 @@ class ReportTemplate:
     #   - revenue → only financial fields with EUR unit
     #   - ghg_emissions → only GHG/emissions fields (E1 section)
     #   - sector → only descriptive text fields, never numeric fields
+    # Valid status values for action plan / Status columns (S1-4, etc.)
+    VALID_STATUS_VALUES = {
+        "In progress", "Planned", "Completed", "Not started",
+        "Delayed", "Cancelled", "On hold", "Not applicable",
+    }
+
     FIELD_REGISTRY: Dict[str, Dict[str, object]] = {
         # Company Profile — textual / identity fields
         "company_name":               {"section": "profile",       "type": "string",    "unit": None,             "magnitude": None},
         "country":                    {"section": "profile",       "type": "string",    "unit": None,             "magnitude": None},
         "sector":                     {"section": "profile",       "type": "string",    "unit": None,             "magnitude": None},
+        # Action plan Status fields — text-only, reject numeric/percentage values
+        "status_s1":                  {"section": "action_plan",   "type": "status_text","unit": None,            "magnitude": None},
+        "status_s2":                  {"section": "action_plan",   "type": "status_text","unit": None,            "magnitude": None},
+        "status_s3":                  {"section": "action_plan",   "type": "status_text","unit": None,            "magnitude": None},
+        "status_s4":                  {"section": "action_plan",   "type": "status_text","unit": None,            "magnitude": None},
+        "status_e1":                  {"section": "action_plan",   "type": "status_text","unit": None,            "magnitude": None},
+        "status_e2":                  {"section": "action_plan",   "type": "status_text","unit": None,            "magnitude": None},
+        "status_e3":                  {"section": "action_plan",   "type": "status_text","unit": None,            "magnitude": None},
+        "status_e4":                  {"section": "action_plan",   "type": "status_text","unit": None,            "magnitude": None},
+        "status_e5":                  {"section": "action_plan",   "type": "status_text","unit": None,            "magnitude": None},
+        "status_g1":                  {"section": "action_plan",   "type": "status_text","unit": None,            "magnitude": None},
         "reporting_year":             {"section": "profile",       "type": "year",      "unit": None,             "magnitude": (2000, 2100)},
         "employee_count_total":       {"section": "workforce",     "type": "count",     "unit": "employees",      "magnitude": (1, 1_000_000)},
         "employee_count_permanent":   {"section": "workforce",     "type": "count",     "unit": "employees",      "magnitude": (0, 1_000_000)},
@@ -444,19 +461,47 @@ class ReportTemplate:
         field_type = meta.get("type")
         magnitude = meta.get("magnitude")
 
+        # ── Status text fields (action plan Status column) ────────
+        if field_type == "status_text":
+            # Only accept valid status values — never percentages or numbers
+            stripped = value.strip().lower()
+            valid_lower = {s.lower() for s in self.VALID_STATUS_VALUES}
+            if stripped in valid_lower:
+                return True
+            # Reject numeric/percentage values entirely
+            cleaned_num = value.strip().replace(",", "").replace(" ", "").replace("%", "")
+            try:
+                float(cleaned_num)
+                return False  # Numeric/percentage — reject
+            except ValueError:
+                pass
+            # Unknown text value — still reject to avoid garbage injection
+            return False
+
         # ── String-type fields ─────────────────────────────────────
         if field_type in ("string",):
             # Reject bare numeric-looking strings for string fields that
             # expect names (e.g. database_name, substance_name, site_name).
+            # Also reject percentage-looking strings (e.g. "72.0%").
             # Allow if the value contains non-digit characters (i.e., real text).
-            cleaned = value.strip().replace(",", "").replace(".", "")
+            cleaned = value.strip().replace(",", "").replace(".", "").replace("%", "")
             if cleaned.isdigit():
                 return False
+            # Check if the value is a pure number with decimal or percentage
+            try:
+                float(value.strip().replace(",", "").replace(" ", "").replace("%", ""))
+                # If the whole cleaned string is numeric, reject
+                if cleaned.strip().isdigit():
+                    return False
+            except ValueError:
+                pass
             return True  # Non-numeric text is fine for string fields
 
         # ── Numeric fields — try to parse ──────────────────────────
+        # Strip % suffix before parsing for percentage fields
+        cleaned_num = value.replace(",", "").replace(" ", "").replace("%", "")
         try:
-            num_val = float(value.replace(",", "").replace(" ", ""))
+            num_val = float(cleaned_num)
         except (ValueError, AttributeError):
             # Non-numeric value for numeric field — reject (keep TBC)
             return False
@@ -524,13 +569,33 @@ class ReportTemplate:
 
 
     def set_company_context(self, ctx: Dict[str, str]) -> None:
-
         """
         Set company context data used to replace [TBC:key] placeholders
-        throughout the report. Only non-empty values are used; for any missing
-        or empty keys the placeholder [TBC:key] is preserved.
+        throughout the report. Only non-empty values that pass semantic
+        validation are stored; for any missing, empty, or invalid keys the
+        placeholder [TBC:key] is preserved and renders as [TO BE CONFIRMED].
+
+        Validation rules applied per FIELD_REGISTRY:
+        - status_text fields: only accept whitelisted status strings
+          (e.g. "In progress", "Planned", "Completed"), reject numeric
+          and percentage values.
+        - string fields: reject bare numeric-looking values.
+        - numeric fields: reject non-numeric values.
+        - percentage fields: ensure 0-100 range.
+        - count/currency/float fields: ensure within magnitude bounds.
         """
-        self.company_context = {k: v for k, v in ctx.items() if v}
+        validated = {}
+        for k, v in ctx.items():
+            if not v:
+                continue  # skip empty strings
+            if not self._validate_placeholder_value(k, v):
+                # Value fails semantic validation — skip it so the
+                # placeholder renders as [TO BE CONFIRMED]
+                logger.debug("set_company_context: value for '%s'='%s' "
+                             "failed validation, skipping", k, v)
+                continue
+            validated[k] = v
+        self.company_context = validated
 
     def _resolve_placeholder(self, text: str, key: str) -> str:
         """
@@ -1616,7 +1681,7 @@ class ReportTemplate:
                 <td>Scope 3 GHG emissions (Category 1 — Purchased goods and services)</td>
                 <td>Spend-based methodology uses industry-average emission factors</td>
                 <td>EEIO factors from [TBC:database_name] database; supplier spend classification accuracy &plusmn;10%</td>
-                <td>A &plusmn;10% change in emission factors would result in a variation of approximately [TBC:scope1_emissions] tCO2e</td>
+                <td>A &plusmn;10% change in emission factors would result in a variation of approximately [TO BE CONFIRMED] tCO2e</td>
             </tr>
             <tr>
                 <td>Pollutant emissions to air (NOx, SOx, PM)</td>
@@ -2175,43 +2240,43 @@ class ReportTemplate:
         <tbody>
             <tr>
                 <td>Nitrogen oxides (NOx)</td>
-                <td>[TBC:scope1_emissions]</td>
-                <td>[TBC:scope1_emissions]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
                 <td>kg/year</td>
                 <td>Continuous monitoring / emission factor</td>
             </tr>
             <tr>
                 <td>Sulphur oxides (SOx)</td>
-                <td>[TBC:scope1_emissions]</td>
-                <td>[TBC:scope1_emissions]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
                 <td>kg/year</td>
                 <td>Continuous monitoring / emission factor</td>
             </tr>
             <tr>
                 <td>Particulate matter (PM10)</td>
-                <td>[TBC:scope1_emissions]</td>
-                <td>[TBC:scope1_emissions]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
                 <td>kg/year</td>
                 <td>Periodic sampling + emission factor</td>
             </tr>
             <tr>
                 <td>Particulate matter (PM2.5)</td>
-                <td>[TBC:scope1_emissions]</td>
-                <td>[TBC:scope1_emissions]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
                 <td>kg/year</td>
                 <td>Periodic sampling + emission factor</td>
             </tr>
             <tr>
                 <td>Volatile organic compounds (VOCs)</td>
-                <td>[TBC:scope1_emissions]</td>
-                <td>[TBC:scope1_emissions]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
                 <td>kg/year</td>
                 <td>Mass balance / LDAR programme</td>
             </tr>
             <tr>
                 <td>Heavy metals (total)</td>
-                <td>[TBC:scope1_emissions]</td>
-                <td>[TBC:scope1_emissions]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
                 <td>kg/year</td>
                 <td>Periodic stack sampling</td>
             </tr>
@@ -2232,36 +2297,36 @@ class ReportTemplate:
         <tbody>
             <tr>
                 <td>Chemical Oxygen Demand (COD)</td>
-                <td>[TBC:scope1_emissions]</td>
-                <td>[TBC:scope1_emissions]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
                 <td>kg/year</td>
                 <td>Periodic effluent sampling</td>
             </tr>
             <tr>
                 <td>Total nitrogen</td>
-                <td>[TBC:scope1_emissions]</td>
-                <td>[TBC:scope1_emissions]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
                 <td>kg/year</td>
                 <td>Periodic effluent sampling</td>
             </tr>
             <tr>
                 <td>Total phosphorus</td>
-                <td>[TBC:scope1_emissions]</td>
-                <td>[TBC:scope1_emissions]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
                 <td>kg/year</td>
                 <td>Periodic effluent sampling</td>
             </tr>
             <tr>
                 <td>Heavy metals (total)</td>
-                <td>[TBC:scope1_emissions]</td>
-                <td>[TBC:scope1_emissions]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
                 <td>kg/year</td>
                 <td>Periodic effluent sampling</td>
             </tr>
             <tr>
                 <td>Suspended solids (TSS)</td>
-                <td>[TBC:scope1_emissions]</td>
-                <td>[TBC:scope1_emissions]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
                 <td>kg/year</td>
                 <td>Periodic effluent sampling</td>
             </tr>
@@ -2281,29 +2346,29 @@ class ReportTemplate:
         <tbody>
             <tr>
                 <td>Total weight of substances of concern used</td>
-                <td>[TBC:scope1_emissions]</td>
-                <td>[TBC:scope1_emissions]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
                 <td>tonnes/year</td>
                 <td>Continuous monitoring / emission factor</td>
             </tr>
             <tr>
                 <td>Total weight of SVHCs used</td>
-                <td>[TBC:scope1_emissions]</td>
-                <td>[TBC:scope1_emissions]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
                 <td>tonnes/year</td>
                 <td>Continuous monitoring / emission factor</td>
             </tr>
             <tr>
                 <td>Number of SVHCs in product portfolio</td>
-                <td>[TBC:scope1_emissions]</td>
-                <td>[TBC:scope1_emissions]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
                 <td>count</td>
                 <td>Continuous monitoring / emission factor</td>
             </tr>
             <tr>
                 <td>SCIP notifications submitted</td>
-                <td>[TBC:scope1_emissions]</td>
-                <td>[TBC:scope1_emissions]</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED]</td>
                 <td>count</td>
                 <td>Continuous monitoring / emission factor</td>
             </tr>
@@ -2685,36 +2750,36 @@ class ReportTemplate:
             <tr>
                 <td>Implementation of mental health and well-being programme</td>
                 <td>Work-related stress and burnout</td>
-                <td>[TBC:employee_engagement_score]%</td>
-                <td>[TBC:avg_tenure_years] years</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED] years</td>
                 <td>HR Director</td>
             </tr>
             <tr>
                 <td>Ergonomic assessment and workstation redesign at production sites</td>
                 <td>Physical strain and musculoskeletal disorders</td>
-                <td>[TBC:employee_engagement_score]%</td>
-                <td>[TBC:avg_tenure_years] years</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED] years</td>
                 <td>Health & Safety Manager</td>
             </tr>
             <tr>
                 <td>Blind recruitment pilot and bias training for hiring managers</td>
                 <td>Discrimination risk in hiring and promotion</td>
-                <td>[TBC:women_in_management_pct]%</td>
-                <td>[TBC:avg_tenure_years] years</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED] years</td>
                 <td>Diversity & Inclusion Lead</td>
             </tr>
             <tr>
                 <td>Expansion of flexible working arrangements</td>
                 <td>Work-life balance / well-being</td>
-                <td>[TBC:employee_engagement_score]%</td>
-                <td>[TBC:avg_tenure_years] years</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED] years</td>
                 <td>HR Director</td>
             </tr>
             <tr>
                 <td>Leadership development programme for women and underrepresented groups</td>
                 <td>Gender diversity in management</td>
-                <td>[TBC:women_in_management_pct]%</td>
-                <td>[TBC:avg_tenure_years] years</td>
+                <td>[TO BE CONFIRMED]</td>
+                <td>[TO BE CONFIRMED] years</td>
                 <td>Diversity & Inclusion Lead</td>
             </tr>
         </tbody>
@@ -3260,31 +3325,31 @@ class ReportTemplate:
             <tr>
                 <td>Expansion of supplier audit programme to cover Tier 2 suppliers</td>
                 <td>Health and safety, labour rights compliance</td>
-                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
+                <td>[TO BE CONFIRMED]</td>
                 <td>[TBC:substitution_timeline_years] years</td>
             </tr>
             <tr>
                 <td>Implementation of worker voice technology platform at high-risk supplier sites</td>
                 <td>Limited grievance access for workers</td>
-                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
+                <td>[TO BE CONFIRMED]</td>
                 <td>[TBC:substitution_timeline_years] years</td>
             </tr>
             <tr>
                 <td>Supplier training programme on living wage and working time management</td>
                 <td>Wage and working time violations</td>
-                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
+                <td>[TO BE CONFIRMED]</td>
                 <td>[TBC:substitution_timeline_years] years</td>
             </tr>
             <tr>
                 <td>Integration of human rights criteria into strategic sourcing and procurement decisions</td>
                 <td>Embedding human rights in procurement</td>
-                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
+                <td>[TO BE CONFIRMED]</td>
                 <td>[TBC:substitution_timeline_years] years</td>
             </tr>
             <tr>
                 <td>Participation in industry-wide responsible sourcing initiative for [TBC:sector] sector/material</td>
                 <td>Sector-level systemic issues</td>
-                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
+                <td>[TO BE CONFIRMED]</td>
                 <td>[TBC:substitution_timeline_years] years</td>
             </tr>
         </tbody>
