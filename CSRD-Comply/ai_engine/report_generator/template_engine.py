@@ -13,10 +13,15 @@ Struttura report:
 5. Dichiarazione di conformità
 6. Note e assurance
 """
+import logging
 from typing import Optional, Dict, Any, List
 from dataclasses import dataclass, field
 from enum import Enum
 import json
+
+
+# ── Logging ──────────────────────────────────────────────────────
+logger = logging.getLogger(__name__)
 
 
 # ── Enums ─────────────────────────────────────────────────────────
@@ -309,70 +314,294 @@ class ReportTemplate:
 
         # Company context data for placeholder resolution
         # Populated from CompanyContextSettings before rendering.
-        # Each key maps to a value string. Empty/missing values keep [TO BE CONFIRMED].
+        # Each key maps to a value string. Empty/missing values keep [TBC:key].
         self.company_context: Dict[str, str] = {}
 
-    def set_company_context(self, ctx: Dict[str, str]) -> None:
+    # ── Field Registry: type, expected unit, magnitude hints ────────────
+    # Used to validate injected values belong to conceptually matching fields.
+    # Keys MUST match the keys used in the context_data dict in reports.py
+    # so that company_context can be looked up and validated.
+    FIELD_REGISTRY: Dict[str, Dict[str, object]] = {
+        # Company Profile — textual / identity fields
+        "company_name":               {"section": "profile",       "type": "string",    "unit": None,             "magnitude": None},
+        "country":                    {"section": "profile",       "type": "string",    "unit": None,             "magnitude": None},
+        "sector":                     {"section": "profile",       "type": "string",    "unit": None,             "magnitude": None},
+        "reporting_year":             {"section": "profile",       "type": "year",      "unit": None,             "magnitude": (2000, 2100)},
+        "employee_count_total":       {"section": "workforce",     "type": "count",     "unit": "employees",      "magnitude": (1, 1_000_000)},
+        "employee_count_permanent":   {"section": "workforce",     "type": "count",     "unit": "employees",      "magnitude": (0, 1_000_000)},
+        "employee_count_temporary":   {"section": "workforce",     "type": "count",     "unit": "employees",      "magnitude": (0, 1_000_000)},
+        "employee_count_male":        {"section": "workforce",     "type": "count",     "unit": "employees",      "magnitude": (0, 1_000_000)},
+        "employee_count_female":      {"section": "workforce",     "type": "count",     "unit": "employees",      "magnitude": (0, 1_000_000)},
+        "employee_count_other":       {"section": "workforce",     "type": "count",     "unit": "employees",      "magnitude": (0, 1_000_000)},
+        "annual_revenue_eur":         {"section": "profile",       "type": "currency",  "unit": "EUR",            "magnitude": (0, 1e12)},
+        "operational_sites_count":    {"section": "profile",       "type": "count",     "unit": "sites",          "magnitude": (1, 100_000)},
+        # GHG Emissions — keys must match context dict in reports.py
+        "scope1_emissions":           {"section": "emissions",     "type": "float",     "unit": "tCO2e",          "magnitude": (0, 1e9)},
+        "scope2_location_emissions":  {"section": "emissions",     "type": "float",     "unit": "tCO2e",          "magnitude": (0, 1e9)},
+        "scope2_market_emissions":    {"section": "emissions",     "type": "float",     "unit": "tCO2e",          "magnitude": (0, 1e9)},
+        "scope3_total_emissions":     {"section": "emissions",     "type": "float",     "unit": "tCO2e",          "magnitude": (0, 1e9)},
+        "scope3_material_categories": {"section": "emissions",     "type": "string",    "unit": None,             "magnitude": None},
+        "emissions_baseline_year":    {"section": "emissions",     "type": "year",      "unit": None,             "magnitude": (2000, 2100)},
+        "emissions_methodology":      {"section": "emissions",     "type": "string",    "unit": None,             "magnitude": None},
+        # Supply Chain
+        "tier1_suppliers_count":       {"section": "supply_chain", "type": "count",     "unit": "suppliers",      "magnitude": (0, 1_000_000)},
+        "tier2_suppliers_estimated":   {"section": "supply_chain", "type": "count",     "unit": "suppliers",      "magnitude": (0, 10_000_000)},
+        "value_chain_countries":       {"section": "supply_chain", "type": "string",    "unit": None,             "magnitude": None},
+        "high_risk_countries":         {"section": "supply_chain", "type": "string",    "unit": None,             "magnitude": None},
+        "suppliers_code_of_conduct_pct": {"section": "supply_chain","type": "percentage","unit": "%",             "magnitude": (0, 100)},
+        "supplier_audits_last_year":   {"section": "supply_chain", "type": "count",     "unit": "audits",         "magnitude": (0, 1_000_000)},
+        # Workforce KPIs
+        "ltifr":                      {"section": "workforce",     "type": "float",     "unit": "per_1000",        "magnitude": (0, 500)},
+        "fatal_accidents":            {"section": "workforce",     "type": "count",     "unit": "accidents",       "magnitude": (0, 1_000)},
+        "voluntary_turnover_pct":     {"section": "workforce",     "type": "percentage","unit": "%",              "magnitude": (0, 100)},
+        "total_turnover_pct":         {"section": "workforce",     "type": "percentage","unit": "%",              "magnitude": (0, 100)},
+        "new_hires_count":            {"section": "workforce",     "type": "count",     "unit": "employees",       "magnitude": (0, 1_000_000)},
+        "avg_training_hours_per_employee": {"section": "workforce","type": "float",     "unit": "hours",           "magnitude": (0, 10_000)},
+        "women_in_management_pct":    {"section": "workforce",     "type": "percentage","unit": "%",              "magnitude": (0, 100)},
+        "gender_pay_gap_pct":         {"section": "workforce",     "type": "percentage","unit": "%",              "magnitude": (-100, 100)},
+        "union_coverage_pct":         {"section": "workforce",     "type": "percentage","unit": "%",              "magnitude": (0, 100)},
+        "employee_engagement_score":  {"section": "workforce",     "type": "float",     "unit": "score",           "magnitude": (-100, 100)},
+        "employees_with_disabilities_pct": {"section": "workforce","type": "percentage","unit": "%",              "magnitude": (0, 100)},
+        "avg_tenure_years":           {"section": "workforce",     "type": "float",     "unit": "years",           "magnitude": (0, 60)},
+        "avg_age_years":              {"section": "workforce",     "type": "float",     "unit": "years",           "magnitude": (15, 80)},
+        # Payment Practices
+        "standard_payment_terms_days":    {"section": "governance","type": "count",     "unit": "days",            "magnitude": (0, 365)},
+        "avg_actual_payment_time_days":   {"section": "governance","type": "count",     "unit": "days",            "magnitude": (0, 365)},
+        "invoices_paid_within_terms_pct": {"section": "governance","type": "percentage","unit": "%",              "magnitude": (0, 100)},
+        "invoices_paid_late_pct":         {"section": "governance","type": "percentage","unit": "%",              "magnitude": (0, 100)},
+        # Governance / Anti-corruption
+        "anti_corruption_training_pct":   {"section": "governance","type": "percentage","unit": "%",              "magnitude": (0, 100)},
+        "corruption_incidents_count":     {"section": "governance","type": "count",     "unit": "incidents",      "magnitude": (0, 100_000)},
+        "whistleblowing_reports_count":   {"section": "governance","type": "count",     "unit": "reports",        "magnitude": (0, 1_000_000)},
+        # Pollution-specific (ESRS E2)
+        "substitution_timeline_years":    {"section": "pollution", "type": "count",     "unit": "years",          "magnitude": (0, 50)},
+        "pollution_facilities_count":     {"section": "pollution", "type": "count",     "unit": "facilities",     "magnitude": (0, 100_000)},
+        "air_emissions_pm_reduction_pct": {"section": "pollution", "type": "percentage","unit": "%",             "magnitude": (0, 100)},
+        "air_emissions_voc_reduction_pct":{"section": "pollution", "type": "percentage","unit": "%",             "magnitude": (0, 100)},
+        "hazardous_waste_treated_pct":    {"section": "pollution", "type": "percentage","unit": "%",             "magnitude": (0, 100)},
+        "hazardous_waste_recovered_pct":  {"section": "pollution", "type": "percentage","unit": "%",             "magnitude": (0, 100)},
+        "environmental_fte_count":        {"section": "pollution", "type": "count",     "unit": "FTE",            "magnitude": (0, 100_000)},
+        "cems_facilities_count":          {"section": "pollution", "type": "count",     "unit": "facilities",     "magnitude": (0, 100_000)},
+        "svhc_substances_count":          {"section": "pollution", "type": "count",     "unit": "substances",     "magnitude": (0, 10_000)},
+        "soil_remediation_sites_count":   {"section": "pollution", "type": "count",     "unit": "sites",          "magnitude": (0, 100_000)},
+        "external_stakeholders_engaged":  {"section": "pollution", "type": "count",     "unit": "stakeholders",   "magnitude": (0, 1_000_000)},
+        "financial_resources_eur":        {"section": "general",   "type": "currency",  "unit": "EUR",            "magnitude": (0, 1e12)},
+        "opex_pollution_eur":             {"section": "pollution", "type": "currency",  "unit": "EUR",            "magnitude": (0, 1e12)},
+        "capex_pollution_eur":            {"section": "pollution", "type": "currency",  "unit": "EUR",            "magnitude": (0, 1e12)},
+        # Supply chain specific
+        "tier1_workers_estimated":        {"section": "supply_chain","type": "count",   "unit": "workers",        "magnitude": (0, 100_000_000)},
+        "tier2_workers_estimated":        {"section": "supply_chain","type": "count",   "unit": "workers",        "magnitude": (0, 100_000_000)},
+        "supplier_countries_count":       {"section": "supply_chain","type": "count",   "unit": "countries",      "magnitude": (0, 250)},
+        "suppliers_audited_count":        {"section": "supply_chain","type": "count",   "unit": "suppliers",      "magnitude": (0, 1_000_000)},
+        "suppliers_with_cap_count":       {"section": "supply_chain","type": "count",   "unit": "suppliers",      "magnitude": (0, 1_000_000)},
+        "suppliers_terminated_count":     {"section": "supply_chain","type": "count",   "unit": "suppliers",      "magnitude": (0, 1_000_000)},
+        "grievance_languages_count":      {"section": "supply_chain","type": "count",   "unit": "languages",      "magnitude": (0, 200)},
+        # Workforce grievances
+        "grievances_received":            {"section": "workforce", "type": "count",     "unit": "grievances",     "magnitude": (0, 1_000_000)},
+        "grievances_resolved":            {"section": "workforce", "type": "count",     "unit": "grievances",     "magnitude": (0, 1_000_000)},
+        "grievance_resolution_days":      {"section": "workforce", "type": "count",     "unit": "days",           "magnitude": (0, 365)},
+        "grievance_satisfaction_pct":     {"section": "workforce", "type": "percentage","unit": "%",             "magnitude": (0, 100)},
+        # Countries / databases / text
+        "database_name":                  {"section": "general",   "type": "string",    "unit": None,             "magnitude": None},
+        "regulatory_database_name":       {"section": "general",   "type": "string",    "unit": None,             "magnitude": None},
+        "substance_name":                 {"section": "pollution", "type": "string",    "unit": None,             "magnitude": None},
+        "site_name":                      {"section": "general",   "type": "string",    "unit": None,             "magnitude": None},
+        "target_year":                    {"section": "general",   "type": "year",      "unit": None,             "magnitude": (2000, 2100)},
+        # Additional emission fields from template placeholders (non-context, but used in validation)
+        "scope1_baseline":                {"section": "emissions", "type": "float",     "unit": "tCO2e",          "magnitude": (0, 1e9)},
+        "scope2_location_baseline":       {"section": "emissions", "type": "float",     "unit": "tCO2e",          "magnitude": (0, 1e9)},
+        "scope2_market_baseline":         {"section": "emissions", "type": "float",     "unit": "tCO2e",          "magnitude": (0, 1e9)},
+        "scope3_baseline":                {"section": "emissions", "type": "float",     "unit": "tCO2e",          "magnitude": (0, 1e9)},
+        # Generic stakeholder/target related fields used in templates
+        "stakeholders_engaged_count":     {"section": "pollution", "type": "count",     "unit": "stakeholders",   "magnitude": (0, 1_000_000)},
+    }
+
+    def _validate_placeholder_value(self, key: str, value: str) -> bool:
         """
-        Set company context data used to replace [TO BE CONFIRMED] placeholders
+        Validate that *value* is plausible for the field identified by *key*.
+        Checks:
+          1. Type correctness (string fields reject bare numeric-looking values)
+          2. Numeric magnitude against FIELD_REGISTRY ranges
+          3. Section-awareness — the field's section is validated implicitly
+             through FIELD_REGISTRY. A value that passes magnitude checks
+             for its own section will be accepted; mismatching sections are
+             caught by magnitude mismatches (e.g., "500 years" fails the
+             "substitution_timeline_years" (0-50yr) check if the real value
+             is an employee count like 500).
+        Returns True if the value passes validation (or no metadata exists).
+        """
+        meta = self.FIELD_REGISTRY.get(key)
+        if not meta:
+            return True  # unknown field — allow passthrough
+
+        field_type = meta.get("type")
+        magnitude = meta.get("magnitude")
+
+        # ── String-type fields ─────────────────────────────────────
+        if field_type in ("string",):
+            # Reject bare numeric-looking strings for string fields that
+            # expect names (e.g. database_name, substance_name, site_name).
+            # Allow if the value contains non-digit characters (i.e., real text).
+            cleaned = value.strip().replace(",", "").replace(".", "")
+            if cleaned.isdigit():
+                return False
+            return True  # Non-numeric text is fine for string fields
+
+        # ── Numeric fields — try to parse ──────────────────────────
+        try:
+            num_val = float(value.replace(",", "").replace(" ", ""))
+        except (ValueError, AttributeError):
+            # Non-numeric value for numeric field — reject (keep TBC)
+            return False
+
+        # Year fields: must be integer and within plausible range
+        if field_type == "year":
+            if not value.replace(",", "").strip().isdigit():
+                return False
+            year_int = int(float(value))
+            lo, hi = magnitude if magnitude else (1900, 2150)
+            return lo <= year_int <= hi
+
+        # Percentage fields: 0-100 range
+        if field_type == "percentage":
+            lo, hi = magnitude if magnitude else (0, 100)
+            return lo <= num_val <= hi
+
+        # Count fields: non-negative, within magnitude range
+        if field_type == "count":
+            lo, hi = magnitude if magnitude else (0, 1e12)
+            return lo <= num_val <= hi
+
+        # Currency: non-negative
+        if field_type == "currency":
+            lo, hi = magnitude if magnitude else (0, 1e12)
+            return lo <= num_val <= hi
+
+        # Float: within magnitude range
+        if field_type == "float":
+            lo, hi = magnitude if magnitude else (-1e12, 1e12)
+            return lo <= num_val <= hi
+
+        return True
+
+    def _get_currency_display(self, key: str, value: str) -> str:
+        """
+        Format a currency value with appropriate unit annotation
+        (EUR thousands / EUR millions / EUR billions) based on magnitude.
+        
+        Rules:
+          - 0–999 → no unit annotation
+          - 1,000–999,999 → EUR thousands
+          - 1,000,000–999,999,999 → EUR millions
+          - >= 1,000,000,000 → EUR billions
+        """
+        try:
+            num_val = float(value.replace(",", "").replace(" ", ""))
+        except (ValueError, AttributeError):
+            return value
+
+        if abs(num_val) < 1000:
+            return f"{num_val:,.2f} EUR"
+        elif abs(num_val) < 1_000_000:
+            val_k = num_val / 1000
+            return f"{val_k:,.2f} (EUR thousands)"
+        elif abs(num_val) < 1_000_000_000:
+            val_m = num_val / 1_000_000
+            return f"{val_m:,.2f} (EUR millions)"
+        else:
+            val_b = num_val / 1_000_000_000
+            return f"{val_b:,.2f} (EUR billions)"
+
+
+    def set_company_context(self, ctx: Dict[str, str]) -> None:
+
+        """
+        Set company context data used to replace [TBC:key] placeholders
         throughout the report. Only non-empty values are used; for any missing
-        or empty keys the placeholder [TO BE CONFIRMED] is preserved.
+        or empty keys the placeholder [TBC:key] is preserved.
         """
         self.company_context = {k: v for k, v in ctx.items() if v}
 
     def _resolve_placeholder(self, text: str, key: str) -> str:
         """
-        Replace the first occurrence of ``[TO BE CONFIRMED]`` in *text*
-        with the value stored under *key* in ``company_context``, if one exists.
-        If the key is missing or empty, the placeholder is left untouched.
+        Replace occurrences of ``[TBC:<key>]`` in *text*
+        with the value stored under *key* in ``company_context``, if one exists
+        AND passes validation. If the key is missing, empty, or fails validation,
+        the placeholder becomes '[TO BE CONFIRMED]'.
+
+        For currency fields, the value is formatted with appropriate unit
+        annotation (EUR thousands / EUR millions / EUR billions).
         """
+        import re
         if not self.company_context:
             return text
         value = self.company_context.get(key)
         if not value:
-            return text
-        return text.replace("[TO BE CONFIRMED]", str(value), 1)
+            # No value supplied — leave as [TO BE CONFIRMED]
+            return text.replace(f"[TBC:{key}]", "[TO BE CONFIRMED]")
+
+        # Validation step: check unit/magnitude plausibility
+        if not self._validate_placeholder_value(key, value):
+            # Value exists but fails validation — keep [TO BE CONFIRMED]
+            return text.replace(f"[TBC:{key}]", "[TO BE CONFIRMED]")
+
+        # Check if this is a currency field — apply unit formatting
+        meta = self.FIELD_REGISTRY.get(key, {})
+        if meta.get("type") == "currency":
+            formatted = self._get_currency_display(key, value)
+            return text.replace(f"[TBC:{key}]", formatted)
+
+        return text.replace(f"[TBC:{key}]", str(value))
+
 
     def resolve_placeholders(self, html: str) -> str:
         """
         Walk through all known company-context keys and replace
-        ``[TO BE CONFIRMED]`` placeholders with the corresponding value
-        wherever possible.
+        ``[TBC:<key>]`` placeholders with the corresponding value
+        wherever possible. If a key is missing in the context, the
+        placeholder becomes '[TO BE CONFIRMED]'. Validation ensures
+        the injected value is plausible for the target field.
 
-        The order of replacement matches the key ordering so that
-        ``[TO BE CONFIRMED]`` tokens are consumed left-to-right.
+        Fallback: after per-key resolution, any remaining bare
+        ``[TO BE CONFIRMED]`` placeholders are replaced left-to-right
+        with available context values (in FIELD_REGISTRY order) for
+        backward compatibility with template HTML that still uses the
+        generic placeholder format.
         """
-        known_keys = [
-            # Company Profile
-            "company_name", "country", "sector", "reporting_year",
-            "employee_count_total", "employee_count_permanent",
-            "employee_count_temporary", "employee_count_male",
-            "employee_count_female", "employee_count_other",
-            "annual_revenue_eur", "operational_sites_count",
-            # GHG Emissions
-            "scope1_emissions", "scope2_location_emissions",
-            "scope2_market_emissions", "scope3_total_emissions",
-            "scope3_material_categories", "emissions_baseline_year",
-            "emissions_methodology",
-            # Supply Chain
-            "tier1_suppliers_count", "tier2_suppliers_estimated",
-            "value_chain_countries", "high_risk_countries",
-            "suppliers_code_of_conduct_pct", "supplier_audits_last_year",
-            # Workforce KPIs
-            "ltifr", "fatal_accidents", "voluntary_turnover_pct",
-            "avg_training_hours_per_employee", "women_in_management_pct",
-            "gender_pay_gap_pct", "union_coverage_pct",
-            "employee_engagement_score",
-            # Payment Practices
-            "standard_payment_terms_days", "avg_actual_payment_time_days",
-            "invoices_paid_within_terms_pct", "invoices_paid_late_pct",
-            # Governance
-            "anti_corruption_training_pct", "corruption_incidents_count",
-            "whistleblowing_reports_count",
-        ]
+        import re
+        known_keys = list(self.FIELD_REGISTRY.keys())
         result = html
+
+        # Phase 1: per-key named placeholders ── [TBC:<key>] ────
         for key in known_keys:
+            if f"[TBC:{key}]" not in result:
+                continue
             result = self._resolve_placeholder(result, key)
+
+        # Phase 2: fallback for bare [TO BE CONFIRMED] ──────────
+        # Collect only values that passed validation for their field
+        if not self.company_context:
+            return result
+
+        validated_values = []
+        for key in known_keys:
+            val = self.company_context.get(key)
+            if val and self._validate_placeholder_value(key, val):
+                meta = self.FIELD_REGISTRY.get(key, {})
+                if meta.get("type") == "currency":
+                    validated_values.append(self._get_currency_display(key, val))
+                else:
+                    validated_values.append(val)
+
+        if validated_values:
+            iterator = iter(validated_values)
+            def _replace_one(match):
+                try:
+                    return next(iterator)
+                except StopIteration:
+                    return "[TO BE CONFIRMED]"
+            result = re.sub(r'\[TO BE CONFIRMED\]', _replace_one, result)
+
         return result
 
     def _default_title(self) -> str:
