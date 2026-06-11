@@ -2576,7 +2576,7 @@ class ReportTemplate:
     <p>The undertaking respects the right of all employees to join trade unions and to be represented by worker representatives in accordance with national laws and EU directives. As of the reporting date:</p>
     <ul>
         <li><strong>Union representation:</strong> [TBC:union_coverage_pct]% of the workforce is covered by collective bargaining agreements.</li>
-        <li><strong>Works councils / employee representatives:</strong> [TBC:employee_count_total] bodies are active at [TBC:operational_sites_count] locations.</li>
+        <li><strong>Works councils / employee representatives:</strong> [TO BE CONFIRMED] bodies are active at [TO BE CONFIRMED] locations.</li>
         <li><strong>European Works Council (EWC):</strong> [TO BE CONFIRMED — describe if applicable].</li>
         <li><strong>Health and safety committees:</strong> Joint health and safety committees operate at all sites with more than [TBC:employee_count_total] employees.</li>
     </ul>
@@ -3583,27 +3583,27 @@ class ReportTemplate:
         <tbody>
             <tr>
                 <td>Health and safety</td>
-                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
+                <td>[TO BE CONFIRMED]</td>
                 <td>[TO BE CONFIRMED]</td>
             </tr>
             <tr>
                 <td>Working hours</td>
-                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
+                <td>[TO BE CONFIRMED]</td>
                 <td>[TO BE CONFIRMED]</td>
             </tr>
             <tr>
                 <td>Wages and benefits</td>
-                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
+                <td>[TO BE CONFIRMED]</td>
                 <td>[TO BE CONFIRMED]</td>
             </tr>
             <tr>
                 <td>Freedom of association</td>
-                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
+                <td>[TO BE CONFIRMED]</td>
                 <td>[TO BE CONFIRMED]</td>
             </tr>
             <tr>
                 <td>Environmental management</td>
-                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
+                <td>[TO BE CONFIRMED]</td>
                 <td>[TO BE CONFIRMED]</td>
             </tr>
         </tbody>
