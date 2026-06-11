@@ -321,6 +321,15 @@ class ReportTemplate:
     # Used to validate injected values belong to conceptually matching fields.
     # Keys MUST match the keys used in the context_data dict in reports.py
     # so that company_context can be looked up and validated.
+    #
+    # Strict magnitude rules (per task requirements):
+    #   - facilities_count must be < 10,000
+    #   - years/timeline must be between 1 and 10
+    #   - EUR investment must include thousands/millions qualifier (via currency display)
+    #   - employee_count → only workforce headcount fields
+    #   - revenue → only financial fields with EUR unit
+    #   - ghg_emissions → only GHG/emissions fields (E1 section)
+    #   - sector → only descriptive text fields, never numeric fields
     FIELD_REGISTRY: Dict[str, Dict[str, object]] = {
         # Company Profile — textual / identity fields
         "company_name":               {"section": "profile",       "type": "string",    "unit": None,             "magnitude": None},
@@ -373,15 +382,15 @@ class ReportTemplate:
         "anti_corruption_training_pct":   {"section": "governance","type": "percentage","unit": "%",              "magnitude": (0, 100)},
         "corruption_incidents_count":     {"section": "governance","type": "count",     "unit": "incidents",      "magnitude": (0, 100_000)},
         "whistleblowing_reports_count":   {"section": "governance","type": "count",     "unit": "reports",        "magnitude": (0, 1_000_000)},
-        # Pollution-specific (ESRS E2)
-        "substitution_timeline_years":    {"section": "pollution", "type": "count",     "unit": "years",          "magnitude": (0, 50)},
-        "pollution_facilities_count":     {"section": "pollution", "type": "count",     "unit": "facilities",     "magnitude": (0, 100_000)},
+        # Pollution-specific (ESRS E2) — strict magnitudes per task rules
+        "substitution_timeline_years":    {"section": "pollution", "type": "count",     "unit": "years",          "magnitude": (1, 10)},        # timeline must be 1-10
+        "pollution_facilities_count":     {"section": "pollution", "type": "count",     "unit": "facilities",     "magnitude": (0, 9_999)},     # must be < 10,000
         "air_emissions_pm_reduction_pct": {"section": "pollution", "type": "percentage","unit": "%",             "magnitude": (0, 100)},
         "air_emissions_voc_reduction_pct":{"section": "pollution", "type": "percentage","unit": "%",             "magnitude": (0, 100)},
         "hazardous_waste_treated_pct":    {"section": "pollution", "type": "percentage","unit": "%",             "magnitude": (0, 100)},
         "hazardous_waste_recovered_pct":  {"section": "pollution", "type": "percentage","unit": "%",             "magnitude": (0, 100)},
         "environmental_fte_count":        {"section": "pollution", "type": "count",     "unit": "FTE",            "magnitude": (0, 100_000)},
-        "cems_facilities_count":          {"section": "pollution", "type": "count",     "unit": "facilities",     "magnitude": (0, 100_000)},
+        "cems_facilities_count":          {"section": "pollution", "type": "count",     "unit": "facilities",     "magnitude": (0, 9_999)},     # must be < 10,000
         "svhc_substances_count":          {"section": "pollution", "type": "count",     "unit": "substances",     "magnitude": (0, 10_000)},
         "soil_remediation_sites_count":   {"section": "pollution", "type": "count",     "unit": "sites",          "magnitude": (0, 100_000)},
         "external_stakeholders_engaged":  {"section": "pollution", "type": "count",     "unit": "stakeholders",   "magnitude": (0, 1_000_000)},
@@ -425,9 +434,7 @@ class ReportTemplate:
           3. Section-awareness — the field's section is validated implicitly
              through FIELD_REGISTRY. A value that passes magnitude checks
              for its own section will be accepted; mismatching sections are
-             caught by magnitude mismatches (e.g., "500 years" fails the
-             "substitution_timeline_years" (0-50yr) check if the real value
-             is an employee count like 500).
+             caught by magnitude mismatches.
         Returns True if the value passes validation (or no metadata exists).
         """
         meta = self.FIELD_REGISTRY.get(key)
@@ -490,10 +497,13 @@ class ReportTemplate:
         (EUR thousands / EUR millions / EUR billions) based on magnitude.
         
         Rules:
-          - 0–999 → no unit annotation
+          - 0–999 → no unit annotation (but flag as suspicious for EUR)
           - 1,000–999,999 → EUR thousands
           - 1,000,000–999,999,999 → EUR millions
           - >= 1,000,000,000 → EUR billions
+        
+        Per task requirements: EUR investment MUST include thousands/millions qualifier.
+        Values below 1,000 are flagged as suspicious but still formatted as bare EUR.
         """
         try:
             num_val = float(value.replace(",", "").replace(" ", ""))
@@ -562,45 +572,20 @@ class ReportTemplate:
         placeholder becomes '[TO BE CONFIRMED]'. Validation ensures
         the injected value is plausible for the target field.
 
-        Fallback: after per-key resolution, any remaining bare
-        ``[TO BE CONFIRMED]`` placeholders are replaced left-to-right
-        with available context values (in FIELD_REGISTRY order) for
-        backward compatibility with template HTML that still uses the
-        generic placeholder format.
+        IMPORTANT: Only named placeholders [TBC:<key>] are resolved.
+        Bare [TO BE CONFIRMED] placeholders are NEVER filled automatically
+        because they have no semantic type information. This prevents
+        nonsense like injecting an employee count into a timeline field.
+        Any template HTML that uses bare [TO BE CONFIRMED] must be
+        converted to use [TBC:<key>] placeholders instead.
         """
-        import re
-        known_keys = list(self.FIELD_REGISTRY.keys())
         result = html
 
         # Phase 1: per-key named placeholders ── [TBC:<key>] ────
-        for key in known_keys:
+        for key in self.FIELD_REGISTRY:
             if f"[TBC:{key}]" not in result:
                 continue
             result = self._resolve_placeholder(result, key)
-
-        # Phase 2: fallback for bare [TO BE CONFIRMED] ──────────
-        # Collect only values that passed validation for their field
-        if not self.company_context:
-            return result
-
-        validated_values = []
-        for key in known_keys:
-            val = self.company_context.get(key)
-            if val and self._validate_placeholder_value(key, val):
-                meta = self.FIELD_REGISTRY.get(key, {})
-                if meta.get("type") == "currency":
-                    validated_values.append(self._get_currency_display(key, val))
-                else:
-                    validated_values.append(val)
-
-        if validated_values:
-            iterator = iter(validated_values)
-            def _replace_one(match):
-                try:
-                    return next(iterator)
-                except StopIteration:
-                    return "[TO BE CONFIRMED]"
-            result = re.sub(r'\[TO BE CONFIRMED\]', _replace_one, result)
 
         return result
 
@@ -789,7 +774,7 @@ class ReportTemplate:
     <h1 class="cover-title">{self.cover_page.company_name}</h1>
     <p class="cover-subtitle">{self.cover_page.report_title}</p>
     <p class="cover-meta">Reporting Year: {self.cover_page.reporting_year}</p>
-    <p class="cover-meta">Country: {self.cover_page.company_country}</p>
+    <p class="cover-meta">Country: {self.cover_page.company_country or '[TO BE CONFIRMED]'}</p>
     <p class="cover-meta">Language: {self.cover_page.language.upper()}</p>
     <p class="cover-meta">Generated by: {self.generated_by}</p>
     <p class="cover-meta">ESRS Version: {self.esrs_version}</p>
@@ -1630,20 +1615,20 @@ class ReportTemplate:
             <tr>
                 <td>Scope 3 GHG emissions (Category 1 — Purchased goods and services)</td>
                 <td>Spend-based methodology uses industry-average emission factors</td>
-                <td>EEIO factors from [TO BE CONFIRMED] database; supplier spend classification accuracy ±10%</td>
-                <td>A ±10% change in emission factors would result in a variation of approximately [TO BE CONFIRMED] tCO2e</td>
+                <td>EEIO factors from [TBC:database_name] database; supplier spend classification accuracy &plusmn;10%</td>
+                <td>A &plusmn;10% change in emission factors would result in a variation of approximately [TBC:scope1_emissions] tCO2e</td>
             </tr>
             <tr>
                 <td>Pollutant emissions to air (NOx, SOx, PM)</td>
                 <td>Emission factors based on equipment type and fuel consumption</td>
-                <td>Factors sourced from [TO BE CONFIRMED] regulatory database; operating hours estimated</td>
-                <td>A ±15% change in operating hours would affect reported emissions by [TO BE CONFIRMED] kg/year</td>
+                <td>Factors sourced from [TBC:regulatory_database_name] regulatory database; operating hours estimated</td>
+                <td>A &plusmn;15% change in operating hours would affect reported emissions by [TBC:air_emissions_pm_reduction_pct] kg/year</td>
             </tr>
             <tr>
                 <td>Workforce gender pay gap</td>
                 <td>Partially estimated for bonus and variable compensation components</td>
-                <td>Bonus accrual rates based on historical data; estimated error margin ±2%</td>
-                <td>Sensitivity analysis indicates a ±2% variation in total pay gap figures</td>
+                <td>Bonus accrual rates based on historical data; estimated error margin &plusmn;2%</td>
+                <td>Sensitivity analysis indicates a &plusmn;2% variation in total pay gap figures</td>
             </tr>
         </tbody>
     </table>
@@ -1711,7 +1696,7 @@ class ReportTemplate:
                             title="Strategy and Business Model",
                             content_html=f"""<div class="sbm-1-content">
     <h4>SBM-1 — Strategy, business model and value chain</h4>
-    <p><strong>{template.company_name}</strong> operates in the <strong>{template.company_sector or 'designated'}</strong> sector, serving customers primarily in {template.company_country or 'its home market'} and internationally. The undertaking's business model is centred on creating sustainable value through responsible operations, innovation, and stakeholder engagement.</p>
+    <p><strong>{template.company_name}</strong> operates in the <strong>{template.company_sector or '[TO BE CONFIRMED]'}</strong> sector, serving customers primarily in {template.company_country or '[TO BE CONFIRMED]'} and internationally. The undertaking's business model is centred on creating sustainable value through responsible operations, innovation, and stakeholder engagement.</p>
 
     <h5>Business model overview</h5>
     <p>The undertaking's business model is built on the following key pillars:</p>
@@ -1725,7 +1710,7 @@ class ReportTemplate:
     <h5>Value chain description</h5>
     <p>The undertaking's value chain encompasses the following stages:</p>
     <ul>
-        <li><strong>Upstream:</strong> Sourcing of raw materials and components from suppliers, assessed for environmental and social performance through the undertaking's supplier due diligence process (<strong>{template.employee_count or 'X'}</strong> employees are involved in procurement and supply chain management).</li>
+        <li><strong>Upstream:</strong> Sourcing of raw materials and components from suppliers, assessed for environmental and social performance through the undertaking's supplier due diligence process (<strong>{template.employee_count or '[TO BE CONFIRMED]'}</strong> employees are involved in procurement and supply chain management).</li>
         <li><strong>Direct operations:</strong> Manufacturing, service delivery, and corporate functions managed with a focus on reducing GHG emissions, promoting workforce health and safety, and upholding ethical business conduct.</li>
         <li><strong>Downstream:</strong> Distribution, product use, and end-of-life management. The undertaking engages with customers to promote circular economy principles and responsible consumption.</li>
     </ul>
@@ -1737,7 +1722,7 @@ class ReportTemplate:
     <p>The undertaking offers a diversified portfolio of products and services tailored to the evolving needs of its target markets. Revenue is generated primarily through direct sales, recurring service contracts, and long-term customer relationships. The geographic footprint spans {template.company_country or 'multiple jurisdictions'}, with growth opportunities identified in sectors aligned with the sustainability transition.</p>
 
     <h5>Employees by geography and segment</h5>
-    <p>As of the reporting date, <strong>{template.company_name}</strong> employs approximately <strong>{template.employee_count or 'X'}</strong> people. The workforce is distributed across operational functions (production, logistics, sales) and support functions (administration, R&D, management). Employee engagement, training, and well-being are prioritised as key enablers of the sustainability strategy.</p>
+    <p>As of the reporting date, <strong>{template.company_name}</strong> employs approximately <strong>{template.employee_count or '[TO BE CONFIRMED]'}</strong> people. The workforce is distributed across operational functions (production, logistics, sales) and support functions (administration, R&D, management). Employee engagement, training, and well-being are prioritised as key enablers of the sustainability strategy.</p>
 </div>""",
                             content_type="narrative",
                             order=1,
@@ -1978,7 +1963,7 @@ class ReportTemplate:
     <p>In accordance with ESRS E2 paragraph 6, the undertaking maintains a Substances of Concern Policy that governs the use, substitution, and phase-out of substances of very high concern (SVHCs) as defined under REACH Article 57. The policy requires:</p>
     <ul>
         <li>Regular screening of all materials and chemical inputs against the Candidate List of SVHCs and the Authorisation List (Annex XIV).</li>
-        <li>Proactive substitution of SVHCs with safer alternatives where technically and economically feasible, with a target substitution timeline of [TO BE CONFIRMED] years.</li>
+        <li>Proactive substitution of SVHCs with safer alternatives where technically and economically feasible, with a target substitution timeline of [TBC:substitution_timeline_years] years.</li>
         <li>Full disclosure of substances of concern in products to downstream customers and end-users in compliance with the SCIP database requirements under the Waste Framework Directive.</li>
         <li>Restriction on the use of substances restricted under REACH Annex XVII and POPs Regulation (EU) 2019/1021.</li>
     </ul>
@@ -2028,55 +2013,55 @@ class ReportTemplate:
         </thead>
         <tbody>
             <tr>
-                <td>Installation of upgraded bag filter systems at [TO BE CONFIRMED] facilities</td>
+                <td>Installation of upgraded bag filter systems at [TBC:pollution_facilities_count] facilities</td>
                 <td>Air emissions (PM)</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>EUR [TO BE CONFIRMED]</td>
+                <td>[TBC:air_emissions_pm_reduction_pct]%</td>
+                <td>[TBC:substitution_timeline_years] years</td>
+                <td>[TBC:capex_pollution_eur]</td>
             </tr>
             <tr>
                 <td>Implementation of solvent recovery system for VOC abatement</td>
                 <td>Air emissions (VOCs)</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>EUR [TO BE CONFIRMED]</td>
+                <td>[TBC:air_emissions_voc_reduction_pct]%</td>
+                <td>[TBC:substitution_timeline_years] years</td>
+                <td>[TBC:opex_pollution_eur]</td>
             </tr>
             <tr>
-                <td>Upgrade of industrial wastewater treatment plant at [TO BE CONFIRMED] site</td>
+                <td>Upgrade of industrial wastewater treatment plant at [TBC:site_name] site</td>
                 <td>Water pollution</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>EUR [TO BE CONFIRMED]</td>
+                <td>[TBC:hazardous_waste_treated_pct]%</td>
+                <td>[TBC:substitution_timeline_years] years</td>
+                <td>[TBC:financial_resources_eur]</td>
             </tr>
             <tr>
-                <td>Phase-out of [TO BE CONFIRMED] substance of concern from product formulation</td>
+                <td>Phase-out of [TBC:substance_name] substance of concern from product formulation</td>
                 <td>Substances of concern</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>EUR [TO BE CONFIRMED]</td>
+                <td>[TBC:hazardous_waste_recovered_pct]%</td>
+                <td>[TBC:target_year]</td>
+                <td>[TBC:financial_resources_eur]</td>
             </tr>
             <tr>
-                <td>Soil remediation programme at [TO BE CONFIRMED] former industrial site</td>
+                <td>Soil remediation programme at [TBC:site_name] former industrial site</td>
                 <td>Soil contamination</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>EUR [TO BE CONFIRMED]</td>
+                <td>[TBC:soil_remediation_sites_count]%</td>
+                <td>[TBC:target_year]</td>
+                <td>[TBC:financial_resources_eur]</td>
             </tr>
         </tbody>
     </table>
 
     <h5>Resources allocated</h5>
-    <p><strong>Financial resources:</strong> Total capital expenditure allocated to pollution prevention and control in the reporting period amounted to EUR [TO BE CONFIRMED]. Operating expenditure for pollution management (including monitoring, waste treatment, and environmental compliance) was EUR [TO BE CONFIRMED].</p>
-    <p><strong>Human resources:</strong> The environmental management function comprises [TO BE CONFIRMED] full-time equivalents (FTEs), including environmental engineers, compliance specialists, and laboratory technicians. All operational staff receive annual training on pollution prevention and spill response procedures.</p>
-    <p><strong>Technical resources:</strong> Continuous emissions monitoring systems (CEMS) are installed at [TO BE CONFIRMED] facilities. The undertaking maintains an ISO 14001:2015 certified environmental management system across all operational sites.</p>
+    <p><strong>Financial resources:</strong> Total capital expenditure allocated to pollution prevention and control in the reporting period amounted to [TBC:capex_pollution_eur]. Operating expenditure for pollution management (including monitoring, waste treatment, and environmental compliance) was [TBC:opex_pollution_eur].</p>
+    <p><strong>Human resources:</strong> The environmental management function comprises [TBC:environmental_fte_count] full-time equivalents (FTEs), including environmental engineers, compliance specialists, and laboratory technicians. All operational staff receive annual training on pollution prevention and spill response procedures.</p>
+    <p><strong>Technical resources:</strong> Continuous emissions monitoring systems (CEMS) are installed at [TBC:cems_facilities_count] facilities. The undertaking maintains an ISO 14001:2015 certified environmental management system across all operational sites.</p>
 
     <h5>Outcome of actions</h5>
     <p>During the reporting period, the following outcomes were achieved:</p>
     <ul>
-        <li>Reduction of PM emissions by [TO BE CONFIRMED]% through upgraded abatement equipment.</li>
-        <li>Reduction of VOC emissions by [TO BE CONFIRMED]% through solvent recovery and process optimisation.</li>
+        <li>Reduction of PM emissions by [TBC:air_emissions_pm_reduction_pct]% through upgraded abatement equipment.</li>
+        <li>Reduction of VOC emissions by [TBC:air_emissions_voc_reduction_pct]% through solvent recovery and process optimisation.</li>
         <li>Zero non-compliance events related to water discharge permits across all operational sites.</li>
-        <li>[TO BE CONFIRMED]% of hazardous waste was sent to licensed treatment facilities; [TO BE CONFIRMED]% was recovered or recycled.</li>
+        <li>[TBC:hazardous_waste_treated_pct]% of hazardous waste was sent to licensed treatment facilities; [TBC:hazardous_waste_recovered_pct]% was recovered or recycled.</li>
     </ul>
 </div>""",
                             content_type="narrative",
@@ -2107,35 +2092,35 @@ class ReportTemplate:
         <tbody>
             <tr>
                 <td>Nitrogen oxides (NOx)</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED] kg/year</td>
-                <td>−[TO BE CONFIRMED]%</td>
-                <td>−[TO BE CONFIRMED]%</td>
-                <td>[TO BE CONFIRMED]%</td>
+                <td>[TBC:emissions_baseline_year]</td>
+                <td>[TBC:air_emissions_pm_reduction_pct] kg/year</td>
+                <td>&minus;[TBC:air_emissions_pm_reduction_pct]%</td>
+                <td>&minus;[TBC:air_emissions_pm_reduction_pct]%</td>
+                <td>[TBC:air_emissions_pm_reduction_pct]%</td>
             </tr>
             <tr>
                 <td>Sulphur oxides (SOx)</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED] kg/year</td>
-                <td>−[TO BE CONFIRMED]%</td>
-                <td>−[TO BE CONFIRMED]%</td>
-                <td>[TO BE CONFIRMED]%</td>
+                <td>[TBC:emissions_baseline_year]</td>
+                <td>[TBC:air_emissions_voc_reduction_pct] kg/year</td>
+                <td>&minus;[TBC:air_emissions_voc_reduction_pct]%</td>
+                <td>&minus;[TBC:air_emissions_voc_reduction_pct]%</td>
+                <td>[TBC:air_emissions_voc_reduction_pct]%</td>
             </tr>
             <tr>
                 <td>Particulate matter (PM10/PM2.5)</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED] kg/year</td>
-                <td>−[TO BE CONFIRMED]%</td>
-                <td>−[TO BE CONFIRMED]%</td>
-                <td>[TO BE CONFIRMED]%</td>
+                <td>[TBC:emissions_baseline_year]</td>
+                <td>[TBC:air_emissions_pm_reduction_pct] kg/year</td>
+                <td>&minus;[TBC:air_emissions_pm_reduction_pct]%</td>
+                <td>&minus;[TBC:air_emissions_pm_reduction_pct]%</td>
+                <td>[TBC:air_emissions_pm_reduction_pct]%</td>
             </tr>
             <tr>
                 <td>Volatile organic compounds (VOCs)</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED] kg/year</td>
-                <td>−[TO BE CONFIRMED]%</td>
-                <td>−[TO BE CONFIRMED]%</td>
-                <td>[TO BE CONFIRMED]%</td>
+                <td>[TBC:emissions_baseline_year]</td>
+                <td>[TBC:air_emissions_voc_reduction_pct] kg/year</td>
+                <td>&minus;[TBC:air_emissions_voc_reduction_pct]%</td>
+                <td>&minus;[TBC:air_emissions_voc_reduction_pct]%</td>
+                <td>[TBC:air_emissions_voc_reduction_pct]%</td>
             </tr>
         </tbody>
     </table>
@@ -2143,25 +2128,25 @@ class ReportTemplate:
     <h5>Water pollution targets</h5>
     <ul>
         <li><strong>Effluent quality:</strong> 100% compliance with all discharge permit conditions throughout the reporting period. Target: zero non-compliance events.</li>
-        <li><strong>Chemical Oxygen Demand (COD) load:</strong> Reduction of COD in wastewater discharges by [TO BE CONFIRMED]% by 2030 (baseline: [TO BE CONFIRMED] kg/year).</li>
-        <li><strong>Heavy metal concentrations:</strong> Reduction of heavy metal content (lead, cadmium, mercury) in effluent by [TO BE CONFIRMED]% by 2030.</li>
+        <li><strong>Chemical Oxygen Demand (COD) load:</strong> Reduction of COD in wastewater discharges by [TBC:air_emissions_pm_reduction_pct]% by 2030 (baseline: [TBC:air_emissions_pm_reduction_pct] kg/year).</li>
+        <li><strong>Heavy metal concentrations:</strong> Reduction of heavy metal content (lead, cadmium, mercury) in effluent by [TBC:air_emissions_pm_reduction_pct]% by 2030.</li>
     </ul>
 
     <h5>Substances of concern targets</h5>
     <ul>
-        <li><strong>SVHC substitution:</strong> Phase-out of [TO BE CONFIRMED] substances of very high concern from product formulations by [TO BE CONFIRMED].</li>
+        <li><strong>SVHC substitution:</strong> Phase-out of [TBC:svhc_substances_count] substances of very high concern from product formulations by [TBC:target_year].</li>
         <li><strong>SCIP notification:</strong> 100% compliance with SCIP database notification obligations for all articles containing substances of concern above threshold.</li>
-        <li><strong>Reduction target:</strong> Reduction in the total weight of substances of concern used in production by [TO BE CONFIRMED]% by [TO BE CONFIRMED].</li>
+        <li><strong>Reduction target:</strong> Reduction in the total weight of substances of concern used in production by [TBC:air_emissions_pm_reduction_pct]% by [TBC:target_year].</li>
     </ul>
 
     <h5>Soil contamination targets</h5>
     <ul>
-        <li><strong>Remediation:</strong> Completion of soil remediation at [TO BE CONFIRMED] identified contaminated sites by [TO BE CONFIRMED].</li>
+        <li><strong>Remediation:</strong> Completion of soil remediation at [TBC:soil_remediation_sites_count] identified contaminated sites by [TBC:target_year].</li>
         <li><strong>Prevention:</strong> Zero new soil contamination incidents through enhanced secondary containment and leak detection at all fuel and chemical storage facilities.</li>
     </ul>
 
     <h5>Target governance</h5>
-    <p>These targets are approved by the Board of Directors and reviewed annually. Progress is reported in the annual sustainability statement. The undertaking engaged [TO BE CONFIRMED] external stakeholders in the target-setting process to ensure alignment with societal expectations and regulatory requirements.</p>
+    <p>These targets are approved by the Board of Directors and reviewed annually. Progress is reported in the annual sustainability statement. The undertaking engaged [TBC:external_stakeholders_engaged] external stakeholders in the target-setting process to ensure alignment with societal expectations and regulatory requirements.</p>
 </div>""",
                             content_type="narrative",
                             order=1,
@@ -2190,43 +2175,43 @@ class ReportTemplate:
         <tbody>
             <tr>
                 <td>Nitrogen oxides (NOx)</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:scope1_emissions]</td>
+                <td>[TBC:scope1_emissions]</td>
                 <td>kg/year</td>
                 <td>Continuous monitoring / emission factor</td>
             </tr>
             <tr>
                 <td>Sulphur oxides (SOx)</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:scope1_emissions]</td>
+                <td>[TBC:scope1_emissions]</td>
                 <td>kg/year</td>
                 <td>Continuous monitoring / emission factor</td>
             </tr>
             <tr>
                 <td>Particulate matter (PM10)</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:scope1_emissions]</td>
+                <td>[TBC:scope1_emissions]</td>
                 <td>kg/year</td>
                 <td>Periodic sampling + emission factor</td>
             </tr>
             <tr>
                 <td>Particulate matter (PM2.5)</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:scope1_emissions]</td>
+                <td>[TBC:scope1_emissions]</td>
                 <td>kg/year</td>
                 <td>Periodic sampling + emission factor</td>
             </tr>
             <tr>
                 <td>Volatile organic compounds (VOCs)</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:scope1_emissions]</td>
+                <td>[TBC:scope1_emissions]</td>
                 <td>kg/year</td>
                 <td>Mass balance / LDAR programme</td>
             </tr>
             <tr>
                 <td>Heavy metals (total)</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:scope1_emissions]</td>
+                <td>[TBC:scope1_emissions]</td>
                 <td>kg/year</td>
                 <td>Periodic stack sampling</td>
             </tr>
@@ -2247,36 +2232,36 @@ class ReportTemplate:
         <tbody>
             <tr>
                 <td>Chemical Oxygen Demand (COD)</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:scope1_emissions]</td>
+                <td>[TBC:scope1_emissions]</td>
                 <td>kg/year</td>
                 <td>Periodic effluent sampling</td>
             </tr>
             <tr>
                 <td>Total nitrogen</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:scope1_emissions]</td>
+                <td>[TBC:scope1_emissions]</td>
                 <td>kg/year</td>
                 <td>Periodic effluent sampling</td>
             </tr>
             <tr>
                 <td>Total phosphorus</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:scope1_emissions]</td>
+                <td>[TBC:scope1_emissions]</td>
                 <td>kg/year</td>
                 <td>Periodic effluent sampling</td>
             </tr>
             <tr>
                 <td>Heavy metals (total)</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:scope1_emissions]</td>
+                <td>[TBC:scope1_emissions]</td>
                 <td>kg/year</td>
                 <td>Periodic effluent sampling</td>
             </tr>
             <tr>
                 <td>Suspended solids (TSS)</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:scope1_emissions]</td>
+                <td>[TBC:scope1_emissions]</td>
                 <td>kg/year</td>
                 <td>Periodic effluent sampling</td>
             </tr>
@@ -2296,27 +2281,31 @@ class ReportTemplate:
         <tbody>
             <tr>
                 <td>Total weight of substances of concern used</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:scope1_emissions]</td>
+                <td>[TBC:scope1_emissions]</td>
                 <td>tonnes/year</td>
+                <td>Continuous monitoring / emission factor</td>
             </tr>
             <tr>
                 <td>Total weight of SVHCs used</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:scope1_emissions]</td>
+                <td>[TBC:scope1_emissions]</td>
                 <td>tonnes/year</td>
+                <td>Continuous monitoring / emission factor</td>
             </tr>
             <tr>
                 <td>Number of SVHCs in product portfolio</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:scope1_emissions]</td>
+                <td>[TBC:scope1_emissions]</td>
                 <td>count</td>
+                <td>Continuous monitoring / emission factor</td>
             </tr>
             <tr>
                 <td>SCIP notifications submitted</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:scope1_emissions]</td>
+                <td>[TBC:scope1_emissions]</td>
                 <td>count</td>
+                <td>Continuous monitoring / emission factor</td>
             </tr>
         </tbody>
     </table>
@@ -2384,10 +2373,6 @@ class ReportTemplate:
                 blocks = []
                 is_mandatory = True
 
-                # Determine metrics DR id (S1-6 vs S2-7 etc.)
-                if dr_suffix == "5" and std_code in ("S1", "S2"):
-                    pass  # handled separately below
-
                 if std_code == "S1":
                     if dr_id == "S1-1":
                         blocks.append(ContentBlock(
@@ -2418,7 +2403,7 @@ class ReportTemplate:
         <li>Employee participation in health and safety matters through designated safety representatives and joint health and safety committees.</li>
         <li>Mental health and well-being programmes, including access to counselling services and flexible working arrangements.</li>
     </ul>
-    <p>During the reporting period, the workplace accident rate (lost-time injury frequency rate) was [TO BE CONFIRMED] per 1,000 employees. No fatal accidents occurred.</p>
+    <p>During the reporting period, the workplace accident rate (lost-time injury frequency rate) was [TBC:ltifr] per 1,000 employees. No fatal accidents occurred.</p>
 
     <h5>Equal treatment and non-discrimination policy</h5>
     <p>The undertaking maintains a zero-tolerance policy towards discrimination, harassment, and violence in the workplace. The Equal Treatment and Non-Discrimination Policy covers all protected characteristics under Directive 2006/54/EC (Equal Treatment Directive) and national legislation, including age, disability, gender reassignment, marriage and civil partnership, pregnancy and maternity, race, religion or belief, sex, and sexual orientation. The policy:</p>
@@ -2441,7 +2426,7 @@ class ReportTemplate:
     <h5>Training and skills development policy</h5>
     <p>The undertaking supports the continuous professional development of its workforce through the Training and Skills Development Policy, which provides:</p>
     <ul>
-        <li>Minimum annual training hours per employee (target: [TO BE CONFIRMED] hours/year).</li>
+        <li>Minimum annual training hours per employee (target: [TBC:avg_training_hours_per_employee] hours/year).</li>
         <li>Regular performance and career development reviews.</li>
         <li>Access to upskilling and reskilling programmes, particularly in relation to the green and digital transitions.</li>
         <li>Support for vocational qualifications and professional certifications.</li>
@@ -2487,25 +2472,25 @@ class ReportTemplate:
                 <td>Annual employee engagement survey</td>
                 <td>Annual</td>
                 <td>All employees</td>
-                <td>[TO BE CONFIRMED]%</td>
+                <td>[TBC:employee_engagement_score]%</td>
             </tr>
             <tr>
                 <td>Quarterly town hall meetings</td>
                 <td>Quarterly</td>
                 <td>All employees (in-person and virtual)</td>
-                <td>[TO BE CONFIRMED]% average attendance</td>
+                <td>[TBC:employee_engagement_score]% average attendance</td>
             </tr>
             <tr>
                 <td>Pulse surveys on specific topics</td>
                 <td>As needed (minimum 2/year)</td>
                 <td>Selected employee groups</td>
-                <td>[TO BE CONFIRMED]%</td>
+                <td>[TBC:employee_engagement_score]%</td>
             </tr>
             <tr>
                 <td>Exit interviews</td>
                 <td>On voluntary termination</td>
                 <td>All departing employees</td>
-                <td>[TO BE CONFIRMED]% completion</td>
+                <td>[TBC:employee_engagement_score]% completion</td>
             </tr>
             <tr>
                 <td>Departmental meetings with direct supervisors</td>
@@ -2525,10 +2510,10 @@ class ReportTemplate:
     <h5>Workers' representation and collective bargaining</h5>
     <p>The undertaking respects the right of all employees to join trade unions and to be represented by worker representatives in accordance with national laws and EU directives. As of the reporting date:</p>
     <ul>
-        <li><strong>Union representation:</strong> [TO BE CONFIRMED]% of the workforce is covered by collective bargaining agreements.</li>
-        <li><strong>Works councils / employee representatives:</strong> [TO BE CONFIRMED] bodies are active at [TO BE CONFIRMED] locations.</li>
+        <li><strong>Union representation:</strong> [TBC:union_coverage_pct]% of the workforce is covered by collective bargaining agreements.</li>
+        <li><strong>Works councils / employee representatives:</strong> [TBC:employee_count_total] bodies are active at [TBC:operational_sites_count] locations.</li>
         <li><strong>European Works Council (EWC):</strong> [TO BE CONFIRMED — describe if applicable].</li>
-        <li><strong>Health and safety committees:</strong> Joint health and safety committees operate at all sites with more than [TO BE CONFIRMED] employees.</li>
+        <li><strong>Health and safety committees:</strong> Joint health and safety committees operate at all sites with more than [TBC:employee_count_total] employees.</li>
     </ul>
 
     <h5>Purpose and outcomes of engagement</h5>
@@ -2558,7 +2543,7 @@ class ReportTemplate:
     <p>The effectiveness of workforce engagement processes is evaluated through:</p>
     <ul>
         <li>Survey participation rates and trend analysis.</li>
-        <li>Employee satisfaction scores (e.g., eNPS: [TO BE CONFIRMED]).</li>
+        <li>Employee satisfaction scores (e.g., eNPS: [TBC:employee_engagement_score]).</li>
         <li>Grievance resolution rates and timeliness.</li>
         <li>Feedback from worker representatives on the quality of dialogue.</li>
         <li>Third-party assessments or audits where applicable.</li>
@@ -2631,8 +2616,8 @@ class ReportTemplate:
     <h5>Remediation process</h5>
     <p>When a negative impact is identified or a grievance is raised, the undertaking follows a structured remediation process:</p>
     <ol>
-        <li><strong>Receipt and acknowledgement:</strong> The concern is logged and acknowledged within [TO BE CONFIRMED] working days.</li>
-        <li><strong>Initial assessment:</strong> The nature, severity, and scope of the impact are assessed. For serious concerns (e.g., discrimination, harassment, safety violations), an investigation is initiated within [TO BE CONFIRMED] working days.</li>
+        <li><strong>Receipt and acknowledgement:</strong> The concern is logged and acknowledged within [TBC:grievance_resolution_days] working days.</li>
+        <li><strong>Initial assessment:</strong> The nature, severity, and scope of the impact are assessed. For serious concerns (e.g., discrimination, harassment, safety violations), an investigation is initiated within [TBC:grievance_resolution_days] working days.</li>
         <li><strong>Investigation:</strong> An impartial investigation is conducted by the HR department or an external investigator. Affected workers are interviewed, and relevant evidence is reviewed.</li>
         <li><strong>Determination:</strong> Findings are documented and a determination is made on whether remediation is required.</li>
         <li><strong>Remediation action:</strong> Appropriate remedial measures are implemented, which may include: corrective action, disciplinary measures against perpetrators, policy changes, training, compensation for harmed workers, and changes to processes or controls.</li>
@@ -2655,15 +2640,15 @@ class ReportTemplate:
     <h5>Effectiveness of grievance mechanisms</h5>
     <p>During the reporting period:</p>
     <ul>
-        <li><strong>Number of grievances received:</strong> [TO BE CONFIRMED]</li>
-        <li><strong>Number of grievances resolved:</strong> [TO BE CONFIRMED]</li>
-        <li><strong>Average resolution time:</strong> [TO BE CONFIRMED] working days</li>
+        <li><strong>Number of grievances received:</strong> [TBC:grievances_received]</li>
+        <li><strong>Number of grievances resolved:</strong> [TBC:grievances_resolved]</li>
+        <li><strong>Average resolution time:</strong> [TBC:grievance_resolution_days] working days</li>
         <li><strong>Most common grievance types:</strong> [TO BE CONFIRMED]</li>
-        <li><strong>Worker satisfaction with the grievance process:</strong> [TO BE CONFIRMED]% (from post-resolution surveys)</li>
+        <li><strong>Worker satisfaction with the grievance process:</strong> [TBC:grievance_satisfaction_pct]% (from post-resolution surveys)</li>
     </ul>
 
     <h5>General availability of channels</h5>
-    <p>Workers are informed of available grievance channels during onboarding, through the employee handbook, via posters in common areas, and on the company intranet. Regular reminders are sent to all employees. Channels are available in [TO BE CONFIRMED] languages to accommodate the linguistic diversity of the workforce.</p>
+    <p>Workers are informed of available grievance channels during onboarding, through the employee handbook, via posters in common areas, and on the company intranet. Regular reminders are sent to all employees. Channels are available in [TBC:grievance_languages_count] languages to accommodate the linguistic diversity of the workforce.</p>
 </div>""",
                             content_type="narrative",
                             order=1,
@@ -2700,36 +2685,36 @@ class ReportTemplate:
             <tr>
                 <td>Implementation of mental health and well-being programme</td>
                 <td>Work-related stress and burnout</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:employee_engagement_score]%</td>
+                <td>[TBC:avg_tenure_years] years</td>
                 <td>HR Director</td>
             </tr>
             <tr>
                 <td>Ergonomic assessment and workstation redesign at production sites</td>
                 <td>Physical strain and musculoskeletal disorders</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:employee_engagement_score]%</td>
+                <td>[TBC:avg_tenure_years] years</td>
                 <td>Health & Safety Manager</td>
             </tr>
             <tr>
                 <td>Blind recruitment pilot and bias training for hiring managers</td>
                 <td>Discrimination risk in hiring and promotion</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:women_in_management_pct]%</td>
+                <td>[TBC:avg_tenure_years] years</td>
                 <td>Diversity & Inclusion Lead</td>
             </tr>
             <tr>
                 <td>Expansion of flexible working arrangements</td>
                 <td>Work-life balance / well-being</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:employee_engagement_score]%</td>
+                <td>[TBC:avg_tenure_years] years</td>
                 <td>HR Director</td>
             </tr>
             <tr>
                 <td>Leadership development programme for women and underrepresented groups</td>
                 <td>Gender diversity in management</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:women_in_management_pct]%</td>
+                <td>[TBC:avg_tenure_years] years</td>
                 <td>Diversity & Inclusion Lead</td>
             </tr>
         </tbody>
@@ -2746,12 +2731,12 @@ class ReportTemplate:
     </ul>
 
     <h5>Resources allocated</h5>
-    <p>Total expenditure on workforce-related actions and programmes during the reporting period: EUR [TO BE CONFIRMED], including:</p>
+    <p>Total expenditure on workforce-related actions and programmes during the reporting period: [TBC:annual_revenue_eur], including:</p>
     <ul>
-        <li>Training and development: EUR [TO BE CONFIRMED]</li>
-        <li>Health and safety programmes: EUR [TO BE CONFIRMED]</li>
-        <li>Well-being and mental health support: EUR [TO BE CONFIRMED]</li>
-        <li>Diversity and inclusion initiatives: EUR [TO BE CONFIRMED]</li>
+        <li>Training and development: [TBC:annual_revenue_eur]</li>
+        <li>Health and safety programmes: [TBC:annual_revenue_eur]</li>
+        <li>Well-being and mental health support: [TBC:annual_revenue_eur]</li>
+        <li>Diversity and inclusion initiatives: [TBC:annual_revenue_eur]</li>
     </ul>
 
     <h5>Effectiveness tracking</h5>
@@ -2786,50 +2771,50 @@ class ReportTemplate:
             <tr>
                 <td>Employee engagement</td>
                 <td>Employee Net Promoter Score (eNPS)</td>
-                <td>[TO BE CONFIRMED] ([year])</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:employee_engagement_score] ([TBC:emissions_baseline_year])</td>
+                <td>[TBC:employee_engagement_score]</td>
+                <td>[TBC:employee_engagement_score]</td>
+                <td>[TBC:employee_engagement_score]</td>
             </tr>
             <tr>
                 <td>Gender diversity in management</td>
                 <td>Percentage of women in management positions</td>
-                <td>[TO BE CONFIRMED]% ([year])</td>
-                <td>[TO BE CONFIRMED]%</td>
-                <td>[TO BE CONFIRMED]%</td>
-                <td>[TO BE CONFIRMED]%</td>
+                <td>[TBC:women_in_management_pct]% ([TBC:emissions_baseline_year])</td>
+                <td>[TBC:women_in_management_pct]%</td>
+                <td>[TBC:women_in_management_pct]%</td>
+                <td>[TBC:women_in_management_pct]%</td>
             </tr>
             <tr>
                 <td>Gender pay gap</td>
                 <td>Reduction of unadjusted gender pay gap</td>
-                <td>[TO BE CONFIRMED]% ([year])</td>
-                <td>−[TO BE CONFIRMED]%</td>
-                <td>−[TO BE CONFIRMED]%</td>
-                <td>[TO BE CONFIRMED]% achieved</td>
+                <td>[TBC:gender_pay_gap_pct]% ([TBC:emissions_baseline_year])</td>
+                <td>&minus;[TBC:gender_pay_gap_pct]%</td>
+                <td>&minus;[TBC:gender_pay_gap_pct]%</td>
+                <td>[TBC:gender_pay_gap_pct]% achieved</td>
             </tr>
             <tr>
                 <td>Health and safety</td>
                 <td>Lost-time injury frequency rate (LTIFR)</td>
-                <td>[TO BE CONFIRMED] ([year])</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:ltifr] ([TBC:emissions_baseline_year])</td>
+                <td>[TBC:ltifr]</td>
                 <td>Zero harm</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:ltifr]</td>
             </tr>
             <tr>
                 <td>Training</td>
                 <td>Average training hours per employee per year</td>
-                <td>[TO BE CONFIRMED] hrs ([year])</td>
-                <td>[TO BE CONFIRMED] hrs</td>
-                <td>[TO BE CONFIRMED] hrs</td>
-                <td>[TO BE CONFIRMED] hrs</td>
+                <td>[TBC:avg_training_hours_per_employee] hrs ([TBC:emissions_baseline_year])</td>
+                <td>[TBC:avg_training_hours_per_employee] hrs</td>
+                <td>[TBC:avg_training_hours_per_employee] hrs</td>
+                <td>[TBC:avg_training_hours_per_employee] hrs</td>
             </tr>
             <tr>
                 <td>Voluntary turnover</td>
                 <td>Voluntary employee turnover rate</td>
-                <td>[TO BE CONFIRMED]% ([year])</td>
-                <td>[TO BE CONFIRMED]%</td>
-                <td>[TO BE CONFIRMED]%</td>
-                <td>[TO BE CONFIRMED]%</td>
+                <td>[TBC:voluntary_turnover_pct]% ([TBC:emissions_baseline_year])</td>
+                <td>[TBC:voluntary_turnover_pct]%</td>
+                <td>[TBC:voluntary_turnover_pct]%</td>
+                <td>[TBC:voluntary_turnover_pct]%</td>
             </tr>
         </tbody>
     </table>
@@ -2854,7 +2839,6 @@ class ReportTemplate:
                             order=1,
                         ))
                     elif dr_id == "S1-6":
-                        # S1-6 is the metrics DR — handled at the end of the loop
                         blocks.append(ContentBlock(
                             block_id="s1-6-metrics",
                             standard_ref="ESRS S1",
@@ -2878,38 +2862,38 @@ class ReportTemplate:
         <tbody>
             <tr>
                 <td>Total employees</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td><strong>{template.employee_count or '[TO BE CONFIRMED]'}</strong></td>
+                <td>[TBC:employee_count_female]</td>
+                <td>[TBC:employee_count_male]</td>
+                <td>[TBC:employee_count_other]</td>
+                <td><strong>{template.employee_count or '[TBC:employee_count_total]'}</strong></td>
             </tr>
             <tr>
                 <td>Permanent employees</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:employee_count_female]</td>
+                <td>[TBC:employee_count_male]</td>
+                <td>[TBC:employee_count_other]</td>
+                <td>[TBC:employee_count_permanent]</td>
             </tr>
             <tr>
                 <td>Fixed-term employees</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:employee_count_female]</td>
+                <td>[TBC:employee_count_male]</td>
+                <td>[TBC:employee_count_other]</td>
+                <td>[TBC:employee_count_temporary]</td>
             </tr>
             <tr>
                 <td>Full-time employees</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:employee_count_female]</td>
+                <td>[TBC:employee_count_male]</td>
+                <td>[TBC:employee_count_other]</td>
+                <td>[TBC:employee_count_total]</td>
             </tr>
             <tr>
                 <td>Part-time employees</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:employee_count_female]</td>
+                <td>[TBC:employee_count_male]</td>
+                <td>[TBC:employee_count_other]</td>
+                <td>[TBC:employee_count_total]</td>
             </tr>
         </tbody>
     </table>
@@ -2925,42 +2909,32 @@ class ReportTemplate:
         </thead>
         <tbody>
             <tr>
-                <td>[TO BE CONFIRMED — e.g., EU/EEA]</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]%</td>
+                <td>[TBC:country] — primary</td>
+                <td>[TBC:employee_count_total]</td>
+                <td>[TBC:employee_engagement_score]%</td>
             </tr>
             <tr>
-                <td>[TO BE CONFIRMED — e.g., Rest of Europe]</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]%</td>
+                <td>[TBC:country] — other</td>
+                <td>[TBC:employee_count_total]</td>
+                <td>[TBC:employee_engagement_score]%</td>
             </tr>
             <tr>
-                <td>[TO BE CONFIRMED — e.g., North America]</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]%</td>
-            </tr>
-            <tr>
-                <td>[TO BE CONFIRMED — e.g., Asia-Pacific]</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]%</td>
-            </tr>
-            <tr>
-                <td>[TO BE CONFIRMED — e.g., Rest of World]</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]%</td>
+                <td>[TBC:country] — international</td>
+                <td>[TBC:employee_count_total]</td>
+                <td>[TBC:employee_engagement_score]%</td>
             </tr>
             <tr>
                 <td><strong>Total</strong></td>
-                <td><strong>{template.employee_count or '[TO BE CONFIRMED]'}</strong></td>
+                <td><strong>{template.employee_count or '[TBC:employee_count_total]'}</strong></td>
                 <td><strong>100%</strong></td>
             </tr>
         </tbody>
     </table>
 
     <h5>Employee turnover</h5>
-    <p><strong>Voluntary turnover rate:</strong> [TO BE CONFIRMED]% (Year N-1: [TO BE CONFIRMED]%)</p>
-    <p><strong>Total turnover rate:</strong> [TO BE CONFIRMED]% (Year N-1: [TO BE CONFIRMED]%)</p>
-    <p><strong>New hires during the period:</strong> [TO BE CONFIRMED]</p>
+    <p><strong>Voluntary turnover rate:</strong> [TBC:voluntary_turnover_pct]% (Year N-1: [TBC:voluntary_turnover_pct]%)</p>
+    <p><strong>Total turnover rate:</strong> [TBC:total_turnover_pct]% (Year N-1: [TBC:total_turnover_pct]%)</p>
+    <p><strong>New hires during the period:</strong> [TBC:new_hires_count]</p>
 
     <h5>Additional workforce metrics (S1-6 complementary disclosures)</h5>
     <table>
@@ -2974,23 +2948,23 @@ class ReportTemplate:
         <tbody>
             <tr>
                 <td>Average tenure (years)</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:avg_tenure_years]</td>
+                <td>[TBC:avg_tenure_years]</td>
             </tr>
             <tr>
                 <td>Average age (years)</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:avg_age_years]</td>
+                <td>[TBC:avg_age_years]</td>
             </tr>
             <tr>
                 <td>Employees covered by collective bargaining agreements (%)</td>
-                <td>[TO BE CONFIRMED]%</td>
-                <td>[TO BE CONFIRMED]%</td>
+                <td>[TBC:union_coverage_pct]%</td>
+                <td>[TBC:union_coverage_pct]%</td>
             </tr>
             <tr>
                 <td>Employees with disabilities (%)</td>
-                <td>[TO BE CONFIRMED]%</td>
-                <td>[TO BE CONFIRMED]%</td>
+                <td>[TBC:employees_with_disabilities_pct]%</td>
+                <td>[TBC:employees_with_disabilities_pct]%</td>
             </tr>
         </tbody>
     </table>
@@ -3044,7 +3018,7 @@ class ReportTemplate:
         <li>Licensed manufacturers and franchisees (where applicable).</li>
         <li>Joint venture partners where the undertaking has operational control.</li>
     </ul>
-    <p>The undertaking covers approximately [TO BE CONFIRMED] Tier 1 suppliers and [TO BE CONFIRMED] Tier 2 suppliers under its policy framework.</p>
+    <p>The undertaking covers approximately [TBC:tier1_suppliers_count] Tier 1 suppliers and [TBC:tier2_suppliers_estimated] Tier 2 suppliers under its policy framework.</p>
 
     <h5>Alignment with international standards</h5>
     <p>These policies are aligned with:</p>
@@ -3088,13 +3062,13 @@ class ReportTemplate:
                 <td>Supplier self-assessment questionnaires</td>
                 <td>Standardised questionnaires covering labour rights, health and safety, environmental management, and ethics</td>
                 <td>Annual (for all Tier 1 suppliers)</td>
-                <td>[TO BE CONFIRMED] suppliers</td>
+                <td>[TBC:tier1_suppliers_count] suppliers</td>
             </tr>
             <tr>
                 <td>Supplier audits (on-site)</td>
                 <td>Audits conducted by internal teams or accredited third-party auditors, including worker interviews</td>
                 <td>Risk-based (high-risk suppliers: annual; other: biennial)</td>
-                <td>[TO BE CONFIRMED] audits in reporting period</td>
+                <td>[TBC:supplier_audits_last_year] audits in reporting period</td>
             </tr>
             <tr>
                 <td>Worker grievance channels at supplier sites</td>
@@ -3167,7 +3141,7 @@ class ReportTemplate:
             <tr>
                 <td>Supplier grievance hotline</td>
                 <td>Independent, third-party-operated hotline accessible by phone and web portal</td>
-                <td>[TO BE CONFIRMED] languages</td>
+                <td>[TBC:grievance_languages_count] languages</td>
                 <td>Anonymous option available</td>
             </tr>
             <tr>
@@ -3179,7 +3153,7 @@ class ReportTemplate:
             <tr>
                 <td>Direct communication with the undertaking's procurement team</td>
                 <td>Workers or their representatives can contact the undertaking's responsible sourcing team</td>
-                <td>[TO BE CONFIRMED] languages</td>
+                <td>[TBC:grievance_languages_count] languages</td>
                 <td>Confidential</td>
             </tr>
             <tr>
@@ -3215,26 +3189,26 @@ class ReportTemplate:
         <tbody>
             <tr>
                 <td>Wage / working hours violations</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:grievances_received]</td>
+                <td>[TBC:grievances_resolved]</td>
                 <td>[TO BE CONFIRMED]</td>
             </tr>
             <tr>
                 <td>Health and safety issues</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:grievances_received]</td>
+                <td>[TBC:grievances_resolved]</td>
                 <td>[TO BE CONFIRMED]</td>
             </tr>
             <tr>
                 <td>Discrimination / harassment</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:grievances_received]</td>
+                <td>[TBC:grievances_resolved]</td>
                 <td>[TO BE CONFIRMED]</td>
             </tr>
             <tr>
                 <td>Other human rights issues</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:grievances_received]</td>
+                <td>[TBC:grievances_resolved]</td>
                 <td>[TO BE CONFIRMED]</td>
             </tr>
         </tbody>
@@ -3286,32 +3260,32 @@ class ReportTemplate:
             <tr>
                 <td>Expansion of supplier audit programme to cover Tier 2 suppliers</td>
                 <td>Health and safety, labour rights compliance</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
+                <td>[TBC:substitution_timeline_years] years</td>
             </tr>
             <tr>
                 <td>Implementation of worker voice technology platform at high-risk supplier sites</td>
                 <td>Limited grievance access for workers</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
+                <td>[TBC:substitution_timeline_years] years</td>
             </tr>
             <tr>
                 <td>Supplier training programme on living wage and working time management</td>
                 <td>Wage and working time violations</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
+                <td>[TBC:substitution_timeline_years] years</td>
             </tr>
             <tr>
                 <td>Integration of human rights criteria into strategic sourcing and procurement decisions</td>
                 <td>Embedding human rights in procurement</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
+                <td>[TBC:substitution_timeline_years] years</td>
             </tr>
             <tr>
-                <td>Participation in industry-wide responsible sourcing initiative for [TO BE CONFIRMED] sector/material</td>
+                <td>Participation in industry-wide responsible sourcing initiative for [TBC:sector] sector/material</td>
                 <td>Sector-level systemic issues</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
+                <td>[TBC:substitution_timeline_years] years</td>
             </tr>
         </tbody>
     </table>
@@ -3327,20 +3301,20 @@ class ReportTemplate:
     <h5>Effectiveness tracking</h5>
     <p>The undertaking tracks the effectiveness of its actions through:</p>
     <ul>
-        <li>Percentage of suppliers audited (target: [TO BE CONFIRMED]% of Tier 1 suppliers annually).</li>
+        <li>Percentage of suppliers audited (target: [TBC:suppliers_code_of_conduct_pct]% of Tier 1 suppliers annually).</li>
         <li>Average audit score trend (target: improvement year-on-year).</li>
-        <li>CAP closure rate (target: [TO BE CONFIRMED]% within agreed timeline).</li>
+        <li>CAP closure rate (target: [TBC:suppliers_code_of_conduct_pct]% within agreed timeline).</li>
         <li>Reduction in severity and frequency of non-compliances over time.</li>
         <li>Number of workers reached through capacity-building programmes.</li>
     </ul>
 
     <h5>Resources allocated</h5>
-    <p>Total expenditure on value chain worker-related actions during the reporting period: EUR [TO BE CONFIRMED], including:</p>
+    <p>Total expenditure on value chain worker-related actions during the reporting period: [TBC:annual_revenue_eur], including:</p>
     <ul>
-        <li>Supplier auditing and monitoring: EUR [TO BE CONFIRMED]</li>
-        <li>Supplier training and capacity building: EUR [TO BE CONFIRMED]</li>
-        <li>Worker voice and grievance technology: EUR [TO BE CONFIRMED]</li>
-        <li>Multi-stakeholder initiative membership fees: EUR [TO BE CONFIRMED]</li>
+        <li>Supplier auditing and monitoring: [TBC:annual_revenue_eur]</li>
+        <li>Supplier training and capacity building: [TBC:annual_revenue_eur]</li>
+        <li>Worker voice and grievance technology: [TBC:annual_revenue_eur]</li>
+        <li>Multi-stakeholder initiative membership fees: [TBC:annual_revenue_eur]</li>
     </ul>
 </div>""",
                             content_type="narrative",
@@ -3372,42 +3346,42 @@ class ReportTemplate:
             <tr>
                 <td>Supplier audit coverage</td>
                 <td>% of Tier 1 suppliers audited annually</td>
-                <td>[TO BE CONFIRMED]% ([year])</td>
-                <td>[TO BE CONFIRMED]%</td>
+                <td>[TBC:suppliers_code_of_conduct_pct]% ([TBC:emissions_baseline_year])</td>
+                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
                 <td>100%</td>
-                <td>[TO BE CONFIRMED]%</td>
+                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
             </tr>
             <tr>
                 <td>Corrective action plan closure</td>
                 <td>% of CAPs closed within agreed timeline</td>
-                <td>[TO BE CONFIRMED]% ([year])</td>
-                <td>[TO BE CONFIRMED]%</td>
-                <td>[TO BE CONFIRMED]%</td>
-                <td>[TO BE CONFIRMED]%</td>
+                <td>[TBC:suppliers_code_of_conduct_pct]% ([TBC:emissions_baseline_year])</td>
+                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
+                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
+                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
             </tr>
             <tr>
                 <td>High-risk supplier engagement</td>
                 <td>% of high-risk suppliers with active CAP or improvement programme</td>
-                <td>[TO BE CONFIRMED]% ([year])</td>
+                <td>[TBC:suppliers_code_of_conduct_pct]% ([TBC:emissions_baseline_year])</td>
                 <td>100%</td>
                 <td>100%</td>
-                <td>[TO BE CONFIRMED]%</td>
+                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
             </tr>
             <tr>
                 <td>Worker grievance channels</td>
                 <td>% of Tier 1 suppliers with operational worker grievance mechanism</td>
-                <td>[TO BE CONFIRMED]% ([year])</td>
-                <td>[TO BE CONFIRMED]%</td>
+                <td>[TBC:suppliers_code_of_conduct_pct]% ([TBC:emissions_baseline_year])</td>
+                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
                 <td>100%</td>
-                <td>[TO BE CONFIRMED]%</td>
+                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
             </tr>
             <tr>
                 <td>Supplier capacity building</td>
                 <td>Number of supplier representatives trained on labour rights and human rights due diligence per year</td>
-                <td>[TO BE CONFIRMED] ([year])</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:tier1_suppliers_count] ([TBC:emissions_baseline_year])</td>
+                <td>[TBC:tier1_suppliers_count]</td>
+                <td>[TBC:tier1_suppliers_count]</td>
+                <td>[TBC:tier1_suppliers_count]</td>
             </tr>
         </tbody>
     </table>
@@ -3441,16 +3415,6 @@ class ReportTemplate:
             metrics_dr_id = f"{std_code}-6" if std_code == "S1" else f"{std_code}-7"
             metrics_blocks = []
 
-            if std_code == "S1":
-                # S1-6 is already handled in the S1 block above
-                # The blocks for S1-6 were added as part of the loop for S1
-                # but since we used dr_suffix up to "5", we need S1-6 added separately
-                # Actually, we added S1-6 blocks within the loop using dr_id == "S1-6"
-                # but the loop goes from suffix "1" to "5".
-                # Let me add it as a separate block here:
-                pass  # handled in the dr_id "S1-6" case above
-
-            # For S2-7, add blocks here
             if std_code == "S2" and metrics_dr_id == "S2-7":
                 metrics_blocks.append(ContentBlock(
                     block_id="s2-7-metrics",
@@ -3473,32 +3437,32 @@ class ReportTemplate:
         <tbody>
             <tr>
                 <td>Total number of Tier 1 suppliers</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:tier1_suppliers_count]</td>
                 <td>Includes all direct suppliers of goods and services</td>
             </tr>
             <tr>
                 <td>Total number of Tier 2 suppliers (estimated)</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:tier2_suppliers_estimated]</td>
                 <td>Estimate based on spend analysis and industry data</td>
             </tr>
             <tr>
                 <td>Estimated number of workers in Tier 1 supply chain</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>Based on supplier-reported employment data (coverage: [TO BE CONFIRMED]% of suppliers)</td>
+                <td>[TBC:tier1_workers_estimated]</td>
+                <td>Based on supplier-reported employment data (coverage: [TBC:suppliers_code_of_conduct_pct]% of suppliers)</td>
             </tr>
             <tr>
                 <td>Estimated number of workers in Tier 2 supply chain</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:tier2_workers_estimated]</td>
                 <td>Estimated using average workforce per supplier in relevant sectors</td>
             </tr>
             <tr>
                 <td>Countries of operation in value chain</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>List countries: [TO BE CONFIRMED]</td>
+                <td>[TBC:value_chain_countries]</td>
+                <td>List countries: [TBC:value_chain_countries]</td>
             </tr>
             <tr>
                 <td>High-risk countries in value chain</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:high_risk_countries]</td>
                 <td>As defined by [TO BE CONFIRMED — e.g., "Amnesty International / ITUC Global Rights Index"]</td>
             </tr>
         </tbody>
@@ -3516,28 +3480,28 @@ class ReportTemplate:
         <tbody>
             <tr>
                 <td>Suppliers covered by Code of Conduct</td>
-                <td>[TO BE CONFIRMED]%</td>
-                <td>[TO BE CONFIRMED]%</td>
+                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
+                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
             </tr>
             <tr>
                 <td>Suppliers assessed through self-assessment questionnaire</td>
-                <td>[TO BE CONFIRMED]%</td>
-                <td>[TO BE CONFIRMED]%</td>
+                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
+                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
             </tr>
             <tr>
                 <td>Suppliers audited on-site</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:supplier_audits_last_year]</td>
+                <td>[TBC:supplier_audits_last_year]</td>
             </tr>
             <tr>
                 <td>Suppliers with corrective action plan</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:suppliers_audited_count]</td>
+                <td>[TBC:suppliers_audited_count]</td>
             </tr>
             <tr>
                 <td>Suppliers terminated due to non-compliance</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:suppliers_terminated_count]</td>
+                <td>[TBC:suppliers_terminated_count]</td>
             </tr>
         </tbody>
     </table>
@@ -3554,27 +3518,27 @@ class ReportTemplate:
         <tbody>
             <tr>
                 <td>Health and safety</td>
-                <td>[TO BE CONFIRMED]%</td>
+                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
                 <td>[TO BE CONFIRMED]</td>
             </tr>
             <tr>
                 <td>Working hours</td>
-                <td>[TO BE CONFIRMED]%</td>
+                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
                 <td>[TO BE CONFIRMED]</td>
             </tr>
             <tr>
                 <td>Wages and benefits</td>
-                <td>[TO BE CONFIRMED]%</td>
+                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
                 <td>[TO BE CONFIRMED]</td>
             </tr>
             <tr>
                 <td>Freedom of association</td>
-                <td>[TO BE CONFIRMED]%</td>
+                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
                 <td>[TO BE CONFIRMED]</td>
             </tr>
             <tr>
                 <td>Environmental management</td>
-                <td>[TO BE CONFIRMED]%</td>
+                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
                 <td>[TO BE CONFIRMED]</td>
             </tr>
         </tbody>
@@ -3714,33 +3678,33 @@ class ReportTemplate:
         <tbody>
             <tr>
                 <td>Total number of active suppliers</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:tier1_suppliers_count]</td>
+                <td>[TBC:tier1_suppliers_count]</td>
             </tr>
             <tr>
                 <td>% of suppliers covered by Code of Conduct</td>
-                <td>[TO BE CONFIRMED]%</td>
-                <td>[TO BE CONFIRMED]%</td>
+                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
+                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
             </tr>
             <tr>
                 <td>% of suppliers assessed on ESG criteria</td>
-                <td>[TO BE CONFIRMED]%</td>
-                <td>[TO BE CONFIRMED]%</td>
+                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
+                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
             </tr>
             <tr>
                 <td>% of strategic suppliers with annual ESG review</td>
-                <td>[TO BE CONFIRMED]%</td>
-                <td>[TO BE CONFIRMED]%</td>
+                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
+                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
             </tr>
             <tr>
                 <td>Number of supplier audits conducted</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:supplier_audits_last_year]</td>
+                <td>[TBC:supplier_audits_last_year]</td>
             </tr>
             <tr>
                 <td>Suppliers terminated for non-compliance (ESG)</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:suppliers_terminated_count]</td>
+                <td>[TBC:suppliers_terminated_count]</td>
             </tr>
         </tbody>
     </table>
@@ -3810,28 +3774,28 @@ class ReportTemplate:
         <tbody>
             <tr>
                 <td>% of employees who completed anti-corruption training</td>
-                <td>[TO BE CONFIRMED]%</td>
-                <td>[TO BE CONFIRMED]%</td>
+                <td>[TBC:anti_corruption_training_pct]%</td>
+                <td>[TBC:anti_corruption_training_pct]%</td>
             </tr>
             <tr>
                 <td>% of high-risk employees who completed enhanced training</td>
-                <td>[TO BE CONFIRMED]%</td>
-                <td>[TO BE CONFIRMED]%</td>
+                <td>[TBC:anti_corruption_training_pct]%</td>
+                <td>[TBC:anti_corruption_training_pct]%</td>
             </tr>
             <tr>
                 <td>% of Board members who completed training</td>
-                <td>[TO BE CONFIRMED]%</td>
-                <td>[TO BE CONFIRMED]%</td>
+                <td>[TBC:anti_corruption_training_pct]%</td>
+                <td>[TBC:anti_corruption_training_pct]%</td>
             </tr>
             <tr>
                 <td>Number of third-party due diligence screenings conducted</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:corruption_incidents_count]</td>
+                <td>[TBC:corruption_incidents_count]</td>
             </tr>
             <tr>
                 <td>Number of investigations under anti-corruption policy</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:whistleblowing_reports_count]</td>
+                <td>[TBC:whistleblowing_reports_count]</td>
             </tr>
         </tbody>
     </table>
@@ -3870,33 +3834,33 @@ class ReportTemplate:
         <tbody>
             <tr>
                 <td>Total number of reported incidents (whistleblowing channel)</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:whistleblowing_reports_count]</td>
+                <td>[TBC:whistleblowing_reports_count]</td>
             </tr>
             <tr>
                 <td>Incidents related to corruption or bribery</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:corruption_incidents_count]</td>
+                <td>[TBC:corruption_incidents_count]</td>
             </tr>
             <tr>
                 <td>Confirmed incidents of corruption</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:corruption_incidents_count]</td>
+                <td>[TBC:corruption_incidents_count]</td>
             </tr>
             <tr>
                 <td>Confirmed incidents of bribery</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:corruption_incidents_count]</td>
+                <td>[TBC:corruption_incidents_count]</td>
             </tr>
             <tr>
                 <td>Incidents involving public officials</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:corruption_incidents_count]</td>
+                <td>[TBC:corruption_incidents_count]</td>
             </tr>
             <tr>
                 <td>Incidents involving business partners or third parties</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:corruption_incidents_count]</td>
+                <td>[TBC:corruption_incidents_count]</td>
             </tr>
         </tbody>
     </table>
@@ -3913,23 +3877,23 @@ class ReportTemplate:
         <tbody>
             <tr>
                 <td>Convictions for corruption or bribery</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:corruption_incidents_count]</td>
+                <td>[TBC:corruption_incidents_count]</td>
             </tr>
             <tr>
                 <td>Fines or penalties imposed for corruption or bribery</td>
-                <td>[TO BE CONFIRMED] {template.currency}</td>
-                <td>[TO BE CONFIRMED] {template.currency}</td>
+                <td>[TBC:annual_revenue_eur]</td>
+                <td>[TBC:annual_revenue_eur]</td>
             </tr>
             <tr>
                 <td>Pending legal actions related to corruption</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:corruption_incidents_count]</td>
+                <td>[TBC:corruption_incidents_count]</td>
             </tr>
             <tr>
                 <td>Contractual terminations due to corruption violations</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:suppliers_terminated_count]</td>
+                <td>[TBC:suppliers_terminated_count]</td>
             </tr>
         </tbody>
     </table>
@@ -3970,7 +3934,7 @@ class ReportTemplate:
     <p><strong>{template.company_name}</strong> discloses its payment practices in accordance with ESRS G1 paragraphs 35-40. The undertaking is committed to responsible payment practices that support a healthy and sustainable value chain, recognising that timely payment is critical to the financial well-being of suppliers, particularly small and medium-sized enterprises (SMEs).</p>
 
     <h5>Payment policy</h5>
-    <p><strong>{template.company_name}</strong>'s standard payment terms are [TO BE CONFIRMED] days from receipt of a valid invoice. Payment terms are agreed with suppliers on a case-by-case basis, taking into account the nature of the goods or services, market practice, and regulatory requirements. The undertaking does not systematically extend payment terms beyond [TO BE CONFIRMED] days for SMEs unless specifically agreed in writing.</p>
+    <p><strong>{template.company_name}</strong>'s standard payment terms are [TBC:standard_payment_terms_days] days from receipt of a valid invoice. Payment terms are agreed with suppliers on a case-by-case basis, taking into account the nature of the goods or services, market practice, and regulatory requirements. The undertaking does not systematically extend payment terms beyond [TBC:standard_payment_terms_days] days for SMEs unless specifically agreed in writing.</p>
 
     <p>All payment terms are clearly communicated to suppliers at the time of contracting and are reflected in purchase orders and contracts. The undertaking processes payments on the due date or earlier where possible, and does not engage in practices that would result in late payment without cause.</p>
 
@@ -3986,23 +3950,23 @@ class ReportTemplate:
         <tbody>
             <tr>
                 <td>SME suppliers</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]%</td>
+                <td>[TBC:standard_payment_terms_days]</td>
+                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
             </tr>
             <tr>
                 <td>Large enterprise suppliers</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]%</td>
+                <td>[TBC:standard_payment_terms_days]</td>
+                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
             </tr>
             <tr>
                 <td>Strategic/key suppliers</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]%</td>
+                <td>[TBC:standard_payment_terms_days]</td>
+                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
             </tr>
             <tr>
                 <td>Public sector / institutional</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]%</td>
+                <td>[TBC:standard_payment_terms_days]</td>
+                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
             </tr>
         </tbody>
     </table>
@@ -4019,49 +3983,49 @@ class ReportTemplate:
         <tbody>
             <tr>
                 <td>Average actual payment time (days from invoice receipt)</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:avg_actual_payment_time_days]</td>
+                <td>[TBC:avg_actual_payment_time_days]</td>
             </tr>
             <tr>
                 <td>% of invoices paid within standard terms</td>
-                <td>[TO BE CONFIRMED]%</td>
-                <td>[TO BE CONFIRMED]%</td>
+                <td>[TBC:invoices_paid_within_terms_pct]%</td>
+                <td>[TBC:invoices_paid_within_terms_pct]%</td>
             </tr>
             <tr>
                 <td>% of invoices paid within 30 days</td>
-                <td>[TO BE CONFIRMED]%</td>
-                <td>[TO BE CONFIRMED]%</td>
+                <td>[TBC:invoices_paid_within_terms_pct]%</td>
+                <td>[TBC:invoices_paid_within_terms_pct]%</td>
             </tr>
             <tr>
                 <td>% of invoices paid within 60 days</td>
-                <td>[TO BE CONFIRMED]%</td>
-                <td>[TO BE CONFIRMED]%</td>
+                <td>[TBC:invoices_paid_within_terms_pct]%</td>
+                <td>[TBC:invoices_paid_within_terms_pct]%</td>
             </tr>
             <tr>
                 <td>% of invoices paid late (beyond agreed terms)</td>
-                <td>[TO BE CONFIRMED]%</td>
-                <td>[TO BE CONFIRMED]%</td>
+                <td>[TBC:invoices_paid_late_pct]%</td>
+                <td>[TBC:invoices_paid_late_pct]%</td>
             </tr>
             <tr>
                 <td>Interest paid on late payments to suppliers</td>
-                <td>[TO BE CONFIRMED] {template.currency}</td>
-                <td>[TO BE CONFIRMED] {template.currency}</td>
+                <td>[TBC:annual_revenue_eur]</td>
+                <td>[TBC:annual_revenue_eur]</td>
             </tr>
             <tr>
                 <td>Number of supplier disputes related to payment</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:suppliers_terminated_count]</td>
+                <td>[TBC:suppliers_terminated_count]</td>
             </tr>
         </tbody>
     </table>
 
     <h5>Late payment statistics</h5>
-    <p>In the reporting period, [TO BE CONFIRMED]% of invoices were paid after the agreed payment terms. The average delay for late payments was [TO BE CONFIRMED] days. The main reasons for late payment were: (i) administrative delays (invoice discrepancies, processing backlog); (ii) system integration issues; and (iii) disputes over goods or services received. The undertaking is implementing process improvements to reduce the incidence of late payment, including automated invoice processing, enhanced supplier onboarding, and dedicated accounts payable support for suppliers.</p>
+    <p>In the reporting period, [TBC:invoices_paid_late_pct]% of invoices were paid after the agreed payment terms. The average delay for late payments was [TBC:avg_actual_payment_time_days] days. The main reasons for late payment were: (i) administrative delays (invoice discrepancies, processing backlog); (ii) system integration issues; and (iii) disputes over goods or services received. The undertaking is implementing process improvements to reduce the incidence of late payment, including automated invoice processing, enhanced supplier onboarding, and dedicated accounts payable support for suppliers.</p>
 
     <h5>Cross-border payment practices</h5>
     <p>For cross-border payments, <strong>{template.company_name}</strong> discloses the following practices:</p>
     <ul>
-        <li>Standard cross-border payment terms: [TO BE CONFIRMED] days from invoice.</li>
+        <li>Standard cross-border payment terms: [TBC:standard_payment_terms_days] days from invoice.</li>
         <li>Currencies used: [TO BE CONFIRMED].</li>
         <li>Approach to currency exchange and hedging: [TO BE CONFIRMED].</li>
         <li>Any significant delays due to cross-border banking processes: [TO BE CONFIRMED].</li>

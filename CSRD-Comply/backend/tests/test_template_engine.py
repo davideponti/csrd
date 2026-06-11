@@ -6,6 +6,9 @@ Covers:
 - Complete end-to-end rendering with default template
 - Scope 3 categories breakdown in GHG block
 - Empty data edge case handling
+- Company context injection with semantic validation
+- Phase 2 fallback removal (bare [TO BE CONFIRMED] preserved)
+- Magnitude validation (facilities < 10k, years 1-10, EUR qualifier)
 """
 import pytest
 from ai_engine.report_generator.template_engine import (
@@ -126,3 +129,186 @@ class TestGHGE1_6:
         """
         empty_block = ReportTemplate().build_ghg_emissions_block({})
         assert "—" in empty_block.content_html
+
+    # ── Context Validation Tests ─────────────────────────────────
+
+    def test_phase2_fallback_removed(self):
+        """
+        TEST 5: Bare [TO BE CONFIRMED] placeholders are NEVER replaced.
+        Phase 2 fallback was the root cause of nonsense injection.
+        """
+        t = ReportTemplate(company_name="TestCorp", reporting_year=2025)
+        html_in = "<td>[TO BE CONFIRMED]</td><p>[TO BE CONFIRMED]</p>"
+        t.set_company_context({"employee_count_total": "500", "annual_revenue_eur": "12500000"})
+        result = t.resolve_placeholders(html_in)
+        assert "[TO BE CONFIRMED]" in result, "Bare [TO BE CONFIRMED] was replaced!"
+        assert "500" not in result, "Employee count leaked into bare placeholder!"
+        assert "12,500,000" not in result, "Revenue leaked into bare placeholder!"
+
+    def test_named_placeholders_resolve(self):
+        """
+        TEST 6: Named [TBC:key] placeholders still resolve with validation.
+        """
+        t = ReportTemplate(company_name="TestCorp", reporting_year=2025)
+        html_in = "<td>[TBC:employee_count_total]</td><td>[TBC:annual_revenue_eur]</td>"
+        t.set_company_context({"employee_count_total": "500", "annual_revenue_eur": "12500000"})
+        result = t.resolve_placeholders(html_in)
+        assert "500" in result, "employee_count_total not injected"
+        assert "EUR millions" in result or "12,500,000" in result, "EUR qualifier missing"
+
+    def test_string_value_rejected_for_numeric_field(self):
+        """
+        TEST 7: String values must not be injected into numeric fields.
+        """
+        html_in = "<td>[TBC:employee_count_total]</td>"
+        t = ReportTemplate(company_name="TestCorp", reporting_year=2025)
+        t.set_company_context({"employee_count_total": "not-a-number"})
+        result = t.resolve_placeholders(html_in)
+        assert "[TO BE CONFIRMED]" in result, "String value injected into numeric field!"
+        assert "not-a-number" not in result, "String leaked into numeric field!"
+
+    def test_numeric_value_rejected_for_string_field(self):
+        """
+        TEST 8: Numeric-looking values must not be injected into text fields.
+        """
+        html_in = "<td>[TBC:database_name]</td>"
+        t = ReportTemplate(company_name="TestCorp", reporting_year=2025)
+        t.set_company_context({"database_name": "12345"})
+        result = t.resolve_placeholders(html_in)
+        assert "[TO BE CONFIRMED]" in result, "Numeric value injected into string field!"
+        assert "12345" not in result, "Numeric leaked into string field!"
+
+    def test_facilities_count_magnitude(self):
+        """
+        TEST 9: Facilities count must be < 10,000.
+        """
+        html_in = "<td>[TBC:pollution_facilities_count]</td>"
+        t = ReportTemplate(company_name="TestCorp", reporting_year=2025)
+        t.set_company_context({"pollution_facilities_count": "12500"})
+        result = t.resolve_placeholders(html_in)
+        assert "[TO BE CONFIRMED]" in result, "12500 facilities was not rejected!"
+
+        t2 = ReportTemplate(company_name="TestCorp", reporting_year=2025)
+        t2.set_company_context({"pollution_facilities_count": "5"})
+        result = t2.resolve_placeholders(html_in)
+        assert "5" in result, "5 facilities was not accepted"
+
+    def test_timeline_years_magnitude(self):
+        """
+        TEST 10: Timeline years must be between 1 and 10.
+        """
+        html_in = "<td>[TBC:substitution_timeline_years]</td>"
+        t = ReportTemplate(company_name="TestCorp", reporting_year=2025)
+        t.set_company_context({"substitution_timeline_years": "500"})
+        result = t.resolve_placeholders(html_in)
+        assert "[TO BE CONFIRMED]" in result, "500 years was not rejected!"
+
+        t2 = ReportTemplate(company_name="TestCorp", reporting_year=2025)
+        t2.set_company_context({"substitution_timeline_years": "3"})
+        result = t2.resolve_placeholders(html_in)
+        assert "3" in result, "3 years was not accepted"
+
+    def test_eur_investment_qualifier(self):
+        """
+        TEST 11: EUR investment must include thousands/millions qualifier.
+        """
+        html_in = "<td>[TBC:annual_revenue_eur]</td>"
+        t = ReportTemplate(company_name="TestCorp", reporting_year=2025)
+        t.set_company_context({"annual_revenue_eur": "5000"})
+        result = t.resolve_placeholders(html_in)
+        assert "EUR thousands" in result, "EUR thousands qualifier missing"
+
+        t2 = ReportTemplate(company_name="TestCorp", reporting_year=2025)
+        t2.set_company_context({"annual_revenue_eur": "5000000"})
+        result = t2.resolve_placeholders(html_in)
+        assert "EUR millions" in result, "EUR millions qualifier missing"
+
+    def test_sector_text_only(self):
+        """
+        TEST 12: Sector field must only accept descriptive text, never numeric values.
+        """
+        html_in = "<td>[TBC:sector]</td>"
+        t = ReportTemplate(company_name="TestCorp", reporting_year=2025)
+        t.set_company_context({"sector": "Manufacturing"})
+        result = t.resolve_placeholders(html_in)
+        assert "Manufacturing" in result, "Text sector value was rejected"
+
+        t2 = ReportTemplate(company_name="TestCorp", reporting_year=2025)
+        t2.set_company_context({"sector": "12345"})
+        result = t2.resolve_placeholders(html_in)
+        assert "[TO BE CONFIRMED]" in result, "Numeric sector value was not rejected!"
+
+    def test_e2_2_table_uses_named_placeholders(self):
+        """
+        TEST 13: E2-2 actions table must use [TBC:key] placeholders instead of bare [TO BE CONFIRMED].
+        """
+        t = ReportTemplate(company_name="TestCorp", reporting_year=2025)
+        t.set_company_context({
+            "pollution_facilities_count": "5",
+            "air_emissions_pm_reduction_pct": "25",
+            "substitution_timeline_years": "3",
+            "capex_pollution_eur": "1500000",
+        })
+        html_in = (
+            "<td>Installation at [TBC:pollution_facilities_count] facilities</td>"
+            "<td>[TBC:substitution_timeline_years] years</td>"
+            "<td>[TBC:capex_pollution_eur]</td>"
+        )
+        result = t.resolve_placeholders(html_in)
+        assert "5" in result, "Facilities count not injected"
+        assert "3 years" in result, "Timeline not injected"
+        assert "EUR" in result, "EUR qualifier not present"
+
+    def test_bp2_sensitivity_table_uses_named_placeholders(self):
+        """
+        TEST 14: BP-2 sensitivity table must use [TBC:key] placeholders for database references.
+        """
+        html_in = "EEIO factors from [TBC:database_name] database; Factors sourced from [TBC:regulatory_database_name]"
+        t = ReportTemplate(company_name="TestCorp", reporting_year=2025)
+        t.set_company_context({"database_name": "EEIO v2.0", "regulatory_database_name": "EEA/EMEP"})
+        result = t.resolve_placeholders(html_in)
+        assert "EEIO v2.0" in result, "database_name not injected into BP-2 table"
+        assert "EEA/EMEP" in result, "regulatory_database_name not injected into BP-2 table"
+
+    def test_empty_context_preserves_placeholders(self):
+        """
+        TEST 15: With empty company_context, all placeholders should remain.
+        """
+        html_in = "<td>[TBC:employee_count_total]</td><td>[TBC:annual_revenue_eur]</td>"
+        t = ReportTemplate(company_name="TestCorp", reporting_year=2025)
+        # No context set
+        result = t.resolve_placeholders(html_in)
+        assert "[TO BE CONFIRMED]" in result, "Placeholders not preserved when no context"
+        assert "[TBC:" not in result, "Raw TBC tag preserved but should have been replaced with [TO BE CONFIRMED]"
+
+    def test_ghg_emissions_only_e1_fields(self):
+        """
+        TEST 16: GHG emissions values should only go into emission fields.
+        """
+        html_in = "<td>[TBC:scope1_emissions]</td>"
+        t = ReportTemplate(company_name="TestCorp", reporting_year=2025)
+        t.set_company_context({"scope1_emissions": "2500.5"})
+        result = t.resolve_placeholders(html_in)
+        assert "2500.5" in result, "Emission float value not accepted"
+
+        t2 = ReportTemplate(company_name="TestCorp", reporting_year=2025)
+        t2.set_company_context({"scope1_emissions": "not-numeric"})
+        result = t2.resolve_placeholders(html_in)
+        assert "[TO BE CONFIRMED]" in result, "Non-numeric emission value not rejected"
+
+    def test_revenue_only_financial_fields(self):
+        """
+        TEST 17: Revenue values should only go into financial/currency fields.
+        """
+        html_in = "<td>[TBC:annual_revenue_eur]</td>"
+        t = ReportTemplate(company_name="TestCorp", reporting_year=2025)
+        t.set_company_context({"annual_revenue_eur": "5000000"})
+        result = t.resolve_placeholders(html_in)
+        assert "EUR millions" in result, "Revenue not formatted with EUR qualifier"
+
+        # Revenue should NOT be injectable into string fields
+        html_in2 = "<td>[TBC:database_name]</td>"
+        t2 = ReportTemplate(company_name="TestCorp", reporting_year=2025)
+        t2.set_company_context({"database_name": "5000000"})
+        result2 = t2.resolve_placeholders(html_in2)
+        assert "[TO BE CONFIRMED]" in result2, "Numeric value (revenue-like) injected into string field!"
