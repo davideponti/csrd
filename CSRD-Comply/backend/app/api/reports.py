@@ -724,9 +724,9 @@ def _calc_change(current: float, baseline: float) -> str:
 def _generate_preview_html(report) -> str:
 
     """Generate a preview HTML from report data when no XHTML exists yet."""
-    gap = report.gap_analysis_results or {}
+    gap = getattr(report, 'gap_analysis_results', None) or {}
     tables = report.table_data or {}
-    narratives = report.narrative_content or {}
+    narratives = getattr(report, 'narrative_content', None) or {}
 
     return f"""<!DOCTYPE html>
 <html>
@@ -810,7 +810,8 @@ def get_validation_result(
         raise HTTPException(status_code=404, detail="Report not found")
 
     # If validation already exists in metadata, use it
-    if report.ixbrl_metadata and report.ixbrl_metadata.get("validation_status") in ("passed", "failed"):
+    ixbrl_metadata = getattr(report, 'ixbrl_metadata', None)
+    if ixbrl_metadata and ixbrl_metadata.get("validation_status") in ("passed", "failed"):
         metadata = report.ixbrl_metadata
         errors_list = []
         if metadata.get("fatal_count", 0) > 0 or metadata.get("error_count", 0) > 0:
