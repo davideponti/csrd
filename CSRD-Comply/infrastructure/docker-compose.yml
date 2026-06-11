@@ -27,7 +27,7 @@ services:
     ports:
       - "127.0.0.1:8000:8000"
     environment:
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/csrd_comply
+      DATABASE_URL: postgresql://postgres:JHExajO8VU8gmZGqUCpwmaWgACIlepfC@postgres:5432/csrd_comply
       ENVIRONMENT: production
       SECRET_KEY_FILE: /run/secrets/secret_key
       CORS_ORIGINS: '["https://csrdcomply.com"]'
