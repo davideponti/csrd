@@ -1,13 +1,15 @@
-# Implementation Plan: Company Context Settings
+# Fix Company Context Injection Logic
 
-- [x] Analyze codebase structure
-- [ ] Backend: Add `CompanyReportContext` model to models/__init__.py
-- [ ] Backend: Create API endpoint for CRUD operations
-- [ ] Backend: Register router
-- [ ] Backend: Create Alembic migration
-- [ ] Frontend: Add TypeScript interfaces
-- [ ] Frontend: Add API client methods
-- [ ] Frontend: Build Company Context UI component with all fields
-- [ ] Frontend: Integrate component into settings page
-- [ ] Engine: Add context injection logic to template_engine.py
-- [ ] Backend: Integrate context into report generation pipeline (reports.py _compile_esrs_data)
+## Todo
+- [x] Analyze the problem: template uses hardcoded `[TO BE CONFIRMED]`, context mapping is incomplete, [TBC:key] markers don't exist in template
+- [ ] Phase 1: Fix context_data mapping in reports.py - add all missing fields, fix incorrect key names
+- [ ] Phase 2: Enhance `_validate_placeholder_value()` in template_engine.py with stricter validation
+  - Add country-name rejection for non-country string fields
+  - Add cross-field section awareness check
+  - Add employee/common value pattern detection for wrong fields
+- [ ] Phase 3: Replace `[TO BE CONFIRMED]` with `[TBC:key]` markers in template HTML
+  - Map each `[TO BE CONFIRMED]` to the correct FIELD_REGISTRY key
+  - Leave unmappable ones as `[TO BE CONFIRMED]`
+- [ ] Phase 4: Fix template direct attribute usage (template.employee_count, template.company_sector) to use context data
+- [ ] Phase 5: Add comprehensive tests for validation, injection, and cross-field rejection
+- [ ] Phase 6: Run existing tests to ensure nothing breaks
