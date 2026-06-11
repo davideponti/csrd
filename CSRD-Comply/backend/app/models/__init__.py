@@ -278,6 +278,7 @@ class Report(TimestampMixin, Base):
     reporting_year = Column(Integer, nullable=False)
     title = Column(String(255), nullable=False)
     status = Column(SAEnum(ReportStatus), default=ReportStatus.draft, nullable=False)
+    table_data = Column(JSON, nullable=True)                     # Pre-computed tables/charts data
     xhtml_content = Column(Text, nullable=True)                  # Generated iXBRL report
     xbrl_validation_passed = Column(Boolean, nullable=True)
     filed_at = Column(DateTime, nullable=True)
