@@ -348,6 +348,16 @@ export const emissions = {
 
   getSummary: (year?: number) =>
     request<any>(`/emissions/summary${year ? `?year=${year}` : ''}`),
+
+  autoFill: (data?: {
+    reporting_year?: number
+    include_previous_year?: boolean
+    replace_existing?: boolean
+  }) =>
+    request<any>('/emissions/auto-fill', {
+      method: 'POST',
+      body: JSON.stringify(data || {}),
+    }),
 }
 
 // ── AI / ESRS Mapper (Steps 6-7) ──────────────────────────────

@@ -150,6 +150,12 @@ class ParseBillInput(BaseModel):
     text: str
 
 
+class AutoFillEmissionsInput(BaseModel):
+    reporting_year: Optional[int] = None
+    include_previous_year: bool = True
+    replace_existing: bool = True
+
+
 # ── Endpoints ────────────────────────────────────────────────────
 
 @router.get("/", response_model=list[EmissionResponse])
@@ -501,6 +507,40 @@ def parse_utility_bill(
     return result
 
 
+@router.post("/auto-fill")
+def auto_fill_emissions(
+    data: AutoFillEmissionsInput = AutoFillEmissionsInput(),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Compila automaticamente Scope 1, 2 e 3 con dati di attività realistici.
+
+    Usa i calculator GHG Protocol (DEFRA/IPCC/Eurostat) scalati su dipendenti
+    e fatturato dell'azienda. Salva anche l'anno precedente per confronti YoY.
+    """
+    from app.services.demo_emissions import auto_fill_emissions as fill_demo
+
+    company = db.query(Company).filter(
+        Company.company_id == current_user.company_id,
+    ).first()
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+
+    reporting_year = data.reporting_year or company.reporting_year or 2026
+
+    try:
+        return fill_demo(
+            db,
+            company,
+            reporting_year,
+            include_previous_year=data.include_previous_year,
+            replace_existing=data.replace_existing,
+        )
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Auto-fill failed: {str(e)}")
+
+
 @router.get("/summary")
 def get_emissions_summary(
     year: Optional[int] = None,
@@ -518,9 +558,15 @@ def get_emissions_summary(
 
     summary = {"scope1": 0.0, "scope2": 0.0, "scope3": 0.0, "total": 0.0}
     for e in emissions:
-        key = f"scope{e.scope}"
-        if e.scope in ["1", "2", "3"]:
-            summary[key] += e.value
+        if e.scope == "1":
+            summary["scope1"] += e.value
+        elif e.scope == "2":
+            # Usa solo location-based per il totale Scope 2 (evita doppio conteggio con market-based)
+            if e.category and "market" in (e.category or "").lower():
+                continue
+            summary["scope2"] += e.value
+        elif e.scope == "3":
+            summary["scope3"] += e.value
     summary["total"] = summary["scope1"] + summary["scope2"] + summary["scope3"]
 
     # Validation

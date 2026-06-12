@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui'
 import { Badge } from '@/components/ui'
 import { Input } from '@/components/ui'
 import { Select } from '@/components/ui'
-import { Leaf, Plus, Calculator, AlertTriangle, CheckCircle2, BarChart3, Upload, FileText, Database, Truck, Building, ShoppingBag, Users, Plane, Trash2, Settings, Briefcase, TrendingUp, PieChart, Zap } from 'lucide-react'
+import { Leaf, Plus, Calculator, AlertTriangle, CheckCircle2, BarChart3, Upload, FileText, Database, Truck, Building, ShoppingBag, Users, Plane, Trash2, Settings, Briefcase, TrendingUp, PieChart, Zap, Sparkles, Loader2 } from 'lucide-react'
 import { emissions as emissionsApi } from '@/lib/api'
 
 // ── Types ───────────────────────────────────────────────────────
@@ -409,7 +409,9 @@ function ValidationPanel({ result }: { result: any }) {
 
   // Loading & Error
   const [loading, setLoading] = useState(false)
+  const [autoFillLoading, setAutoFillLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [autoFillMessage, setAutoFillMessage] = useState<string | null>(null)
   // Summary
   const [summary, setSummary] = useState<any>(null)
   const [savedEmissions, setSavedEmissions] = useState<any[]>([])
@@ -624,6 +626,136 @@ function ValidationPanel({ result }: { result: any }) {
     }
   }
 
+  // ── Auto-fill realistic demo data ─────────────────────────────
+  const handleAutoFill = async () => {
+    setAutoFillLoading(true)
+    setError(null)
+    setAutoFillMessage(null)
+    try {
+      const result = await emissionsApi.autoFill({
+        reporting_year: reportYear,
+        include_previous_year: true,
+        replace_existing: true,
+      })
+
+      const inputs = result.inputs || {}
+      const s1 = inputs.scope1 || {}
+      const s2 = inputs.scope2 || {}
+      const s3 = inputs.scope3 || {}
+
+      setStationary({
+        natural_gas_kwh: String(s1.natural_gas_kwh ?? ''),
+        natural_gas_m3: '',
+        diesel_heating_litres: String(s1.diesel_heating_litres ?? ''),
+        lpg_kwh: '',
+        lpg_litres: '',
+        biomass_kwh: '',
+      })
+      setMobile({
+        diesel_km: String(s1.diesel_km ?? ''),
+        petrol_km: String(s1.petrol_km ?? ''),
+        diesel_van_km: String(s1.diesel_van_km ?? ''),
+        diesel_truck_km: '',
+        electric_km: '',
+      })
+      setFugitive({
+        r410a_kg: String(s1.r410a_kg ?? ''),
+        r134a_kg: String(s1.r134a_kg ?? ''),
+        r32_kg: '',
+        r290_kg: '',
+      })
+      if (inputs.process?.food_tonnes) {
+        setProcess((prev) => ({ ...prev, food_tonnes: String(inputs.process.food_tonnes) }))
+      }
+      setScope2Input({
+        electricity_kwh: String(s2.electricity_kwh ?? ''),
+        country: s2.country || 'IT',
+        has_green_tariff: !!s2.has_green_tariff,
+      })
+      setScope3Upstream({
+        spend_eur: String(s3.spend_eur ?? ''),
+        supplier_nace: s3.supplier_nace || 'C10',
+        capital_goods_eur: String(s3.capital_goods_eur ?? ''),
+        capital_goods_nace: s3.supplier_nace || 'C10',
+        electricity_kwh: String(s3.electricity_kwh ?? ''),
+        natural_gas_kwh_scope3: String(s3.natural_gas_kwh_scope3 ?? ''),
+        diesel_litres_scope3: String(s3.diesel_litres_scope3 ?? ''),
+        upstream_tkm: String(s3.upstream_tkm ?? ''),
+        upstream_transport_mode: s3.upstream_transport_mode || 'truck',
+        waste_kg: String(s3.waste_kg ?? ''),
+        waste_type: s3.waste_type || 'mixed_waste',
+        business_travel_km: String(s3.business_travel_km ?? ''),
+        travel_mode: s3.travel_mode || 'car_diesel',
+        employees: String(s3.employees ?? ''),
+        avg_commute_km: String(s3.avg_commute_km ?? '20'),
+        commuting_mode: s3.commuting_mode || 'car_alone',
+        working_days: String(s3.working_days ?? '220'),
+        leased_area_m2: String(s3.leased_area_m2 ?? ''),
+        lease_cost_eur: '',
+      })
+      setScope3Downstream({
+        downstream_tkm: String(s3.downstream_tkm ?? ''),
+        downstream_transport_mode: s3.downstream_transport_mode || 'truck',
+        distance_to_customer_km: String(s3.distance_to_customer_km ?? ''),
+        product_weight_tonnes: String(s3.product_weight_tonnes ?? ''),
+        product_value_eur: String(s3.product_value_eur ?? ''),
+        processing_type: 'default',
+        products_sold: String(s3.products_sold ?? ''),
+        avg_energy_kwh_per_unit: '',
+        product_type: 'default',
+        product_weight_kg: String(s3.product_weight_kg ?? ''),
+        disposal_method: s3.disposal_method || 'landfill',
+        downstream_leased_area_m2: '',
+        lessees: '',
+        num_franchises: '',
+        avg_energy_kwh_per_franchise: '',
+        franchise_revenue_eur: '',
+        investment_eur: '',
+        investment_type: 'equity',
+        portfolio_company_revenue_eur: '',
+      })
+
+      const calc = result.calculated || {}
+      setScope1Result({
+        scope: '1',
+        total_tco2e: calc.scope1_tco2e,
+        categories: [],
+        method: 'activity_data_x_emission_factors',
+      })
+      setScope2Result({
+        location_based: { total_tco2e: calc.scope2_location_tco2e },
+        market_based: { total_tco2e: calc.scope2_market_tco2e },
+        total_tco2e: calc.scope2_location_tco2e,
+      })
+      setScope3Result({
+        total_tco2e: calc.scope3_tco2e,
+        total: calc.scope3_tco2e,
+      })
+
+      const prevYear = reportYear - 1
+      const prevSummary = result.summaries?.[prevYear]
+      if (prevSummary) {
+        setBaseline2025({
+          scope1: String(prevSummary.scope1),
+          scope2: String(prevSummary.scope2),
+          scope3: String(prevSummary.scope3),
+          scope2_market_based: '',
+        })
+      }
+
+      await loadEmissions()
+      await loadSummary()
+      setAutoFillMessage(
+        `${result.message} Profilo: ${result.profile}. Totale ${reportYear}: ${result.summaries?.[reportYear]?.total?.toFixed(2)} tCO₂e.`,
+      )
+      setActiveTab('overview')
+    } catch (e: any) {
+      setError(e.message || 'Errore durante la compilazione automatica')
+    } finally {
+      setAutoFillLoading(false)
+    }
+  }
+
   // ── Save Result ───────────────────────────────────────────────
   const handleSaveResult = async (scope: string, result: any) => {
     try {
@@ -708,6 +840,18 @@ function ValidationPanel({ result }: { result: any }) {
           Carbon Footprint Calculator (GHG Protocol)
         </h2>
         <div className="flex items-center gap-2">
+          <Button
+            onClick={handleAutoFill}
+            disabled={autoFillLoading}
+            className="bg-emerald-600 hover:bg-emerald-700"
+          >
+            {autoFillLoading ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Sparkles className="h-4 w-4 mr-2" />
+            )}
+            Compila dati realistici
+          </Button>
           <span className="text-sm text-muted-foreground">Anno Report:</span>
           <input
             type="number"
@@ -717,6 +861,13 @@ function ValidationPanel({ result }: { result: any }) {
           />
         </div>
       </div>
+
+      {autoFillMessage && (
+        <div className="mb-4 p-3 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg text-sm text-green-700 dark:text-green-300 flex items-center gap-2">
+          <CheckCircle2 className="h-4 w-4 shrink-0" />
+          {autoFillMessage}
+        </div>
+      )}
 
       {error && (
         <div className="mb-4 p-3 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-700 dark:text-red-400 flex items-center gap-2">
