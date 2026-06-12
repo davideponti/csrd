@@ -94,21 +94,20 @@ export default function ReportsPage() {
   const loadReports = useCallback(async () => {
     try {
       const data = await api.get("/reports")
-      // ⭐ FIX: Deduplica robusta — per ID + per (title + reporting_year)
-      const seen = new Map<string, Report>()
+      const seenIds = new Set<string>()
+      const seenKeys = new Set<string>()
+      const unique: Report[] = []
       if (Array.isArray(data)) {
         for (const r of data) {
-          if (!r || !r.id) continue
-          // Dedup per ID prima di tutto
-          if (seen.has(r.id)) continue
-          // Dedup per titolo+anno (se ID diverso ma stessi dati)
+          if (!r?.id || seenIds.has(r.id)) continue
           const key = `${r.title}|${r.reporting_year}`
-          if (seen.has(key)) continue
-          seen.set(r.id, r)
-          seen.set(key, r)
+          if (seenKeys.has(key)) continue
+          seenIds.add(r.id)
+          seenKeys.add(key)
+          unique.push(r)
         }
       }
-      setReports(Array.from(seen.values()).filter(r => typeof r === 'object' && r.id))
+      setReports(unique)
     } catch (err) {
       console.error("Failed to load reports:", err)
     } finally {
@@ -638,7 +637,9 @@ export default function ReportsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button onClick={createReport}>Crea Report</Button>
+          <Button onClick={createReport} disabled={creating}>
+            {creating ? "Creazione..." : "Crea Report"}
+          </Button>
         </div>
       </div>
 

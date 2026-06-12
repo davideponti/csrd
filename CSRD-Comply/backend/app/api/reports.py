@@ -28,6 +28,14 @@ from app.services.professional_pdf import (
 
 logger = logging.getLogger(__name__)
 
+# Standard ESRS materiali di default per report CSRD completo (PMI tipica)
+DEFAULT_MATERIAL_STANDARDS = {
+    "ESRS E1", "ESRS E2", "ESRS S1", "ESRS S2", "ESRS G1",
+}
+
+# Soglia minima caratteri per considerare xhtml_content un report completo
+MIN_FULL_REPORT_LENGTH = 20_000
+
 # HTML sanitization per prevenire XSS
 try:
     import nh3
@@ -308,16 +316,23 @@ def _compile_esrs_data(report, db):
     scope3_total = 0.0
 
     for em in emissions:
+        if em.reporting_year != report.reporting_year:
+            continue
+        cat = (em.category or "").lower()
         if em.scope == "1":
+            if cat and cat != "scope1_total":
+                continue
             scope1_total += em.value
         elif em.scope == "2":
-            if em.category and "location" in em.category.lower():
-                scope2_location_total += em.value
-            elif em.category and "market" in em.category.lower():
+            if cat and "market" in cat:
                 scope2_market_total += em.value
-            else:
+            elif cat and "location" in cat:
+                scope2_location_total += em.value
+            elif not cat:
                 scope2_location_total += em.value
         elif em.scope == "3":
+            if cat and cat != "scope3_total":
+                continue
             scope3_total += em.value
 
     # Always include current year values (even 0) so the table renders properly
@@ -375,6 +390,9 @@ def _compile_esrs_data(report, db):
                     base_std = std_parts[0].strip()
                     material_standards.add(base_std)
 
+    # Report completo: includi sempre i topic materiali standard CSRD
+    material_standards.update(DEFAULT_MATERIAL_STANDARDS)
+
     material_standards_list = sorted(material_standards)
 
     template = ReportTemplate.create_default_template(
@@ -390,9 +408,6 @@ def _compile_esrs_data(report, db):
     template.cover_page.employee_count = company.employee_count or 0
 
     # ── Load Company Context Settings and inject into template ────
-    ctx = db.query(CompanyContextSettings).filter(
-        CompanyContextSettings.company_id == report.company_id,
-    ).first()
     if ctx:
         context_data = {
             # Company Profile
@@ -494,6 +509,20 @@ def _compile_esrs_data(report, db):
         template.populate_ghg_section(emissions_data)
 
     report.xhtml_content = template.render_to_xhtml()
+
+
+def _get_full_report_html(report, db, *, persist: bool = False) -> str:
+    """Restituisce il report XHTML completo dal template engine (non la preview ridotta)."""
+    content = (report.xhtml_content or "").strip()
+    if len(content) >= MIN_FULL_REPORT_LENGTH:
+        return content
+
+    _compile_esrs_data(report, db)
+    if report.table_data is None:
+        _build_tables_charts(report, db)
+    if persist:
+        db.commit()
+    return report.xhtml_content or content
 
 
 def _run_gap_analysis(report, db):
@@ -741,13 +770,7 @@ def preview_report(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Get HTML preview of the generated report.
-    
-    Generates the preview ALWAYS from _generate_preview_html() so that
-    the complete CSRD report with all ESRS sections is shown regardless
-    of materiality status. The xhtml_content (from template engine) is
-    only used for iXBRL export purposes.
-    """
+    """Get HTML preview of the generated report (template engine completo)."""
     report = db.query(Report).filter(
         Report.id == report_id,
         Report.company_id == current_user.company_id,
@@ -755,9 +778,7 @@ def preview_report(
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
 
-    # ⭐ FIX: Always generate fresh preview from report data for a COMPLETE report
-    html_content = _generate_preview_html(report)
-    # ⚠️ SECURITY FIX: sanitizza HTML per prevenire XSS
+    html_content = _get_full_report_html(report, db, persist=True)
     safe_html = sanitize_html(html_content)
     return HTMLResponse(content=safe_html)
 
@@ -1248,27 +1269,23 @@ def export_report(
             detail=f"Invalid format '{export_format}'. Valid: {', '.join(sorted(valid_formats))}",
         )
 
-    # ⭐ FIX: Use COMPLETE preview HTML for visual exports (PDF, DOCX) instead of minimal xhtml_content
-    xhtml_content = report.xhtml_content or "<html><body><p>No content generated yet.</p></body></html>"
-    # Generate full preview HTML that includes ALL ESRS sections (E2, S1, S2, G1, etc.)
-    full_preview_html = _generate_preview_html(report)
+    # Report completo dal template engine (ESRS 2, E1, E2, S1, S2, G1, …)
+    full_report_html = _get_full_report_html(report, db, persist=True)
+    xhtml_content = report.xhtml_content or full_report_html
     filename_base = f"csrd_report_{report.reporting_year}"
     report_data = _build_report_data(report, current_user, db)
     options = ExportOptions()
 
     try:
         if export_format == "pdf":
-            # Use full preview HTML for PDF so all ESRS sections are rendered
-            result = service.export_pdf(full_preview_html, filename_base, options)
+            result = service.export_pdf(full_report_html, filename_base, options)
         elif export_format == "xlsx":
             result = service.export_xlsx(report_data, filename_base, options)
         elif export_format == "docx":
-            # Use full preview HTML for DOCX so all ESRS sections are included
-            result = service.export_docx(full_preview_html, filename_base, options)
+            result = service.export_docx(full_report_html, filename_base, options)
         elif export_format == "json":
             result = service.export_json(report_data, filename_base, options)
         elif export_format == "ixbrl":
-            # iXBRL must use the tagged xhtml_content — this is the regulatory format
             result = service.export_ixbrl(xhtml_content, filename_base, options)
         else:
             raise HTTPException(status_code=400, detail=f"Unsupported format: {export_format}")
@@ -1289,9 +1306,8 @@ def export_professional_pdf(
 ):
     """Export a professionally formatted PDF with logo, headers, footers, and page numbers."""
     report = _get_report_or_404(report_id, current_user, db)
-    # ⭐ Use full preview HTML (ALL ESRS sections) instead of minimal xhtml_content
-    full_preview_html = _generate_preview_html(report)
-    xhtml_content = full_preview_html
+    full_report_html = _get_full_report_html(report, db, persist=True)
+    xhtml_content = full_report_html
 
     from app.models import Company
     company = db.query(Company).filter(
@@ -1342,12 +1358,10 @@ def export_all_formats(
     report = _get_report_or_404(report_id, current_user, db)
     service = ExportService()
 
-    xhtml_content = report.xhtml_content or ""
-    # ⭐ Use full preview HTML for visual formats so PDF/DOCX preview renders all ESRS sections
-    full_preview_html = _generate_preview_html(report)
+    full_report_html = _get_full_report_html(report, db, persist=True)
     report_data = _build_report_data(report, current_user, db)
 
-    results = service.export_all(full_preview_html, report_data)
+    results = service.export_all(full_report_html, report_data)
 
     export_fmts = {}
     for fmt, result in results.items():
