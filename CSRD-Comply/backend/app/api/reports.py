@@ -33,6 +33,31 @@ DEFAULT_MATERIAL_STANDARDS = {
     "ESRS E1", "ESRS E2", "ESRS S1", "ESRS S2", "ESRS G1",
 }
 
+# Settori con impatti rilevanti su acqua e economia circolare (es. alimentare C10)
+SECTOR_EXTRA_MATERIAL_STANDARDS = {
+    "ESRS E3", "ESRS E5",
+}
+
+
+def _sector_code(company, ctx) -> str:
+    raw = ""
+    if ctx and ctx.sector:
+        raw = str(ctx.sector)
+    elif company and company.sector:
+        raw = str(company.sector)
+    return raw.strip().upper().split()[0].split("—")[0].split("-")[0][:2]
+
+
+def _resolve_material_standards(company, ctx, emissions_total: float) -> set[str]:
+    """Standard materiali: default + assessment + settore (food/manufacturing → E3, E5)."""
+    standards = set(DEFAULT_MATERIAL_STANDARDS)
+    if emissions_total > 0:
+        standards.add("ESRS E1")
+    sector = _sector_code(company, ctx)
+    if sector.startswith("C") or "FOOD" in (ctx.sector if ctx and ctx.sector else "").upper():
+        standards.update(SECTOR_EXTRA_MATERIAL_STANDARDS)
+    return standards
+
 # Soglia minima caratteri per considerare xhtml_content un report completo
 MIN_FULL_REPORT_LENGTH = 20_000
 
@@ -360,15 +385,14 @@ def _compile_esrs_data(report, db):
     emissions_data["scope2_market_n1"] = scope2_mkt_n1
     emissions_data["scope3_n1"] = scope3_n1
 
-    # ── Determina standard materiali dal materiality assessment ──
-    material_standards = set()
+    ctx = db.query(CompanyContextSettings).filter(
+        CompanyContextSettings.company_id == report.company_id,
+    ).first()
 
-    # E1 è materiale se ci sono emissioni
-    if (scope1_total + scope2_location_total + scope3_total) > 0:
-        material_standards.add("ESRS E1")
-
+    material_standards = _resolve_material_standards(
+        company, ctx, scope1_total + scope2_location_total + scope3_total,
+    )
     if assessment:
-        # Query tutti gli score materiali per trovare gli standard associati
         material_scores = (
             db.query(MaterialityScore)
             .filter(
@@ -377,22 +401,14 @@ def _compile_esrs_data(report, db):
             )
             .all()
         )
-
         for score in material_scores:
             datapoint = db.query(EsrsDatapoint).filter(
                 EsrsDatapoint.id == score.datapoint_id
             ).first()
             if datapoint:
-                # Estrai lo standard ESRS (es. "ESRS E1" da "ESRS E1-6.54")
-                std_ref = datapoint.standard_ref
-                std_parts = std_ref.split("-")
+                std_parts = datapoint.standard_ref.split("-")
                 if std_parts:
-                    base_std = std_parts[0].strip()
-                    material_standards.add(base_std)
-
-    # Report completo: includi sempre i topic materiali standard CSRD
-    material_standards.update(DEFAULT_MATERIAL_STANDARDS)
-
+                    material_standards.add(std_parts[0].strip())
     material_standards_list = sorted(material_standards)
 
     template = ReportTemplate.create_default_template(
@@ -408,13 +424,19 @@ def _compile_esrs_data(report, db):
     template.cover_page.employee_count = company.employee_count or 0
 
     # ── Load Company Context Settings and inject into template ────
-    ctx = db.query(CompanyContextSettings).filter(
-        CompanyContextSettings.company_id == report.company_id,
-    ).first()
     if ctx and ctx.company_name:
         company_name = ctx.company_name
         template.cover_page.company_name = ctx.company_name
     if ctx:
+        if ctx.country:
+            template.company_country = ctx.country
+            template.cover_page.company_country = ctx.country
+        if ctx.sector:
+            template.company_sector = ctx.sector
+            template.cover_page.company_sector = ctx.sector
+        if ctx.employee_count_total:
+            template.employee_count = ctx.employee_count_total
+            template.cover_page.employee_count = ctx.employee_count_total
         from app.services.report_context import build_report_context_data
         context_data = build_report_context_data(ctx)
         template.set_company_context(context_data)

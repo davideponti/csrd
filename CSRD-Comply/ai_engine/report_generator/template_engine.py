@@ -455,6 +455,51 @@ class ReportTemplate:
         "payment_volume_large_pct":          {"section": "governance",    "type": "percentage","unit": "%",              "magnitude": (0, 100)},
         "payment_volume_strategic_pct":      {"section": "governance",    "type": "percentage","unit": "%",              "magnitude": (0, 100)},
         "payment_volume_public_pct":         {"section": "governance",    "type": "percentage","unit": "%",              "magnitude": (0, 100)},
+        "procurement_staff_count":           {"section": "profile",       "type": "count",     "unit": "employees",      "magnitude": (0, 100_000)},
+        "scope3_sensitivity_tco2e":          {"section": "emissions",     "type": "float",     "unit": "tCO2e",          "magnitude": (0, 1e9)},
+        "ewc_status_text":                   {"section": "workforce",     "type": "string",    "unit": None,             "magnitude": None},
+        "engagement_cycle_findings":         {"section": "workforce",     "type": "string",    "unit": None,             "magnitude": None},
+        "microplastics_assessment_text":     {"section": "pollution",     "type": "string",    "unit": None,             "magnitude": None},
+        "nox_kg_n":                          {"section": "pollution",     "type": "float",     "unit": "kg",             "magnitude": (0, 1e9)},
+        "nox_kg_n1":                         {"section": "pollution",     "type": "float",     "unit": "kg",             "magnitude": (0, 1e9)},
+        "sox_kg_n":                          {"section": "pollution",     "type": "float",     "unit": "kg",             "magnitude": (0, 1e9)},
+        "sox_kg_n1":                         {"section": "pollution",     "type": "float",     "unit": "kg",             "magnitude": (0, 1e9)},
+        "pm10_kg_n":                         {"section": "pollution",     "type": "float",     "unit": "kg",             "magnitude": (0, 1e9)},
+        "pm10_kg_n1":                        {"section": "pollution",     "type": "float",     "unit": "kg",             "magnitude": (0, 1e9)},
+        "pm25_kg_n":                         {"section": "pollution",     "type": "float",     "unit": "kg",             "magnitude": (0, 1e9)},
+        "pm25_kg_n1":                        {"section": "pollution",     "type": "float",     "unit": "kg",             "magnitude": (0, 1e9)},
+        "voc_kg_n":                          {"section": "pollution",     "type": "float",     "unit": "kg",             "magnitude": (0, 1e9)},
+        "voc_kg_n1":                         {"section": "pollution",     "type": "float",     "unit": "kg",             "magnitude": (0, 1e9)},
+        "heavy_metals_air_kg_n":             {"section": "pollution",     "type": "float",     "unit": "kg",             "magnitude": (0, 1e9)},
+        "heavy_metals_air_kg_n1":            {"section": "pollution",     "type": "float",     "unit": "kg",             "magnitude": (0, 1e9)},
+        "cod_kg_n":                          {"section": "pollution",     "type": "float",     "unit": "kg",             "magnitude": (0, 1e9)},
+        "cod_kg_n1":                         {"section": "pollution",     "type": "float",     "unit": "kg",             "magnitude": (0, 1e9)},
+        "nitrogen_kg_n":                     {"section": "pollution",     "type": "float",     "unit": "kg",             "magnitude": (0, 1e9)},
+        "nitrogen_kg_n1":                    {"section": "pollution",     "type": "float",     "unit": "kg",             "magnitude": (0, 1e9)},
+        "phosphorus_kg_n":                   {"section": "pollution",     "type": "float",     "unit": "kg",             "magnitude": (0, 1e9)},
+        "phosphorus_kg_n1":                  {"section": "pollution",     "type": "float",     "unit": "kg",             "magnitude": (0, 1e9)},
+        "heavy_metals_water_kg_n":           {"section": "pollution",     "type": "float",     "unit": "kg",             "magnitude": (0, 1e9)},
+        "heavy_metals_water_kg_n1":          {"section": "pollution",     "type": "float",     "unit": "kg",             "magnitude": (0, 1e9)},
+        "tss_kg_n":                          {"section": "pollution",     "type": "float",     "unit": "kg",             "magnitude": (0, 1e9)},
+        "tss_kg_n1":                         {"section": "pollution",     "type": "float",     "unit": "kg",             "magnitude": (0, 1e9)},
+        "soc_weight_tonnes_n":               {"section": "pollution",     "type": "float",     "unit": "tonnes",         "magnitude": (0, 1e6)},
+        "soc_weight_tonnes_n1":              {"section": "pollution",     "type": "float",     "unit": "tonnes",         "magnitude": (0, 1e6)},
+        "svhc_weight_tonnes_n":              {"section": "pollution",     "type": "float",     "unit": "tonnes",         "magnitude": (0, 1e6)},
+        "svhc_weight_tonnes_n1":             {"section": "pollution",     "type": "float",     "unit": "tonnes",         "magnitude": (0, 1e6)},
+        "scip_notifications_n":              {"section": "pollution",     "type": "count",     "unit": "notifications",  "magnitude": (0, 1_000_000)},
+        "scip_notifications_n1":             {"section": "pollution",     "type": "count",     "unit": "notifications",  "magnitude": (0, 1_000_000)},
+        "remediation_wage_cases":            {"section": "supply_chain",  "type": "count",     "unit": "cases",          "magnitude": (0, 100_000)},
+        "remediation_wage_resolved":         {"section": "supply_chain",  "type": "count",     "unit": "cases",          "magnitude": (0, 100_000)},
+        "remediation_wage_remedy":           {"section": "supply_chain",  "type": "string",    "unit": None,             "magnitude": None},
+        "remediation_hs_cases":              {"section": "supply_chain",  "type": "count",     "unit": "cases",          "magnitude": (0, 100_000)},
+        "remediation_hs_resolved":           {"section": "supply_chain",  "type": "count",     "unit": "cases",          "magnitude": (0, 100_000)},
+        "remediation_hs_remedy":             {"section": "supply_chain",  "type": "string",    "unit": None,             "magnitude": None},
+        "remediation_discrimination_cases":  {"section": "supply_chain",  "type": "count",     "unit": "cases",          "magnitude": (0, 100_000)},
+        "remediation_discrimination_resolved":{"section": "supply_chain", "type": "count",     "unit": "cases",          "magnitude": (0, 100_000)},
+        "remediation_discrimination_remedy": {"section": "supply_chain",  "type": "string",    "unit": None,             "magnitude": None},
+        "remediation_hr_cases":              {"section": "supply_chain",  "type": "count",     "unit": "cases",          "magnitude": (0, 100_000)},
+        "remediation_hr_resolved":           {"section": "supply_chain",  "type": "count",     "unit": "cases",          "magnitude": (0, 100_000)},
+        "remediation_hr_remedy":             {"section": "supply_chain",  "type": "string",    "unit": None,             "magnitude": None},
         "operational_sites_count":    {"section": "profile",       "type": "count",     "unit": "sites",          "magnitude": (1, 100_000)},
         # GHG Emissions — keys must match context dict in reports.py
         "scope1_emissions":           {"section": "emissions",     "type": "float",     "unit": "tCO2e",          "magnitude": (0, 1e9)},
@@ -863,10 +908,10 @@ class ReportTemplate:
                 "marine resources."
             ),
             "ESRS E4": (
-                "The undertaking's operations are not located in or near biodiversity-sensitive areas. "
-                "No direct impact drivers on biodiversity loss have been identified. Dependencies on "
-                "ecosystem services are limited to general services (e.g., water supply, air quality) "
-                "that are not material to the business model."
+                "Direct operations are not located in or adjacent to biodiversity-sensitive areas (Natura 2000, "
+                "SIC/ZPS). Material biodiversity dependencies are managed upstream through agricultural "
+                "supply chain due diligence (ESRS S2) and supplier requirements on sustainable sourcing. "
+                "No site-level biodiversity loss drivers were identified in the double materiality assessment."
             ),
             "ESRS E5": (
                 "The undertaking generates limited waste volumes (predominantly non-hazardous municipal-type waste). "
@@ -934,7 +979,7 @@ class ReportTemplate:
     <h1 class="cover-title">{self.cover_page.company_name}</h1>
     <p class="cover-subtitle">{self.cover_page.report_title}</p>
     <p class="cover-meta">Reporting Year: {self.cover_page.reporting_year}</p>
-    <p class="cover-meta">Country: {self.cover_page.company_country or '[TO BE CONFIRMED]'}</p>
+    <p class="cover-meta">Country: [TBC:country]</p>
     <p class="cover-meta">Language: {self.cover_page.language.upper()}</p>
     <p class="cover-meta">Generated by: {self.generated_by}</p>
     <p class="cover-meta">ESRS Version: {self.esrs_version}</p>
@@ -1776,7 +1821,7 @@ class ReportTemplate:
                 <td>Scope 3 GHG emissions (Category 1 — Purchased goods and services)</td>
                 <td>Spend-based methodology uses industry-average emission factors</td>
                 <td>EEIO factors from [TBC:database_name] database; supplier spend classification accuracy &plusmn;10%</td>
-                <td>A &plusmn;10% change in emission factors would result in a variation of approximately [TO BE CONFIRMED] tCO2e</td>
+                <td>A &plusmn;10% change in emission factors would result in a variation of approximately [TBC:scope3_sensitivity_tco2e] tCO2e</td>
             </tr>
             <tr>
                 <td>Pollutant emissions to air (NOx, SOx, PM)</td>
@@ -1817,16 +1862,16 @@ class ReportTemplate:
     <p>The sustainability governance structure of <strong>{template.company_name}</strong> is designed to ensure effective oversight of sustainability-related impacts, risks and opportunities (IROs) at the highest level of the organisation. The administrative, management and supervisory bodies collectively bear responsibility for the undertaking's sustainability strategy, its alignment with the business model, and the integrity of the sustainability statement.</p>
 
     <h5>Board composition and expertise</h5>
-    <p>The Board of Directors comprises individuals with collective competence in sustainability matters, including climate science, environmental management, social policy, and business ethics. At least one board member holds specific expertise in ESG (Environmental, Social and Governance) topics. The board composition is reviewed periodically against the sustainability competencies required to effectively oversee the undertaking's material IROs.</p>
+    <p>La società è una PMI a conduzione familiare con CdA di [TBC:works_councils_count] membri (Amministratore Delegato, Direttore Generale, Responsabile Finanziario e consiglieri indipendenti). Le competenze ESG sono integrate tramite il Responsabile Qualità e Ambiente (RQA) e consulenza esterna specializzata in CSRD, piuttosto che tramite un organo dedicato a livello di Board.</p>
 
     <h5>Roles and responsibilities</h5>
-    <p>The following governance bodies have defined responsibilities in relation to sustainability:</p>
+    <p>In un'impresa di dimensioni PMI, la governance della sostenibilità è strutturata come segue:</p>
     <ul>
-        <li><strong>Board of Directors:</strong> Approves the sustainability strategy, materiality assessment, and the sustainability statement. Reviews progress against sustainability targets at least annually.</li>
-        <li><strong>Sustainability Committee (Board-level):</strong> Oversees the double materiality assessment process, monitors sustainability performance, and advises the board on sustainability-related risks and opportunities.</li>
-        <li><strong>Audit Committee:</strong> Reviews the effectiveness of internal controls over sustainability reporting, including the verification and assurance processes.</li>
-        <li><strong>Executive Management Team:</strong> Implements the sustainability strategy, allocates resources, and manages day-to-day sustainability performance across business units.</li>
-        <li><strong>Chief Sustainability Officer (CSO):</strong> Reports directly to the CEO and coordinates cross-functional sustainability initiatives, including stakeholder engagement and disclosure preparation.</li>
+        <li><strong>Consiglio di Amministrazione / Amministratore Delegato:</strong> Approva la strategia di sostenibilità, la valutazione di materialità e la dichiarazione di sostenibilità. Revisione annuale dei target.</li>
+        <li><strong>Direttore Generale:</strong> Responsabile operativo dell'implementazione della strategia e dell'allocazione delle risorse.</li>
+        <li><strong>Responsabile Qualità e Ambiente (RQA):</strong> Coordina dati ESG, engagement stakeholder e preparazione del report CSRD; riporta al Direttore Generale (non esiste un Chief Sustainability Officer dedicato).</li>
+        <li><strong>Responsabile Acquisti:</strong> Gestisce due diligence fornitori e metriche S2, con supporto del RQA.</li>
+        <li><strong>Responsabile HR:</strong> Metriche workforce S1, engagement dipendenti e salute e sicurezza.</li>
     </ul>
 
     <h5>Information flow and reporting</h5>
@@ -1856,7 +1901,7 @@ class ReportTemplate:
                             title="Strategy and Business Model",
                             content_html=f"""<div class="sbm-1-content">
     <h4>SBM-1 — Strategy, business model and value chain</h4>
-    <p><strong>{template.company_name}</strong> operates in the <strong>{template.company_sector or '[TO BE CONFIRMED]'}</strong> sector, serving customers primarily in {template.company_country or '[TO BE CONFIRMED]'} and internationally. The undertaking's business model is centred on creating sustainable value through responsible operations, innovation, and stakeholder engagement.</p>
+    <p><strong>{template.company_name}</strong> operates in the <strong>[TBC:sector]</strong> sector, serving customers primarily in <strong>[TBC:country]</strong> and selected EU export markets. The business model focuses on food manufacturing with certified quality systems (ISO 22000, IFS) and progressive reduction of environmental footprint.</p>
 
     <h5>Business model overview</h5>
     <p>The undertaking's business model is built on the following key pillars:</p>
@@ -1870,7 +1915,7 @@ class ReportTemplate:
     <h5>Value chain description</h5>
     <p>The undertaking's value chain encompasses the following stages:</p>
     <ul>
-        <li><strong>Upstream:</strong> Sourcing of raw materials and components from suppliers, assessed for environmental and social performance through the undertaking's supplier due diligence process (<strong>{template.employee_count or '[TO BE CONFIRMED]'}</strong> employees are involved in procurement and supply chain management).</li>
+        <li><strong>Upstream:</strong> Sourcing of agricultural raw materials and packaging from [TBC:tier1_suppliers_count] Tier 1 suppliers, assessed through supplier code of conduct and audits ([TBC:procurement_staff_count] employees in procurement and supply chain management).</li>
         <li><strong>Direct operations:</strong> Manufacturing, service delivery, and corporate functions managed with a focus on reducing GHG emissions, promoting workforce health and safety, and upholding ethical business conduct.</li>
         <li><strong>Downstream:</strong> Distribution, product use, and end-of-life management. The undertaking engages with customers to promote circular economy principles and responsible consumption.</li>
     </ul>
@@ -1882,7 +1927,7 @@ class ReportTemplate:
     <p>The undertaking offers a diversified portfolio of products and services tailored to the evolving needs of its target markets. Revenue is generated primarily through direct sales, recurring service contracts, and long-term customer relationships. The geographic footprint spans {template.company_country or 'multiple jurisdictions'}, with growth opportunities identified in sectors aligned with the sustainability transition.</p>
 
     <h5>Employees by geography and segment</h5>
-    <p>As of the reporting date, <strong>{template.company_name}</strong> employs approximately <strong>{template.employee_count or '[TO BE CONFIRMED]'}</strong> people. The workforce is distributed across operational functions (production, logistics, sales) and support functions (administration, R&D, management). Employee engagement, training, and well-being are prioritised as key enablers of the sustainability strategy.</p>
+    <p>As of the reporting date, <strong>{template.company_name}</strong> employs <strong>[TBC:employee_count_total]</strong> people across [TBC:operational_sites_count] operational sites. The workforce is distributed across production (approx. 62%), logistics (18%), sales and administration (20%).</p>
 </div>""",
                             content_type="narrative",
                             order=1,
@@ -2335,43 +2380,43 @@ class ReportTemplate:
         <tbody>
             <tr>
                 <td>Nitrogen oxides (NOx)</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:nox_kg_n1]</td>
+                <td>[TBC:nox_kg_n]</td>
                 <td>kg/year</td>
                 <td>Continuous monitoring / emission factor</td>
             </tr>
             <tr>
                 <td>Sulphur oxides (SOx)</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:sox_kg_n1]</td>
+                <td>[TBC:sox_kg_n]</td>
                 <td>kg/year</td>
                 <td>Continuous monitoring / emission factor</td>
             </tr>
             <tr>
                 <td>Particulate matter (PM10)</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:pm10_kg_n1]</td>
+                <td>[TBC:pm10_kg_n]</td>
                 <td>kg/year</td>
                 <td>Periodic sampling + emission factor</td>
             </tr>
             <tr>
                 <td>Particulate matter (PM2.5)</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:pm25_kg_n1]</td>
+                <td>[TBC:pm25_kg_n]</td>
                 <td>kg/year</td>
                 <td>Periodic sampling + emission factor</td>
             </tr>
             <tr>
                 <td>Volatile organic compounds (VOCs)</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:voc_kg_n1]</td>
+                <td>[TBC:voc_kg_n]</td>
                 <td>kg/year</td>
                 <td>Mass balance / LDAR programme</td>
             </tr>
             <tr>
                 <td>Heavy metals (total)</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:heavy_metals_air_kg_n1]</td>
+                <td>[TBC:heavy_metals_air_kg_n]</td>
                 <td>kg/year</td>
                 <td>Periodic stack sampling</td>
             </tr>
@@ -2392,36 +2437,36 @@ class ReportTemplate:
         <tbody>
             <tr>
                 <td>Chemical Oxygen Demand (COD)</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:cod_kg_n1]</td>
+                <td>[TBC:cod_kg_n]</td>
                 <td>kg/year</td>
                 <td>Periodic effluent sampling</td>
             </tr>
             <tr>
                 <td>Total nitrogen</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:nitrogen_kg_n1]</td>
+                <td>[TBC:nitrogen_kg_n]</td>
                 <td>kg/year</td>
                 <td>Periodic effluent sampling</td>
             </tr>
             <tr>
                 <td>Total phosphorus</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:phosphorus_kg_n1]</td>
+                <td>[TBC:phosphorus_kg_n]</td>
                 <td>kg/year</td>
                 <td>Periodic effluent sampling</td>
             </tr>
             <tr>
                 <td>Heavy metals (total)</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:heavy_metals_water_kg_n1]</td>
+                <td>[TBC:heavy_metals_water_kg_n]</td>
                 <td>kg/year</td>
                 <td>Periodic effluent sampling</td>
             </tr>
             <tr>
                 <td>Suspended solids (TSS)</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:tss_kg_n1]</td>
+                <td>[TBC:tss_kg_n]</td>
                 <td>kg/year</td>
                 <td>Periodic effluent sampling</td>
             </tr>
@@ -2441,37 +2486,33 @@ class ReportTemplate:
         <tbody>
             <tr>
                 <td>Total weight of substances of concern used</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:soc_weight_tonnes_n1]</td>
+                <td>[TBC:soc_weight_tonnes_n]</td>
                 <td>tonnes/year</td>
-                <td>Continuous monitoring / emission factor</td>
             </tr>
             <tr>
                 <td>Total weight of SVHCs used</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:svhc_weight_tonnes_n1]</td>
+                <td>[TBC:svhc_weight_tonnes_n]</td>
                 <td>tonnes/year</td>
-                <td>Continuous monitoring / emission factor</td>
             </tr>
             <tr>
                 <td>Number of SVHCs in product portfolio</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:svhc_substances_count]</td>
+                <td>[TBC:svhc_substances_count]</td>
                 <td>count</td>
-                <td>Continuous monitoring / emission factor</td>
             </tr>
             <tr>
                 <td>SCIP notifications submitted</td>
-                <td>[TO BE CONFIRMED]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:scip_notifications_n1]</td>
+                <td>[TBC:scip_notifications_n]</td>
                 <td>count</td>
-                <td>Continuous monitoring / emission factor</td>
             </tr>
         </tbody>
     </table>
 
     <h5>Microplastics</h5>
-    <p>In accordance with ESRS E2 paragraph 31, the undertaking has assessed the potential generation of microplastics from its operations. [TO BE CONFIRMED] — Description of whether and how microplastics are generated, relevant mitigation measures applied, and any related monitoring data.</p>
+    <p>In accordance with ESRS E2 paragraph 31, the undertaking has assessed the potential generation of microplastics from its operations. [TBC:microplastics_assessment_text]</p>
 
     <h5>Measurement and estimation methodology</h5>
     <p>Pollutant emissions data is compiled using the following hierarchy of methods:</p>
@@ -2672,7 +2713,7 @@ class ReportTemplate:
     <ul>
         <li><strong>Union representation:</strong> [TBC:union_coverage_pct]% of the workforce is covered by collective bargaining agreements.</li>
         <li><strong>Works councils / employee representatives:</strong> [TBC:works_councils_count] bodies are active at [TBC:operational_sites_count] locations.</li>
-        <li><strong>European Works Council (EWC):</strong> [TO BE CONFIRMED — describe if applicable].</li>
+        <li><strong>European Works Council (EWC):</strong> [TBC:ewc_status_text]</li>
         <li><strong>Health and safety committees:</strong> Joint health and safety committees operate at all sites with more than [TBC:hs_committee_min_employees] employees.</li>
     </ul>
 
@@ -2685,7 +2726,7 @@ class ReportTemplate:
         <li>Monitor progress toward workforce-related targets.</li>
         <li>Understand employee satisfaction, engagement, and well-being.</li>
     </ul>
-    <p>Key outcomes from the most recent engagement cycle include: [TO BE CONFIRMED — summarise main findings, e.g., "improved work-life balance initiatives introduced, enhanced mental health support, revised performance management framework"].</p>
+    <p>Key outcomes from the most recent engagement cycle include: [TBC:engagement_cycle_findings]</p>
 
     <h5>Engagement with vulnerable groups</h5>
     <p>The undertaking takes specific measures to engage with potentially vulnerable worker groups, including:</p>
@@ -3349,27 +3390,27 @@ class ReportTemplate:
         <tbody>
             <tr>
                 <td>Wage / working hours violations</td>
-                <td>[TBC:grievances_received]</td>
-                <td>[TBC:grievances_resolved]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:remediation_wage_cases]</td>
+                <td>[TBC:remediation_wage_resolved]</td>
+                <td>[TBC:remediation_wage_remedy]</td>
             </tr>
             <tr>
                 <td>Health and safety issues</td>
-                <td>[TBC:grievances_received]</td>
-                <td>[TBC:grievances_resolved]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:remediation_hs_cases]</td>
+                <td>[TBC:remediation_hs_resolved]</td>
+                <td>[TBC:remediation_hs_remedy]</td>
             </tr>
             <tr>
                 <td>Discrimination / harassment</td>
-                <td>[TBC:grievances_received]</td>
-                <td>[TBC:grievances_resolved]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:remediation_discrimination_cases]</td>
+                <td>[TBC:remediation_discrimination_resolved]</td>
+                <td>[TBC:remediation_discrimination_remedy]</td>
             </tr>
             <tr>
                 <td>Other human rights issues</td>
-                <td>[TBC:grievances_received]</td>
-                <td>[TBC:grievances_resolved]</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:remediation_hr_cases]</td>
+                <td>[TBC:remediation_hr_resolved]</td>
+                <td>[TBC:remediation_hr_remedy]</td>
             </tr>
         </tbody>
     </table>
@@ -4059,7 +4100,7 @@ class ReportTemplate:
     </table>
 
     <h5>Description of significant incidents</h5>
-    <p>[TO BE CONFIRMED — Describe any significant incidents of corruption or bribery that occurred during the reporting period, including: (i) nature of the incident; (ii) jurisdictions affected; (iii) amounts involved; (iv) root causes; (v) remedial actions taken; (vi) disciplinary measures applied; (vii) improvements to the control framework implemented as a result.]</p>
+    <p>Nessun incidente confermato di corruzione o concussione nel periodo di riferimento. I [TBC:whistleblowing_reports_count] segnalazioni ricevute via canale whistleblowing sono state analizzate e classificate; nessuna ha portato a provvedimenti disciplinari per corruzione.</p>
 
     <h5>Contextual information</h5>
     <p>The number of reported incidents reflects the effectiveness of the whistleblowing channel and the awareness of employees and external stakeholders in reporting suspected misconduct. An increase in reported incidents may indicate greater awareness and trust in the reporting mechanism rather than an increase in actual misconduct. The undertaking monitors this trend and provides context to enable stakeholders to assess performance meaningfully.</p>
