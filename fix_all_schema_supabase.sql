@@ -45,7 +45,8 @@ CREATE TABLE IF NOT EXISTS alembic_version (
 INSERT INTO alembic_version (version_num) VALUES ('d2d4919460f10')
 ON CONFLICT (version_num) DO UPDATE SET version_num = EXCLUDED.version_num;
 
--- Verifica colonne reports
+ALTER TABLE company_context_settings ADD COLUMN IF NOT EXISTS extended_kpis JSONB;
+
 SELECT column_name, data_type
 FROM information_schema.columns
 WHERE table_name = 'reports'

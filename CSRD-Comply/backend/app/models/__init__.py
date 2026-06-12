@@ -158,6 +158,9 @@ class CompanyContextSettings(TimestampMixin, Base):
     corruption_incidents_last_year = Column(Integer, nullable=True)
     whistleblowing_reports_received = Column(Integer, nullable=True)
 
+    # Extended KPIs for report placeholders not stored as dedicated columns
+    extended_kpis = Column(JSON, nullable=True)
+
     company = relationship("Company", backref="context_settings")
 
 

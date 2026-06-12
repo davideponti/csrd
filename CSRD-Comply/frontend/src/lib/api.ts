@@ -431,6 +431,16 @@ export const companyContext = {
   }) => api.patch<CompanyContextSettings>('/company-context/', data),
 
   delete: () => api.del('/company-context/'),
+
+  autoFill: (data?: {
+    reporting_year?: number
+    fill_emissions?: boolean
+    overwrite?: boolean
+  }) =>
+    request<any>('/company-context/auto-fill', {
+      method: 'POST',
+      body: JSON.stringify(data || {}),
+    }),
 }
 
 // ── Dashboard (dati reali, niente mock) ──────────────────────

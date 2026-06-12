@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 
 from app.core.database import get_db
 from app.core.deps import get_current_user
-from app.models import User, CompanyContextSettings
+from app.models import User, Company, CompanyContextSettings
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +83,12 @@ class GovernanceSchema(BaseModel):
     anti_corruption_training_pct: Optional[float] = None
     corruption_incidents_last_year: Optional[int] = None
     whistleblowing_reports_received: Optional[int] = None
+
+
+class AutoFillProfileInput(BaseModel):
+    reporting_year: Optional[int] = None
+    fill_emissions: bool = True
+    overwrite: bool = True
 
 
 class CompanyContextSettingsSchema(BaseModel):
@@ -290,6 +296,37 @@ def patch_company_context(
     )
 
     return settings
+
+
+@router.post("/auto-fill")
+def auto_fill_company_profile(
+    data: AutoFillProfileInput = AutoFillProfileInput(),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Compila dati demo realistici su azienda, contesto report e assessment."""
+    from app.services.demo_company_context import auto_fill_company_profile as fill_profile
+
+    company = db.query(Company).filter(
+        Company.company_id == current_user.company_id,
+    ).first()
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+
+    reporting_year = data.reporting_year or company.reporting_year or 2026
+
+    try:
+        return fill_profile(
+            db,
+            company,
+            reporting_year,
+            fill_emissions=data.fill_emissions,
+            overwrite=data.overwrite,
+        )
+    except Exception as e:
+        db.rollback()
+        logger.exception("Auto-fill company profile failed")
+        raise HTTPException(status_code=500, detail=f"Auto-fill failed: {str(e)}")
 
 
 @router.delete("", status_code=204)

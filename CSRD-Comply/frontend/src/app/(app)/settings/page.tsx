@@ -6,8 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui'
 import { Button } from '@/components/ui'
 import { Input } from '@/components/ui'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui'
-import { Save, User, Building, Palette, FileText, Loader2 } from 'lucide-react'
-import { companies } from '@/lib/api'
+import { Save, User, Building, Palette, FileText, Loader2, Sparkles } from 'lucide-react'
+import { companies, companyContext } from '@/lib/api'
 import { useTheme } from '@/components/ThemeProvider'
 
 const CompanyContextSettings = dynamic(
@@ -37,27 +37,48 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [autoFillLoading, setAutoFillLoading] = useState(false)
+  const [contextRefreshKey, setContextRefreshKey] = useState(0)
+
+  const applyCompanyData = (data: Record<string, any>, extras?: Record<string, any>) => {
+    if (data.company_name) setCompanyName(data.company_name)
+    if (data.vat_number) setVatId(data.vat_number)
+    if (extras?.country_display || data.country) {
+      setCountry(extras?.country_display || data.country)
+    }
+    if (data.sector) setNaceCode(data.sector)
+    if (data.employee_count != null) setEmployees(String(data.employee_count))
+    if (data.turnover != null) setTurnover(String(data.turnover))
+    if (extras?.legal_form) setLegalForm(extras.legal_form)
+    if (extras?.fiscal_year) setFiscalYear(String(extras.fiscal_year))
+    if (data.reporting_year) setFiscalYear(String(data.reporting_year))
+    if (extras?.website) setWebsite(extras.website)
+    if (extras?.address) setAddress(extras.address)
+    if (extras?.city) setCity(extras.city)
+    if (extras?.province) setProvince(extras.province)
+    if (extras?.zip_code) setZipCode(extras.zip_code)
+    if (extras?.phone) setPhone(extras.phone)
+    if (extras?.pec) setPec(extras.pec)
+    if (extras?.sdi_code) setSdiCode(extras.sdi_code)
+  }
 
   useEffect(() => {
     const loadCompany = async () => {
       try {
         const data = await companies.getMe()
-        if (data.company_name) setCompanyName(data.company_name)
-        if (data.vat_number) setVatId(data.vat_number)
-        if (data.country) setCountry(data.country)
-        if (data.sector) setNaceCode(data.sector)
-        if (data.employee_count) setEmployees(String(data.employee_count))
-        if (data.turnover) setTurnover(String(data.turnover))
-        if (data.legal_form) setLegalForm(data.legal_form)
-        if (data.fiscal_year) setFiscalYear(String(data.fiscal_year))
-        if (data.website) setWebsite(data.website)
-        if (data.address) setAddress(data.address)
-        if (data.city) setCity(data.city)
-        if (data.province) setProvince(data.province)
-        if (data.zip_code) setZipCode(data.zip_code)
-        if (data.phone) setPhone(data.phone)
-        if (data.pec) setPec(data.pec)
-        if (data.sdi_code) setSdiCode(data.sdi_code)
+        applyCompanyData(data, {
+          country_display: data.country === 'IT' ? 'Italia' : data.country,
+          legal_form: data.legal_form,
+          fiscal_year: data.reporting_year,
+          website: data.website,
+          address: data.address,
+          city: data.city,
+          province: data.province,
+          zip_code: data.zip_code,
+          phone: data.phone,
+          pec: data.pec,
+          sdi_code: data.sdi_code,
+        })
       } catch (err: any) {
         console.error('[SettingsPage] Load error:', err)
       } finally {
@@ -66,6 +87,29 @@ export default function SettingsPage() {
     }
     loadCompany()
   }, [])
+
+  const handleAutoFill = async () => {
+    setAutoFillLoading(true)
+    setMessage(null)
+    try {
+      const year = fiscalYear ? Number(fiscalYear) : undefined
+      const result = await companyContext.autoFill({
+        reporting_year: year,
+        fill_emissions: true,
+        overwrite: true,
+      })
+      applyCompanyData(result.company || {}, result.profile_extras || {})
+      setContextRefreshKey((k) => k + 1)
+      setMessage({
+        type: 'success',
+        text: result.message || 'Profilo demo compilato su azienda, contesto report ed emissioni.',
+      })
+    } catch (err: any) {
+      setMessage({ type: 'error', text: err.message || 'Errore durante la compilazione automatica' })
+    } finally {
+      setAutoFillLoading(false)
+    }
+  }
 
   const handleSave = async () => {
     setSaving(true)
@@ -102,7 +146,40 @@ export default function SettingsPage() {
 
   return (
     <div>
-      <h2 className="text-2xl font-bold text-foreground mb-6">Impostazioni</h2>
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
+        <div>
+          <h2 className="text-2xl font-bold text-foreground">Impostazioni</h2>
+          <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
+            Compila automaticamente un profilo PMI manifatturiero realistico in tutte le sezioni:
+            dati aziendali, contesto report CSRD, assessment e emissioni GHG.
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          onClick={handleAutoFill}
+          disabled={autoFillLoading || loading}
+          className="shrink-0"
+        >
+          {autoFillLoading ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <Sparkles className="h-4 w-4 mr-2" />
+          )}
+          {autoFillLoading ? 'Compilazione...' : 'Compila profilo demo'}
+        </Button>
+      </div>
+
+      {message && (
+        <div
+          className={`text-sm px-3 py-2 rounded-md mb-4 ${
+            message.type === 'success'
+              ? 'bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-400'
+              : 'bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-400'
+          }`}
+        >
+          {message.text}
+        </div>
+      )}
       
       <Tabs defaultValue="company" className="space-y-4">
         <TabsList>
@@ -225,18 +302,6 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              {message && (
-                <div
-                  className={`text-sm px-3 py-2 rounded-md ${
-                    message.type === 'success'
-                      ? 'bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-400'
-                      : 'bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-400'
-                  }`}
-                >
-                  {message.text}
-                </div>
-              )}
-
               <Button onClick={handleSave} disabled={saving}>
                 {saving ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -304,7 +369,7 @@ export default function SettingsPage() {
         </TabsContent>
 
         <TabsContent value="context">
-          <CompanyContextSettings />
+          <CompanyContextSettings refreshKey={contextRefreshKey} />
         </TabsContent>
       </Tabs>
     </div>

@@ -9,7 +9,7 @@ import { companyContext } from '@/lib/api'
 import type { CompanyContextSettings as ContextSettings } from '@/types'
 import {
   Save, Loader2, Building2, Cloud, Truck, Users,
-  CreditCard, Shield, Plus, X, ChevronDown, ChevronUp,
+  CreditCard, Shield, Plus, X, ChevronDown, ChevronUp, Sparkles,
 } from 'lucide-react'
 
 type SectionKey = 'company_profile' | 'ghg_emissions' | 'supply_chain' | 'workforce_kpis' | 'payment_practices' | 'governance'
@@ -140,10 +140,15 @@ const defaultData: ContextSettings = {
   company_id: '',
 }
 
-export default function CompanyContextSettingsForm() {
+export default function CompanyContextSettingsForm({
+  refreshKey = 0,
+}: {
+  refreshKey?: number
+}) {
   const [data, setData] = useState<ContextSettings>({ ...defaultData })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [autoFillLoading, setAutoFillLoading] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [expanded, setExpanded] = useState<Record<SectionKey, boolean>>({
     company_profile: true,
@@ -154,7 +159,7 @@ export default function CompanyContextSettingsForm() {
     governance: false,
   })
 
-  useEffect(() => { loadData() }, [])
+  useEffect(() => { loadData() }, [refreshKey])
 
   const loadData = async () => {
     try {
@@ -206,6 +211,26 @@ export default function CompanyContextSettingsForm() {
       if (Array.isArray(v)) return v.length > 0
       return true
     }).length
+  }
+
+  const handleAutoFill = async () => {
+    setAutoFillLoading(true)
+    setMessage(null)
+    try {
+      const result = await companyContext.autoFill({
+        fill_emissions: true,
+        overwrite: true,
+      })
+      await loadData()
+      setMessage({
+        type: 'success',
+        text: result.message || 'Profilo demo compilato. I valori sostituiranno i placeholder nei report.',
+      })
+    } catch (err: any) {
+      setMessage({ type: 'error', text: err.message || 'Auto-fill failed' })
+    } finally {
+      setAutoFillLoading(false)
+    }
   }
 
   const handleSave = async () => {
@@ -277,10 +302,25 @@ export default function CompanyContextSettingsForm() {
             Empty fields leave the placeholder visible so you know what data is still missing.
           </p>
         </div>
-        <Button onClick={handleSave} disabled={saving} size="default">
-          {saving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}
-          {saving ? 'Saving…' : 'Save'}
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={handleAutoFill}
+            disabled={autoFillLoading || saving}
+            size="default"
+          >
+            {autoFillLoading ? (
+              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+            ) : (
+              <Sparkles className="h-4 w-4 mr-1" />
+            )}
+            {autoFillLoading ? 'Compilazione…' : 'Compila profilo demo'}
+          </Button>
+          <Button onClick={handleSave} disabled={saving || autoFillLoading} size="default">
+            {saving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}
+            {saving ? 'Saving…' : 'Save'}
+          </Button>
+        </div>
       </div>
 
       {message && (

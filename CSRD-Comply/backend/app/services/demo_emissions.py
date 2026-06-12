@@ -355,6 +355,8 @@ def auto_fill_emissions(
 
         if year == reporting_year:
             sync_company_context_ghg(db, company, year, calculated)
+            from app.services.demo_company_context import sync_full_demo_context
+            sync_full_demo_context(db, company, year, overwrite=True)
             latest_profile = profile
             latest_calculated = calculated
 
@@ -372,7 +374,7 @@ def auto_fill_emissions(
     db.commit()
 
     return {
-        "message": "Dati emissioni compilati automaticamente con profilo PMI realistico.",
+        "message": "Dati emissioni e profilo aziendale CSRD compilati con KPI coerenti (S1, S2, G1, E2).",
         "profile": latest_profile["profile_label"] if latest_profile else "",
         "years_filled": years,
         "summaries": summaries,

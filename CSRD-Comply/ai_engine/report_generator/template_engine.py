@@ -374,6 +374,87 @@ class ReportTemplate:
         "corruption_fines_eur":                  {"section": "governance",    "type": "currency",  "unit": "EUR", "magnitude": (0, 1e12)},
         "late_payment_interest_eur":             {"section": "governance",    "type": "currency",  "unit": "EUR", "magnitude": (0, 1e12)},
         "payment_disputes_count":              {"section": "governance",    "type": "count",     "unit": "disputes", "magnitude": (0, 1_000_000)},
+        "workforce_baseline_year":             {"section": "workforce",     "type": "year",      "unit": None,             "magnitude": (2000, 2100)},
+        "works_councils_count":                {"section": "workforce",     "type": "count",     "unit": "bodies",         "magnitude": (0, 500)},
+        "hs_committee_min_employees":          {"section": "workforce",     "type": "count",     "unit": "employees",      "magnitude": (1, 500)},
+        "survey_participation_pct":            {"section": "workforce",     "type": "percentage","unit": "%",              "magnitude": (0, 100)},
+        "focus_group_attendance_pct":          {"section": "workforce",     "type": "percentage","unit": "%",              "magnitude": (0, 100)},
+        "consultation_response_rate_pct":      {"section": "workforce",     "type": "percentage","unit": "%",              "magnitude": (0, 100)},
+        "training_completion_pct":             {"section": "workforce",     "type": "percentage","unit": "%",              "magnitude": (0, 100)},
+        "enps_baseline":                       {"section": "workforce",     "type": "float",     "unit": "score",           "magnitude": (-100, 100)},
+        "enps_target_2026":                    {"section": "workforce",     "type": "float",     "unit": "score",           "magnitude": (-100, 100)},
+        "enps_target_2030":                    {"section": "workforce",     "type": "float",     "unit": "score",           "magnitude": (-100, 100)},
+        "women_mgmt_baseline_pct":             {"section": "workforce",     "type": "percentage","unit": "%",              "magnitude": (0, 100)},
+        "women_mgmt_target_2026_pct":          {"section": "workforce",     "type": "percentage","unit": "%",              "magnitude": (0, 100)},
+        "women_mgmt_target_2030_pct":          {"section": "workforce",     "type": "percentage","unit": "%",              "magnitude": (0, 100)},
+        "gender_pay_gap_baseline_pct":         {"section": "workforce",     "type": "percentage","unit": "%",              "magnitude": (-100, 100)},
+        "gender_pay_gap_target_2026_pct":      {"section": "workforce",     "type": "percentage","unit": "%",              "magnitude": (-100, 100)},
+        "gender_pay_gap_target_2030_pct":      {"section": "workforce",     "type": "percentage","unit": "%",              "magnitude": (-100, 100)},
+        "ltifr_baseline":                      {"section": "workforce",     "type": "float",     "unit": "per_1000",        "magnitude": (0, 500)},
+        "ltifr_target_2026":                   {"section": "workforce",     "type": "float",     "unit": "per_1000",        "magnitude": (0, 500)},
+        "training_hours_baseline":             {"section": "workforce",     "type": "float",     "unit": "hours",           "magnitude": (0, 10_000)},
+        "training_hours_target_2026":          {"section": "workforce",     "type": "float",     "unit": "hours",           "magnitude": (0, 10_000)},
+        "training_hours_target_2030":          {"section": "workforce",     "type": "float",     "unit": "hours",           "magnitude": (0, 10_000)},
+        "supplier_audit_coverage_baseline_pct": {"section": "supply_chain","type": "percentage","unit": "%",             "magnitude": (0, 100)},
+        "supplier_audit_coverage_target_2026_pct": {"section": "supply_chain","type": "percentage","unit": "%",          "magnitude": (0, 100)},
+        "supplier_audit_coverage_current_pct": {"section": "supply_chain","type": "percentage","unit": "%",             "magnitude": (0, 100)},
+        "supplier_cap_closure_baseline_pct":   {"section": "supply_chain","type": "percentage","unit": "%",             "magnitude": (0, 100)},
+        "supplier_cap_closure_target_2026_pct":{"section": "supply_chain","type": "percentage","unit": "%",             "magnitude": (0, 100)},
+        "supplier_cap_closure_target_2030_pct":{"section": "supply_chain","type": "percentage","unit": "%",             "magnitude": (0, 100)},
+        "supplier_cap_closure_current_pct":    {"section": "supply_chain","type": "percentage","unit": "%",             "magnitude": (0, 100)},
+        "supplier_high_risk_engagement_current_pct": {"section": "supply_chain","type": "percentage","unit": "%",       "magnitude": (0, 100)},
+        "supplier_grievance_channel_baseline_pct": {"section": "supply_chain","type": "percentage","unit": "%",         "magnitude": (0, 100)},
+        "supplier_grievance_channel_target_2026_pct": {"section": "supply_chain","type": "percentage","unit": "%",      "magnitude": (0, 100)},
+        "supplier_grievance_channel_current_pct": {"section": "supply_chain","type": "percentage","unit": "%",        "magnitude": (0, 100)},
+        "supplier_reps_trained_per_year":    {"section": "supply_chain","type": "count",     "unit": "people",         "magnitude": (0, 100_000)},
+        "supplier_reps_trained_baseline":    {"section": "supply_chain","type": "count",     "unit": "people",         "magnitude": (0, 100_000)},
+        "supplier_reps_trained_target_2026": {"section": "supply_chain","type": "count",     "unit": "people",         "magnitude": (0, 100_000)},
+        "supplier_reps_trained_target_2030": {"section": "supply_chain","type": "count",     "unit": "people",         "magnitude": (0, 100_000)},
+        "supplier_self_assessment_pct":      {"section": "supply_chain","type": "percentage","unit": "%",             "magnitude": (0, 100)},
+        "supplier_esg_assessment_pct":       {"section": "supply_chain","type": "percentage","unit": "%",             "magnitude": (0, 100)},
+        "supplier_strategic_review_pct":     {"section": "supply_chain","type": "percentage","unit": "%",             "magnitude": (0, 100)},
+        "supplier_workers_data_coverage_pct":{"section": "supply_chain","type": "percentage","unit": "%",             "magnitude": (0, 100)},
+        "anti_corruption_training_high_risk_pct": {"section": "governance","type": "percentage","unit": "%",          "magnitude": (0, 100)},
+        "anti_corruption_training_board_pct":{"section": "governance","type": "percentage","unit": "%",              "magnitude": (0, 100)},
+        "due_diligence_screenings_count":    {"section": "governance","type": "count",     "unit": "screenings",     "magnitude": (0, 1_000_000)},
+        "due_diligence_screenings_prior_year":{"section": "governance","type": "count",    "unit": "screenings",     "magnitude": (0, 1_000_000)},
+        "corruption_investigations_count":   {"section": "governance","type": "count",     "unit": "investigations", "magnitude": (0, 100_000)},
+        "corruption_investigations_prior_year":{"section": "governance","type": "count",    "unit": "investigations", "magnitude": (0, 100_000)},
+        "confirmed_corruption_count":        {"section": "governance","type": "count",     "unit": "incidents",      "magnitude": (0, 100_000)},
+        "confirmed_bribery_count":           {"section": "governance","type": "count",     "unit": "incidents",      "magnitude": (0, 100_000)},
+        "corruption_public_officials_count": {"section": "governance","type": "count",     "unit": "incidents",      "magnitude": (0, 100_000)},
+        "corruption_business_partners_count":{"section": "governance","type": "count",     "unit": "incidents",      "magnitude": (0, 100_000)},
+        "corruption_convictions_count":      {"section": "governance","type": "count",     "unit": "convictions",    "magnitude": (0, 100_000)},
+        "corruption_pending_actions_count":  {"section": "governance","type": "count",     "unit": "actions",        "magnitude": (0, 100_000)},
+        "suppliers_terminated_corruption_count": {"section": "governance","type": "count", "unit": "suppliers",      "magnitude": (0, 100_000)},
+        "cod_reduction_pct":                 {"section": "pollution", "type": "percentage","unit": "%",             "magnitude": (0, 100)},
+        "heavy_metals_reduction_pct":        {"section": "pollution", "type": "percentage","unit": "%",             "magnitude": (0, 100)},
+        "soc_reduction_pct":                 {"section": "pollution", "type": "percentage","unit": "%",             "magnitude": (0, 100)},
+        "pm_emissions_kg_year":              {"section": "pollution", "type": "float",     "unit": "kg",             "magnitude": (0, 1e9)},
+        "sensitivity_emissions_delta_kg":    {"section": "pollution", "type": "float",     "unit": "kg",             "magnitude": (0, 1e9)},
+        "capex_wastewater_eur":              {"section": "pollution", "type": "currency",  "unit": "EUR",            "magnitude": (0, 1e12)},
+        "capex_substance_phaseout_eur":      {"section": "pollution", "type": "currency",  "unit": "EUR",            "magnitude": (0, 1e12)},
+        "capex_soil_remediation_eur":        {"section": "pollution", "type": "currency",  "unit": "EUR",            "magnitude": (0, 1e12)},
+        "nox_baseline_kg_year":              {"section": "pollution", "type": "float",     "unit": "kg",             "magnitude": (0, 1e9)},
+        "sox_baseline_kg_year":              {"section": "pollution", "type": "float",     "unit": "kg",             "magnitude": (0, 1e9)},
+        "voc_baseline_kg_year":              {"section": "pollution", "type": "float",     "unit": "kg",             "magnitude": (0, 1e9)},
+        "nox_reduction_2030_pct":            {"section": "pollution", "type": "percentage","unit": "%",             "magnitude": (0, 100)},
+        "sox_reduction_2030_pct":            {"section": "pollution", "type": "percentage","unit": "%",             "magnitude": (0, 100)},
+        "supplier_audit_nc_health_safety_pct": {"section": "supply_chain","type": "percentage","unit": "%",           "magnitude": (0, 100)},
+        "supplier_audit_nc_working_hours_pct": {"section": "supply_chain","type": "percentage","unit": "%",           "magnitude": (0, 100)},
+        "supplier_audit_nc_wages_pct":       {"section": "supply_chain","type": "percentage","unit": "%",             "magnitude": (0, 100)},
+        "supplier_audit_nc_freedom_pct":     {"section": "supply_chain","type": "percentage","unit": "%",             "magnitude": (0, 100)},
+        "supplier_audit_nc_environment_pct": {"section": "supply_chain","type": "percentage","unit": "%",             "magnitude": (0, 100)},
+        "workforce_geo_primary_pct":         {"section": "workforce",     "type": "percentage","unit": "%",              "magnitude": (0, 100)},
+        "workforce_geo_secondary_pct":       {"section": "workforce",     "type": "percentage","unit": "%",              "magnitude": (0, 100)},
+        "workforce_geo_intl_pct":            {"section": "workforce",     "type": "percentage","unit": "%",              "magnitude": (0, 100)},
+        "workforce_geo_primary_count":       {"section": "workforce",     "type": "count",     "unit": "employees",      "magnitude": (0, 1_000_000)},
+        "workforce_geo_secondary_count":     {"section": "workforce",     "type": "count",     "unit": "employees",      "magnitude": (0, 1_000_000)},
+        "workforce_geo_intl_count":          {"section": "workforce",     "type": "count",     "unit": "employees",      "magnitude": (0, 1_000_000)},
+        "payment_volume_sme_pct":            {"section": "governance",    "type": "percentage","unit": "%",              "magnitude": (0, 100)},
+        "payment_volume_large_pct":          {"section": "governance",    "type": "percentage","unit": "%",              "magnitude": (0, 100)},
+        "payment_volume_strategic_pct":      {"section": "governance",    "type": "percentage","unit": "%",              "magnitude": (0, 100)},
+        "payment_volume_public_pct":         {"section": "governance",    "type": "percentage","unit": "%",              "magnitude": (0, 100)},
         "operational_sites_count":    {"section": "profile",       "type": "count",     "unit": "sites",          "magnitude": (1, 100_000)},
         # GHG Emissions — keys must match context dict in reports.py
         "scope1_emissions":           {"section": "emissions",     "type": "float",     "unit": "tCO2e",          "magnitude": (0, 1e9)},
@@ -1701,7 +1782,7 @@ class ReportTemplate:
                 <td>Pollutant emissions to air (NOx, SOx, PM)</td>
                 <td>Emission factors based on equipment type and fuel consumption</td>
                 <td>Factors sourced from [TBC:regulatory_database_name] regulatory database; operating hours estimated</td>
-                <td>A &plusmn;15% change in operating hours would affect reported emissions by [TBC:air_emissions_pm_reduction_pct] kg/year</td>
+                <td>A &plusmn;15% change in operating hours would affect reported emissions by [TBC:sensitivity_emissions_delta_kg] kg/year</td>
             </tr>
             <tr>
                 <td>Workforce gender pay gap</td>
@@ -2094,37 +2175,37 @@ class ReportTemplate:
             <tr>
                 <td>Installation of upgraded bag filter systems at [TBC:pollution_facilities_count] facilities</td>
                 <td>Air emissions (PM)</td>
-                <td>[TBC:air_emissions_pm_reduction_pct]%</td>
+                <td>[TBC:status_e2]</td>
                 <td>[TBC:substitution_timeline_years] years</td>
                 <td>[TBC:capex_pollution_eur]</td>
             </tr>
             <tr>
                 <td>Implementation of solvent recovery system for VOC abatement</td>
                 <td>Air emissions (VOCs)</td>
-                <td>[TBC:air_emissions_voc_reduction_pct]%</td>
+                <td>[TBC:status_e2]</td>
                 <td>[TBC:substitution_timeline_years] years</td>
                 <td>[TBC:opex_pollution_eur]</td>
             </tr>
             <tr>
                 <td>Upgrade of industrial wastewater treatment plant at [TBC:site_name] site</td>
                 <td>Water pollution</td>
-                <td>[TBC:hazardous_waste_treated_pct]%</td>
+                <td>[TBC:status_e2]</td>
                 <td>[TBC:substitution_timeline_years] years</td>
-                <td>[TBC:financial_resources_eur]</td>
+                <td>[TBC:capex_wastewater_eur]</td>
             </tr>
             <tr>
                 <td>Phase-out of [TBC:substance_name] substance of concern from product formulation</td>
                 <td>Substances of concern</td>
-                <td>[TBC:hazardous_waste_recovered_pct]%</td>
+                <td>[TBC:status_e2]</td>
                 <td>[TBC:target_year]</td>
-                <td>[TBC:financial_resources_eur]</td>
+                <td>[TBC:capex_substance_phaseout_eur]</td>
             </tr>
             <tr>
                 <td>Soil remediation programme at [TBC:site_name] former industrial site</td>
                 <td>Soil contamination</td>
-                <td>[TBC:soil_remediation_sites_count]%</td>
+                <td>[TBC:status_e2]</td>
                 <td>[TBC:target_year]</td>
-                <td>[TBC:financial_resources_eur]</td>
+                <td>[TBC:capex_soil_remediation_eur]</td>
             </tr>
         </tbody>
     </table>
@@ -2172,23 +2253,23 @@ class ReportTemplate:
             <tr>
                 <td>Nitrogen oxides (NOx)</td>
                 <td>[TBC:emissions_baseline_year]</td>
-                <td>[TBC:air_emissions_pm_reduction_pct] kg/year</td>
-                <td>&minus;[TBC:air_emissions_pm_reduction_pct]%</td>
-                <td>&minus;[TBC:air_emissions_pm_reduction_pct]%</td>
-                <td>[TBC:air_emissions_pm_reduction_pct]%</td>
+                <td>[TBC:nox_baseline_kg_year] kg/year</td>
+                <td>&minus;[TBC:nox_reduction_2030_pct]%</td>
+                <td>&minus;[TBC:nox_reduction_2030_pct]%</td>
+                <td>[TBC:nox_reduction_2030_pct]%</td>
             </tr>
             <tr>
                 <td>Sulphur oxides (SOx)</td>
                 <td>[TBC:emissions_baseline_year]</td>
-                <td>[TBC:air_emissions_voc_reduction_pct] kg/year</td>
-                <td>&minus;[TBC:air_emissions_voc_reduction_pct]%</td>
-                <td>&minus;[TBC:air_emissions_voc_reduction_pct]%</td>
-                <td>[TBC:air_emissions_voc_reduction_pct]%</td>
+                <td>[TBC:sox_baseline_kg_year] kg/year</td>
+                <td>&minus;[TBC:sox_reduction_2030_pct]%</td>
+                <td>&minus;[TBC:sox_reduction_2030_pct]%</td>
+                <td>[TBC:sox_reduction_2030_pct]%</td>
             </tr>
             <tr>
                 <td>Particulate matter (PM10/PM2.5)</td>
                 <td>[TBC:emissions_baseline_year]</td>
-                <td>[TBC:air_emissions_pm_reduction_pct] kg/year</td>
+                <td>[TBC:pm_emissions_kg_year] kg/year</td>
                 <td>&minus;[TBC:air_emissions_pm_reduction_pct]%</td>
                 <td>&minus;[TBC:air_emissions_pm_reduction_pct]%</td>
                 <td>[TBC:air_emissions_pm_reduction_pct]%</td>
@@ -2196,7 +2277,7 @@ class ReportTemplate:
             <tr>
                 <td>Volatile organic compounds (VOCs)</td>
                 <td>[TBC:emissions_baseline_year]</td>
-                <td>[TBC:air_emissions_voc_reduction_pct] kg/year</td>
+                <td>[TBC:voc_baseline_kg_year] kg/year</td>
                 <td>&minus;[TBC:air_emissions_voc_reduction_pct]%</td>
                 <td>&minus;[TBC:air_emissions_voc_reduction_pct]%</td>
                 <td>[TBC:air_emissions_voc_reduction_pct]%</td>
@@ -2207,15 +2288,15 @@ class ReportTemplate:
     <h5>Water pollution targets</h5>
     <ul>
         <li><strong>Effluent quality:</strong> 100% compliance with all discharge permit conditions throughout the reporting period. Target: zero non-compliance events.</li>
-        <li><strong>Chemical Oxygen Demand (COD) load:</strong> Reduction of COD in wastewater discharges by [TBC:air_emissions_pm_reduction_pct]% by 2030 (baseline: [TBC:air_emissions_pm_reduction_pct] kg/year).</li>
-        <li><strong>Heavy metal concentrations:</strong> Reduction of heavy metal content (lead, cadmium, mercury) in effluent by [TBC:air_emissions_pm_reduction_pct]% by 2030.</li>
+        <li><strong>Chemical Oxygen Demand (COD) load:</strong> Reduction of COD in wastewater discharges by [TBC:cod_reduction_pct]% by 2030 (baseline: [TBC:pm_emissions_kg_year] kg/year).</li>
+        <li><strong>Heavy metal concentrations:</strong> Reduction of heavy metal content (lead, cadmium, mercury) in effluent by [TBC:heavy_metals_reduction_pct]% by 2030.</li>
     </ul>
 
     <h5>Substances of concern targets</h5>
     <ul>
         <li><strong>SVHC substitution:</strong> Phase-out of [TBC:svhc_substances_count] substances of very high concern from product formulations by [TBC:target_year].</li>
         <li><strong>SCIP notification:</strong> 100% compliance with SCIP database notification obligations for all articles containing substances of concern above threshold.</li>
-        <li><strong>Reduction target:</strong> Reduction in the total weight of substances of concern used in production by [TBC:air_emissions_pm_reduction_pct]% by [TBC:target_year].</li>
+        <li><strong>Reduction target:</strong> Reduction in the total weight of substances of concern used in production by [TBC:soc_reduction_pct]% by [TBC:target_year].</li>
     </ul>
 
     <h5>Soil contamination targets</h5>
@@ -2551,25 +2632,25 @@ class ReportTemplate:
                 <td>Annual employee engagement survey</td>
                 <td>Annual</td>
                 <td>All employees</td>
-                <td>[TBC:employee_engagement_score]%</td>
+                <td>[TBC:survey_participation_pct]%</td>
             </tr>
             <tr>
                 <td>Quarterly town hall meetings</td>
                 <td>Quarterly</td>
                 <td>All employees (in-person and virtual)</td>
-                <td>[TBC:employee_engagement_score]% average attendance</td>
+                <td>[TBC:focus_group_attendance_pct]% average attendance</td>
             </tr>
             <tr>
                 <td>Pulse surveys on specific topics</td>
                 <td>As needed (minimum 2/year)</td>
                 <td>Selected employee groups</td>
-                <td>[TBC:employee_engagement_score]%</td>
+                <td>[TBC:consultation_response_rate_pct]%</td>
             </tr>
             <tr>
                 <td>Exit interviews</td>
                 <td>On voluntary termination</td>
                 <td>All departing employees</td>
-                <td>[TBC:employee_engagement_score]% completion</td>
+                <td>[TBC:training_completion_pct]% completion</td>
             </tr>
             <tr>
                 <td>Departmental meetings with direct supervisors</td>
@@ -2590,9 +2671,9 @@ class ReportTemplate:
     <p>The undertaking respects the right of all employees to join trade unions and to be represented by worker representatives in accordance with national laws and EU directives. As of the reporting date:</p>
     <ul>
         <li><strong>Union representation:</strong> [TBC:union_coverage_pct]% of the workforce is covered by collective bargaining agreements.</li>
-        <li><strong>Works councils / employee representatives:</strong> [TBC:employee_count_total] bodies are active at [TBC:operational_sites_count] locations.</li>
+        <li><strong>Works councils / employee representatives:</strong> [TBC:works_councils_count] bodies are active at [TBC:operational_sites_count] locations.</li>
         <li><strong>European Works Council (EWC):</strong> [TO BE CONFIRMED — describe if applicable].</li>
-        <li><strong>Health and safety committees:</strong> Joint health and safety committees operate at all sites with more than [TBC:employee_count_total] employees.</li>
+        <li><strong>Health and safety committees:</strong> Joint health and safety committees operate at all sites with more than [TBC:hs_committee_min_employees] employees.</li>
     </ul>
 
     <h5>Purpose and outcomes of engagement</h5>
@@ -2850,41 +2931,41 @@ class ReportTemplate:
             <tr>
                 <td>Employee engagement</td>
                 <td>Employee Net Promoter Score (eNPS)</td>
-                <td>[TBC:employee_engagement_score] ([TBC:emissions_baseline_year])</td>
-                <td>[TBC:employee_engagement_score]</td>
-                <td>[TBC:employee_engagement_score]</td>
+                <td>[TBC:enps_baseline] ([TBC:workforce_baseline_year])</td>
+                <td>[TBC:enps_target_2026]</td>
+                <td>[TBC:enps_target_2030]</td>
                 <td>[TBC:employee_engagement_score]</td>
             </tr>
             <tr>
                 <td>Gender diversity in management</td>
                 <td>Percentage of women in management positions</td>
-                <td>[TBC:women_in_management_pct]% ([TBC:emissions_baseline_year])</td>
-                <td>[TBC:women_in_management_pct]%</td>
-                <td>[TBC:women_in_management_pct]%</td>
+                <td>[TBC:women_mgmt_baseline_pct]% ([TBC:workforce_baseline_year])</td>
+                <td>[TBC:women_mgmt_target_2026_pct]%</td>
+                <td>[TBC:women_mgmt_target_2030_pct]%</td>
                 <td>[TBC:women_in_management_pct]%</td>
             </tr>
             <tr>
                 <td>Gender pay gap</td>
                 <td>Reduction of unadjusted gender pay gap</td>
-                <td>[TBC:gender_pay_gap_pct]% ([TBC:emissions_baseline_year])</td>
-                <td>&minus;[TBC:gender_pay_gap_pct]%</td>
-                <td>&minus;[TBC:gender_pay_gap_pct]%</td>
+                <td>[TBC:gender_pay_gap_baseline_pct]% ([TBC:workforce_baseline_year])</td>
+                <td>&minus;[TBC:gender_pay_gap_target_2026_pct]%</td>
+                <td>&minus;[TBC:gender_pay_gap_target_2030_pct]%</td>
                 <td>[TBC:gender_pay_gap_pct]% achieved</td>
             </tr>
             <tr>
                 <td>Health and safety</td>
                 <td>Lost-time injury frequency rate (LTIFR)</td>
-                <td>[TBC:ltifr] ([TBC:emissions_baseline_year])</td>
-                <td>[TBC:ltifr]</td>
+                <td>[TBC:ltifr_baseline] ([TBC:workforce_baseline_year])</td>
+                <td>[TBC:ltifr_target_2026]</td>
                 <td>Zero harm</td>
                 <td>[TBC:ltifr]</td>
             </tr>
             <tr>
                 <td>Training</td>
                 <td>Average training hours per employee per year</td>
-                <td>[TBC:avg_training_hours_per_employee] hrs ([TBC:emissions_baseline_year])</td>
-                <td>[TBC:avg_training_hours_per_employee] hrs</td>
-                <td>[TBC:avg_training_hours_per_employee] hrs</td>
+                <td>[TBC:training_hours_baseline] hrs ([TBC:workforce_baseline_year])</td>
+                <td>[TBC:training_hours_target_2026] hrs</td>
+                <td>[TBC:training_hours_target_2030] hrs</td>
                 <td>[TBC:avg_training_hours_per_employee] hrs</td>
             </tr>
             <tr>
@@ -2989,18 +3070,18 @@ class ReportTemplate:
         <tbody>
             <tr>
                 <td>[TBC:country] — primary</td>
-                <td>[TBC:employee_count_total]</td>
-                <td>[TBC:employee_engagement_score]%</td>
+                <td>[TBC:workforce_geo_primary_count]</td>
+                <td>[TBC:workforce_geo_primary_pct]%</td>
             </tr>
             <tr>
                 <td>[TBC:country] — other</td>
-                <td>[TBC:employee_count_total]</td>
-                <td>[TBC:employee_engagement_score]%</td>
+                <td>[TBC:workforce_geo_secondary_count]</td>
+                <td>[TBC:workforce_geo_secondary_pct]%</td>
             </tr>
             <tr>
                 <td>[TBC:country] — international</td>
-                <td>[TBC:employee_count_total]</td>
-                <td>[TBC:employee_engagement_score]%</td>
+                <td>[TBC:workforce_geo_intl_count]</td>
+                <td>[TBC:workforce_geo_intl_pct]%</td>
             </tr>
             <tr>
                 <td><strong>Total</strong></td>
@@ -3380,9 +3461,9 @@ class ReportTemplate:
     <h5>Effectiveness tracking</h5>
     <p>The undertaking tracks the effectiveness of its actions through:</p>
     <ul>
-        <li>Percentage of suppliers audited (target: [TBC:suppliers_code_of_conduct_pct]% of Tier 1 suppliers annually).</li>
+        <li>Percentage of suppliers audited (target: [TBC:supplier_audit_coverage_target_2026_pct]% of Tier 1 suppliers annually).</li>
         <li>Average audit score trend (target: improvement year-on-year).</li>
-        <li>CAP closure rate (target: [TBC:suppliers_code_of_conduct_pct]% within agreed timeline).</li>
+        <li>CAP closure rate (target: [TBC:supplier_cap_closure_target_2030_pct]% within agreed timeline).</li>
         <li>Reduction in severity and frequency of non-compliances over time.</li>
         <li>Number of workers reached through capacity-building programmes.</li>
     </ul>
@@ -3425,42 +3506,42 @@ class ReportTemplate:
             <tr>
                 <td>Supplier audit coverage</td>
                 <td>% of Tier 1 suppliers audited annually</td>
-                <td>[TBC:suppliers_code_of_conduct_pct]% ([TBC:emissions_baseline_year])</td>
-                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
+                <td>[TBC:supplier_audit_coverage_baseline_pct]% ([TBC:workforce_baseline_year])</td>
+                <td>[TBC:supplier_audit_coverage_target_2026_pct]%</td>
                 <td>100%</td>
-                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
+                <td>[TBC:supplier_audit_coverage_current_pct]%</td>
             </tr>
             <tr>
                 <td>Corrective action plan closure</td>
                 <td>% of CAPs closed within agreed timeline</td>
-                <td>[TBC:suppliers_code_of_conduct_pct]% ([TBC:emissions_baseline_year])</td>
-                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
-                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
-                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
+                <td>[TBC:supplier_cap_closure_baseline_pct]% ([TBC:workforce_baseline_year])</td>
+                <td>[TBC:supplier_cap_closure_target_2026_pct]%</td>
+                <td>[TBC:supplier_cap_closure_target_2030_pct]%</td>
+                <td>[TBC:supplier_cap_closure_current_pct]%</td>
             </tr>
             <tr>
                 <td>High-risk supplier engagement</td>
                 <td>% of high-risk suppliers with active CAP or improvement programme</td>
-                <td>[TBC:suppliers_code_of_conduct_pct]% ([TBC:emissions_baseline_year])</td>
+                <td>[TBC:supplier_high_risk_engagement_current_pct]% ([TBC:workforce_baseline_year])</td>
                 <td>100%</td>
                 <td>100%</td>
-                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
+                <td>[TBC:supplier_high_risk_engagement_current_pct]%</td>
             </tr>
             <tr>
                 <td>Worker grievance channels</td>
                 <td>% of Tier 1 suppliers with operational worker grievance mechanism</td>
-                <td>[TBC:suppliers_code_of_conduct_pct]% ([TBC:emissions_baseline_year])</td>
-                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
+                <td>[TBC:supplier_grievance_channel_baseline_pct]% ([TBC:workforce_baseline_year])</td>
+                <td>[TBC:supplier_grievance_channel_target_2026_pct]%</td>
                 <td>100%</td>
-                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
+                <td>[TBC:supplier_grievance_channel_current_pct]%</td>
             </tr>
             <tr>
                 <td>Supplier capacity building</td>
                 <td>Number of supplier representatives trained on labour rights and human rights due diligence per year</td>
-                <td>[TBC:tier1_suppliers_count] ([TBC:emissions_baseline_year])</td>
-                <td>[TBC:tier1_suppliers_count]</td>
-                <td>[TBC:tier1_suppliers_count]</td>
-                <td>[TBC:tier1_suppliers_count]</td>
+                <td>[TBC:supplier_reps_trained_baseline] ([TBC:workforce_baseline_year])</td>
+                <td>[TBC:supplier_reps_trained_target_2026]</td>
+                <td>[TBC:supplier_reps_trained_target_2030]</td>
+                <td>[TBC:supplier_reps_trained_per_year]</td>
             </tr>
         </tbody>
     </table>
@@ -3527,7 +3608,7 @@ class ReportTemplate:
             <tr>
                 <td>Estimated number of workers in Tier 1 supply chain</td>
                 <td>[TBC:tier1_workers_estimated]</td>
-                <td>Based on supplier-reported employment data (coverage: [TBC:suppliers_code_of_conduct_pct]% of suppliers)</td>
+                <td>Based on supplier-reported employment data (coverage: [TBC:supplier_workers_data_coverage_pct]% of suppliers)</td>
             </tr>
             <tr>
                 <td>Estimated number of workers in Tier 2 supply chain</td>
@@ -3564,8 +3645,8 @@ class ReportTemplate:
             </tr>
             <tr>
                 <td>Suppliers assessed through self-assessment questionnaire</td>
-                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
-                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
+                <td>[TBC:supplier_self_assessment_pct]%</td>
+                <td>[TBC:supplier_self_assessment_pct]%</td>
             </tr>
             <tr>
                 <td>Suppliers audited on-site</td>
@@ -3574,8 +3655,8 @@ class ReportTemplate:
             </tr>
             <tr>
                 <td>Suppliers with corrective action plan</td>
-                <td>[TBC:suppliers_audited_count]</td>
-                <td>[TBC:suppliers_audited_count]</td>
+                <td>[TBC:suppliers_with_cap_count]</td>
+                <td>[TBC:suppliers_with_cap_count]</td>
             </tr>
             <tr>
                 <td>Suppliers terminated due to non-compliance</td>
@@ -3597,28 +3678,28 @@ class ReportTemplate:
         <tbody>
             <tr>
                 <td>Health and safety</td>
-                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:supplier_audit_nc_health_safety_pct]%</td>
+                <td>Missing PPE, inadequate machine guarding</td>
             </tr>
             <tr>
                 <td>Working hours</td>
-                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:supplier_audit_nc_working_hours_pct]%</td>
+                <td>Excessive overtime, incomplete time records</td>
             </tr>
             <tr>
                 <td>Wages and benefits</td>
-                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:supplier_audit_nc_wages_pct]%</td>
+                <td>Below living wage benchmarks in high-risk regions</td>
             </tr>
             <tr>
                 <td>Freedom of association</td>
-                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:supplier_audit_nc_freedom_pct]%</td>
+                <td>Limited worker representation mechanisms</td>
             </tr>
             <tr>
                 <td>Environmental management</td>
-                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
-                <td>[TO BE CONFIRMED]</td>
+                <td>[TBC:supplier_audit_nc_environment_pct]%</td>
+                <td>Incomplete waste tracking, missing permits</td>
             </tr>
         </tbody>
     </table>
@@ -3767,13 +3848,13 @@ class ReportTemplate:
             </tr>
             <tr>
                 <td>% of suppliers assessed on ESG criteria</td>
-                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
-                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
+                <td>[TBC:supplier_esg_assessment_pct]%</td>
+                <td>[TBC:supplier_esg_assessment_pct]%</td>
             </tr>
             <tr>
                 <td>% of strategic suppliers with annual ESG review</td>
-                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
-                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
+                <td>[TBC:supplier_strategic_review_pct]%</td>
+                <td>[TBC:supplier_strategic_review_pct]%</td>
             </tr>
             <tr>
                 <td>Number of supplier audits conducted</td>
@@ -3858,23 +3939,23 @@ class ReportTemplate:
             </tr>
             <tr>
                 <td>% of high-risk employees who completed enhanced training</td>
-                <td>[TBC:anti_corruption_training_pct]%</td>
-                <td>[TBC:anti_corruption_training_pct]%</td>
+                <td>[TBC:anti_corruption_training_high_risk_pct]%</td>
+                <td>[TBC:anti_corruption_training_high_risk_pct]%</td>
             </tr>
             <tr>
                 <td>% of Board members who completed training</td>
-                <td>[TBC:anti_corruption_training_pct]%</td>
-                <td>[TBC:anti_corruption_training_pct]%</td>
+                <td>[TBC:anti_corruption_training_board_pct]%</td>
+                <td>[TBC:anti_corruption_training_board_pct]%</td>
             </tr>
             <tr>
                 <td>Number of third-party due diligence screenings conducted</td>
-                <td>[TBC:corruption_incidents_count]</td>
-                <td>[TBC:corruption_incidents_count]</td>
+                <td>[TBC:due_diligence_screenings_count]</td>
+                <td>[TBC:due_diligence_screenings_prior_year]</td>
             </tr>
             <tr>
                 <td>Number of investigations under anti-corruption policy</td>
-                <td>[TBC:whistleblowing_reports_count]</td>
-                <td>[TBC:whistleblowing_reports_count]</td>
+                <td>[TBC:corruption_investigations_count]</td>
+                <td>[TBC:corruption_investigations_prior_year]</td>
             </tr>
         </tbody>
     </table>
@@ -3923,23 +4004,23 @@ class ReportTemplate:
             </tr>
             <tr>
                 <td>Confirmed incidents of corruption</td>
-                <td>[TBC:corruption_incidents_count]</td>
-                <td>[TBC:corruption_incidents_count]</td>
+                <td>[TBC:confirmed_corruption_count]</td>
+                <td>[TBC:confirmed_corruption_count]</td>
             </tr>
             <tr>
                 <td>Confirmed incidents of bribery</td>
-                <td>[TBC:corruption_incidents_count]</td>
-                <td>[TBC:corruption_incidents_count]</td>
+                <td>[TBC:confirmed_bribery_count]</td>
+                <td>[TBC:confirmed_bribery_count]</td>
             </tr>
             <tr>
                 <td>Incidents involving public officials</td>
-                <td>[TBC:corruption_incidents_count]</td>
-                <td>[TBC:corruption_incidents_count]</td>
+                <td>[TBC:corruption_public_officials_count]</td>
+                <td>[TBC:corruption_public_officials_count]</td>
             </tr>
             <tr>
                 <td>Incidents involving business partners or third parties</td>
-                <td>[TBC:corruption_incidents_count]</td>
-                <td>[TBC:corruption_incidents_count]</td>
+                <td>[TBC:corruption_business_partners_count]</td>
+                <td>[TBC:corruption_business_partners_count]</td>
             </tr>
         </tbody>
     </table>
@@ -3956,8 +4037,8 @@ class ReportTemplate:
         <tbody>
             <tr>
                 <td>Convictions for corruption or bribery</td>
-                <td>[TBC:corruption_incidents_count]</td>
-                <td>[TBC:corruption_incidents_count]</td>
+                <td>[TBC:corruption_convictions_count]</td>
+                <td>[TBC:corruption_convictions_count]</td>
             </tr>
             <tr>
                 <td>Fines or penalties imposed for corruption or bribery</td>
@@ -3966,13 +4047,13 @@ class ReportTemplate:
             </tr>
             <tr>
                 <td>Pending legal actions related to corruption</td>
-                <td>[TBC:corruption_incidents_count]</td>
-                <td>[TBC:corruption_incidents_count]</td>
+                <td>[TBC:corruption_pending_actions_count]</td>
+                <td>[TBC:corruption_pending_actions_count]</td>
             </tr>
             <tr>
                 <td>Contractual terminations due to corruption violations</td>
-                <td>[TBC:suppliers_terminated_count]</td>
-                <td>[TBC:suppliers_terminated_count]</td>
+                <td>[TBC:suppliers_terminated_corruption_count]</td>
+                <td>[TBC:suppliers_terminated_corruption_count]</td>
             </tr>
         </tbody>
     </table>
@@ -4030,22 +4111,22 @@ class ReportTemplate:
             <tr>
                 <td>SME suppliers</td>
                 <td>[TBC:standard_payment_terms_days]</td>
-                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
+                <td>[TBC:payment_volume_sme_pct]%</td>
             </tr>
             <tr>
                 <td>Large enterprise suppliers</td>
                 <td>[TBC:standard_payment_terms_days]</td>
-                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
+                <td>[TBC:payment_volume_large_pct]%</td>
             </tr>
             <tr>
                 <td>Strategic/key suppliers</td>
                 <td>[TBC:standard_payment_terms_days]</td>
-                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
+                <td>[TBC:payment_volume_strategic_pct]%</td>
             </tr>
             <tr>
                 <td>Public sector / institutional</td>
                 <td>[TBC:standard_payment_terms_days]</td>
-                <td>[TBC:suppliers_code_of_conduct_pct]%</td>
+                <td>[TBC:payment_volume_public_pct]%</td>
             </tr>
         </tbody>
     </table>
