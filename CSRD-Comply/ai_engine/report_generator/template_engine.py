@@ -360,6 +360,20 @@ class ReportTemplate:
         "employee_count_female":      {"section": "workforce",     "type": "count",     "unit": "employees",      "magnitude": (0, 1_000_000)},
         "employee_count_other":       {"section": "workforce",     "type": "count",     "unit": "employees",      "magnitude": (0, 1_000_000)},
         "annual_revenue_eur":         {"section": "profile",       "type": "currency",  "unit": "EUR",            "magnitude": (0, 1e12)},
+        # Expenditure / fines — MUST NOT reuse annual_revenue_eur
+        "workforce_expenditure_total_eur":       {"section": "workforce",     "type": "currency",  "unit": "EUR", "magnitude": (0, 1e12)},
+        "workforce_expenditure_training_eur":    {"section": "workforce",     "type": "currency",  "unit": "EUR", "magnitude": (0, 1e12)},
+        "workforce_expenditure_health_safety_eur": {"section": "workforce",   "type": "currency",  "unit": "EUR", "magnitude": (0, 1e12)},
+        "workforce_expenditure_wellbeing_eur":   {"section": "workforce",     "type": "currency",  "unit": "EUR", "magnitude": (0, 1e12)},
+        "workforce_expenditure_diversity_eur":   {"section": "workforce",     "type": "currency",  "unit": "EUR", "magnitude": (0, 1e12)},
+        "value_chain_expenditure_total_eur":     {"section": "supply_chain",  "type": "currency",  "unit": "EUR", "magnitude": (0, 1e12)},
+        "value_chain_expenditure_auditing_eur":  {"section": "supply_chain",  "type": "currency",  "unit": "EUR", "magnitude": (0, 1e12)},
+        "value_chain_expenditure_training_eur":  {"section": "supply_chain",  "type": "currency",  "unit": "EUR", "magnitude": (0, 1e12)},
+        "value_chain_expenditure_grievance_eur": {"section": "supply_chain",  "type": "currency",  "unit": "EUR", "magnitude": (0, 1e12)},
+        "value_chain_expenditure_msi_fees_eur":  {"section": "supply_chain",  "type": "currency",  "unit": "EUR", "magnitude": (0, 1e12)},
+        "corruption_fines_eur":                  {"section": "governance",    "type": "currency",  "unit": "EUR", "magnitude": (0, 1e12)},
+        "late_payment_interest_eur":             {"section": "governance",    "type": "currency",  "unit": "EUR", "magnitude": (0, 1e12)},
+        "payment_disputes_count":              {"section": "governance",    "type": "count",     "unit": "disputes", "magnitude": (0, 1_000_000)},
         "operational_sites_count":    {"section": "profile",       "type": "count",     "unit": "sites",          "magnitude": (1, 100_000)},
         # GHG Emissions — keys must match context dict in reports.py
         "scope1_emissions":           {"section": "emissions",     "type": "float",     "unit": "tCO2e",          "magnitude": (0, 1e9)},
@@ -2796,12 +2810,12 @@ class ReportTemplate:
     </ul>
 
     <h5>Resources allocated</h5>
-    <p>Total expenditure on workforce-related actions and programmes during the reporting period: [TBC:annual_revenue_eur], including:</p>
+    <p>Total expenditure on workforce-related actions and programmes during the reporting period: [TBC:workforce_expenditure_total_eur], including:</p>
     <ul>
-        <li>Training and development: [TBC:annual_revenue_eur]</li>
-        <li>Health and safety programmes: [TBC:annual_revenue_eur]</li>
-        <li>Well-being and mental health support: [TBC:annual_revenue_eur]</li>
-        <li>Diversity and inclusion initiatives: [TBC:annual_revenue_eur]</li>
+        <li>Training and development: [TBC:workforce_expenditure_training_eur]</li>
+        <li>Health and safety programmes: [TBC:workforce_expenditure_health_safety_eur]</li>
+        <li>Well-being and mental health support: [TBC:workforce_expenditure_wellbeing_eur]</li>
+        <li>Diversity and inclusion initiatives: [TBC:workforce_expenditure_diversity_eur]</li>
     </ul>
 
     <h5>Effectiveness tracking</h5>
@@ -3374,12 +3388,12 @@ class ReportTemplate:
     </ul>
 
     <h5>Resources allocated</h5>
-    <p>Total expenditure on value chain worker-related actions during the reporting period: [TBC:annual_revenue_eur], including:</p>
+    <p>Total expenditure on value chain worker-related actions during the reporting period: [TBC:value_chain_expenditure_total_eur], including:</p>
     <ul>
-        <li>Supplier auditing and monitoring: [TBC:annual_revenue_eur]</li>
-        <li>Supplier training and capacity building: [TBC:annual_revenue_eur]</li>
-        <li>Worker voice and grievance technology: [TBC:annual_revenue_eur]</li>
-        <li>Multi-stakeholder initiative membership fees: [TBC:annual_revenue_eur]</li>
+        <li>Supplier auditing and monitoring: [TBC:value_chain_expenditure_auditing_eur]</li>
+        <li>Supplier training and capacity building: [TBC:value_chain_expenditure_training_eur]</li>
+        <li>Worker voice and grievance technology: [TBC:value_chain_expenditure_grievance_eur]</li>
+        <li>Multi-stakeholder initiative membership fees: [TBC:value_chain_expenditure_msi_fees_eur]</li>
     </ul>
 </div>""",
                             content_type="narrative",
@@ -3947,8 +3961,8 @@ class ReportTemplate:
             </tr>
             <tr>
                 <td>Fines or penalties imposed for corruption or bribery</td>
-                <td>[TBC:annual_revenue_eur]</td>
-                <td>[TBC:annual_revenue_eur]</td>
+                <td>[TBC:corruption_fines_eur]</td>
+                <td>[TBC:corruption_fines_eur]</td>
             </tr>
             <tr>
                 <td>Pending legal actions related to corruption</td>
@@ -4073,13 +4087,13 @@ class ReportTemplate:
             </tr>
             <tr>
                 <td>Interest paid on late payments to suppliers</td>
-                <td>[TBC:annual_revenue_eur]</td>
-                <td>[TBC:annual_revenue_eur]</td>
+                <td>[TBC:late_payment_interest_eur]</td>
+                <td>[TBC:late_payment_interest_eur]</td>
             </tr>
             <tr>
                 <td>Number of supplier disputes related to payment</td>
-                <td>[TBC:suppliers_terminated_count]</td>
-                <td>[TBC:suppliers_terminated_count]</td>
+                <td>[TBC:payment_disputes_count]</td>
+                <td>[TBC:payment_disputes_count]</td>
             </tr>
         </tbody>
     </table>

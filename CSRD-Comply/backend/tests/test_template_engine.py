@@ -312,3 +312,18 @@ class TestGHGE1_6:
         t2.set_company_context({"database_name": "5000000"})
         result2 = t2.resolve_placeholders(html_in2)
         assert "[TO BE CONFIRMED]" in result2, "Numeric value (revenue-like) injected into string field!"
+
+    def test_revenue_not_injected_into_expenditure_fields(self):
+        """
+        TEST 18: annual_revenue_eur must not fill S1-4/S2-4/G1-4/G1-6 expenditure placeholders.
+        """
+        html_in = (
+            "<p>[TBC:workforce_expenditure_total_eur]</p>"
+            "<p>[TBC:corruption_fines_eur]</p>"
+            "<p>[TBC:late_payment_interest_eur]</p>"
+        )
+        t = ReportTemplate(company_name="TestCorp", reporting_year=2025)
+        t.set_company_context({"annual_revenue_eur": "7000000"})
+        result = t.resolve_placeholders(html_in)
+        assert "EUR millions" not in result
+        assert result.count("[TO BE CONFIRMED]") == 3
