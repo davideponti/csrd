@@ -141,9 +141,15 @@ def list_reports(
     db: Session = Depends(get_db),
 ):
     """List reports for the user's company with pagination."""
-    return db.query(Report).filter(
-        Report.company_id == current_user.company_id
-    ).offset(skip).limit(limit).all()
+    try:
+        return db.query(Report).filter(
+            Report.company_id == current_user.company_id
+        ).offset(skip).limit(limit).all()
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Failed to list reports")
+        raise HTTPException(status_code=500, detail=f"Failed to list reports: {str(e)}")
 
 
 @router.post("/", response_model=ReportResponse, status_code=201)
@@ -153,24 +159,30 @@ def create_report(
     db: Session = Depends(get_db),
 ):
     """Create a new report. Prevents duplicates with same company_id, title, and reporting_year."""
-    existing = db.query(Report).filter(
-        Report.company_id == current_user.company_id,
-        Report.title == data.title,
-        Report.reporting_year == data.reporting_year,
-    ).first()
-    if existing:
-        raise HTTPException(
-            status_code=409,
-            detail=f"Report '{data.title}' for year {data.reporting_year} already exists.",
+    try:
+        existing = db.query(Report).filter(
+            Report.company_id == current_user.company_id,
+            Report.title == data.title,
+            Report.reporting_year == data.reporting_year,
+        ).first()
+        if existing:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Report '{data.title}' for year {data.reporting_year} already exists.",
+            )
+        report = Report(
+            company_id=current_user.company_id,
+            **data.model_dump(),
         )
-    report = Report(
-        company_id=current_user.company_id,
-        **data.model_dump(),
-    )
-    db.add(report)
-    db.commit()
-    db.refresh(report)
-    return report
+        db.add(report)
+        db.commit()
+        db.refresh(report)
+        return report
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Failed to create report")
+        raise HTTPException(status_code=500, detail=f"Failed to create report: {str(e)}")
 
 
 @router.get("/{report_id}", response_model=ReportResponse)
