@@ -288,6 +288,8 @@ class Report(TimestampMixin, Base):
     narrative_content = Column(JSON, nullable=True)              # Generated narratives
     ixbrl_tags_applied = Column(Boolean, default=False)
     ixbrl_metadata = Column(JSON, nullable=True)                 # iXBRL tagging metadata
+    approved_at = Column(DateTime, nullable=True)                # When report was approved
+    approved_by = Column(UUID(as_uuid=True), nullable=True)       # User who approved
 
     company = relationship("Company", back_populates="reports")
 

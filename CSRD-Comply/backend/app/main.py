@@ -226,6 +226,23 @@ async def run_migrations():
                 conn.execute(text(f"ALTER TABLE users ADD COLUMN IF NOT EXISTS {col} {col_type}"))
             except Exception:
                 pass
+        # 🔴 Add missing columns to reports table (colonne aggiunte al modello
+        #    ma mai migrate). RIMUOVI quando 
+
+        #    la migration d2d4919460f10 è stata eseguita.
+        for col, col_type in [
+            ("review_comments", "JSON"),
+            ("gap_analysis_results", "JSON"),
+            ("narrative_content", "JSON"),
+            ("ixbrl_tags_applied", "BOOLEAN DEFAULT FALSE"),
+            ("ixbrl_metadata", "JSON"),
+            ("approved_at", "TIMESTAMP"),
+            ("approved_by", "UUID"),
+        ]:
+            try:
+                conn.execute(text(f"ALTER TABLE reports ADD COLUMN IF NOT EXISTS {col} {col_type}"))
+            except Exception:
+                pass
         conn.commit()
 
     Base.metadata.create_all(bind=engine)
