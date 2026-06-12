@@ -42,7 +42,7 @@ ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS auto_renew BOOLEAN NOT NULL D
 CREATE TABLE IF NOT EXISTS alembic_version (
     version_num VARCHAR(32) NOT NULL PRIMARY KEY
 );
-INSERT INTO alembic_version (version_num) VALUES ('d2d4919460f10')
+INSERT INTO alembic_version (version_num) VALUES ('d2d4919460f11')
 ON CONFLICT (version_num) DO UPDATE SET version_num = EXCLUDED.version_num;
 
 ALTER TABLE company_context_settings ADD COLUMN IF NOT EXISTS extended_kpis JSONB;

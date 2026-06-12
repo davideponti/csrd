@@ -244,6 +244,13 @@ async def run_migrations():
                 conn.execute(text(f"ALTER TABLE reports ADD COLUMN IF NOT EXISTS {col} {col_type}"))
             except Exception:
                 pass
+        try:
+            conn.execute(text(
+                "ALTER TABLE company_context_settings "
+                "ADD COLUMN IF NOT EXISTS extended_kpis JSONB"
+            ))
+        except Exception:
+            pass
         conn.commit()
 
     Base.metadata.create_all(bind=engine)

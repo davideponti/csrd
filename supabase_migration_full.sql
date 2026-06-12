@@ -263,7 +263,8 @@ CREATE TABLE IF NOT EXISTS company_context_settings (
     invoices_paid_late_pct FLOAT,
     anti_corruption_training_pct FLOAT,
     corruption_incidents_last_year INTEGER,
-    whistleblowing_reports_received INTEGER
+    whistleblowing_reports_received INTEGER,
+    extended_kpis JSONB
 );
 CREATE UNIQUE INDEX IF NOT EXISTS ix_company_context_settings_company_id ON company_context_settings (company_id);
 
@@ -271,5 +272,5 @@ CREATE UNIQUE INDEX IF NOT EXISTS ix_company_context_settings_company_id ON comp
 CREATE TABLE IF NOT EXISTS alembic_version (
     version_num VARCHAR(32) NOT NULL PRIMARY KEY
 );
-INSERT INTO alembic_version (version_num) VALUES ('d2d4919460f10')
+INSERT INTO alembic_version (version_num) VALUES ('d2d4919460f11')
 ON CONFLICT (version_num) DO UPDATE SET version_num = EXCLUDED.version_num;
