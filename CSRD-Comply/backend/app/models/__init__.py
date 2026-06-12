@@ -283,8 +283,17 @@ class Report(TimestampMixin, Base):
     xbrl_validation_passed = Column(Boolean, nullable=True)
     filed_at = Column(DateTime, nullable=True)
     filed_to = Column(String(100), nullable=True)                # ESAP, national authority
+    review_comments = Column(JSON, nullable=True)                # Review comments
+    gap_analysis_results = Column(JSON, nullable=True)           # Gap analysis JSON
+    narrative_content = Column(JSON, nullable=True)              # Generated narratives
+    ixbrl_tags_applied = Column(Boolean, default=False)
+    ixbrl_metadata = Column(JSON, nullable=True)                 # iXBRL tagging metadata
 
     company = relationship("Company", back_populates="reports")
+
+    __table_args__ = (
+        UniqueConstraint("company_id", "title", "reporting_year", name="uq_report_company_title_year"),
+    )
 
 
 # ── Regulatory Updates ──────────────────────────────────────────

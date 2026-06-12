@@ -87,29 +87,78 @@ export default function ReportsPage() {
   const [reviewDialogOpen, setReviewDialogOpen] = useState(false)
   const [approving, setApproving] = useState(false)
   const [validatingId, setValidatingId] = useState<string | null>(null)
+  const [creating, setCreating] = useState(false)
 
   // ── Load reports ─────────────────────────────────────────────
 
   const loadReports = useCallback(async () => {
     try {
       const data = await api.get("/reports")
-      setReports(data)
+      // ⭐ FIX: Deduplica robusta — per ID + per (title + reporting_year)
+      const seen = new Map<string, Report>()
+      if (Array.isArray(data)) {
+        for (const r of data) {
+          if (!r || !r.id) continue
+          // Dedup per ID prima di tutto
+          if (seen.has(r.id)) continue
+          // Dedup per titolo+anno (se ID diverso ma stessi dati)
+          const key = `${r.title}|${r.reporting_year}`
+          if (seen.has(key)) continue
+          seen.set(r.id, r)
+          seen.set(key, r)
+        }
+      }
+      setReports(Array.from(seen.values()).filter(r => typeof r === 'object' && r.id))
     } catch (err) {
       console.error("Failed to load reports:", err)
     } finally {
       setLoading(false)
     }
-
   }, [])
 
+
   const createReport = async () => {
+    // ⭐ FIX: Previene click multipli e duplicazione
+    if (creating) return
+    setCreating(true)
     try {
-      const data = await api.post("/reports", { title: "Report CSRD " + new Date().getFullYear(), reporting_year: new Date().getFullYear() })
-      setReports(prev => [...prev, data])
-    } catch (err) {
+      // Check if a report for this year already exists
+      const year = new Date().getFullYear()
+      const title = "Report CSRD " + year
+      const exists = reports.some(r => r.title === title && r.reporting_year === year)
+      if (exists) {
+        alert("Un report per questo anno esiste già.")
+        setCreating(false)
+        return
+      }
+      await api.post("/reports", { title, reporting_year: year })
+      // ⭐ FIX: Dopo creazione, ricarica i report invece di push ottimistico
+      await loadReports()
+    } catch (err: any) {
       console.error("Failed to create report:", err)
+      if (err?.message?.includes("409") || err?.status === 409) {
+        alert("Un report con lo stesso titolo e anno esiste già.")
+      } else {
+        alert("Errore durante la creazione del report.")
+      }
+    } finally {
+      setCreating(false)
     }
   }
+
+
+  // ⭐ FIX: Aggiungi funzione deleteReport
+  const deleteReport = async (reportId: string) => {
+    if (!confirm("Sei sicuro di voler eliminare questo report?")) return
+    try {
+      await api.del(`/reports/${reportId}`)
+      await loadReports()
+    } catch (err) {
+      console.error("Failed to delete report:", err)
+      alert("Errore durante l'eliminazione del report.")
+    }
+  }
+
 
   useEffect(() => {
     loadReports()
@@ -325,6 +374,15 @@ export default function ReportsPage() {
               }}
             >
               {isExpanded ? "Nascondi dettagli" : "Dettagli"}
+            </Button>
+            {/* ⭐ FIX: Delete button per rimuovere duplicati */}
+            <Button
+              size="sm"
+              variant="outline"
+              className="text-red-600 border-red-200 hover:bg-red-50 dark:text-red-400 dark:border-red-800 dark:hover:bg-red-950"
+              onClick={() => deleteReport(report.id)}
+            >
+              Elimina
             </Button>
           </div>
 
