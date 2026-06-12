@@ -30,7 +30,14 @@ def decode_access_token(token: str) -> Optional[dict]:
         return None
 
 # ── HttpOnly Cookie Helpers (for secure JWT storage) ────────────
-def set_auth_cookie(response, token: str, max_age: int = 86400):
+def _auth_cookie_max_age() -> int:
+    """Allinea la durata del cookie alla scadenza JWT."""
+    return settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
+
+
+def set_auth_cookie(response, token: str, max_age: int | None = None):
+    if max_age is None:
+        max_age = _auth_cookie_max_age()
     response.set_cookie(
         key="access_token",
         value=token,

@@ -12,6 +12,25 @@ import type { CompanyContextSettings } from '@/types'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || '/api/v1'
 
+function redirectToLoginIfUnauthorized(status: number) {
+  if (status === 401 && typeof window !== 'undefined') {
+    const path = window.location.pathname
+    if (!path.startsWith('/auth/')) {
+      window.location.href = '/auth/login?reason=session_expired'
+    }
+  }
+}
+
+function formatApiError(status: number, detail: unknown, fallback: string): string {
+  if (status === 401) {
+    return 'Sessione scaduta. Effettua di nuovo il login.'
+  }
+  if (typeof detail === 'string' && detail.trim()) {
+    return detail
+  }
+  return fallback
+}
+
 /**
  * 🔒 SICUREZZA: L'autenticazione usa cookie HttpOnly (XSS-safe).
  * Il JWT non è accessibile via JavaScript. Il browser lo invia
@@ -34,8 +53,9 @@ async function request<T>(
   })
 
   if (!res.ok) {
+    redirectToLoginIfUnauthorized(res.status)
     const error = await res.json().catch(() => ({ detail: res.statusText }))
-    throw new Error(error.detail || 'API Error')
+    throw new Error(formatApiError(res.status, error.detail, 'API Error'))
   }
 
   return res.json()
@@ -50,8 +70,9 @@ export const api = {
     };
     return fetch(`${API_BASE}${endpoint}`, { headers, credentials: 'include' }).then(async (res) => {
       if (!res.ok) {
+        redirectToLoginIfUnauthorized(res.status)
         const error = await res.json().catch(() => ({ detail: res.statusText }));
-        throw new Error(error.detail || 'API Error');
+        throw new Error(formatApiError(res.status, error.detail, 'API Error'));
       }
       return res.json() as Promise<T>;
     });
@@ -68,8 +89,9 @@ export const api = {
       body: body ? JSON.stringify(body) : undefined,
     }).then(async (res) => {
       if (!res.ok) {
+        redirectToLoginIfUnauthorized(res.status)
         const error = await res.json().catch(() => ({ detail: res.statusText }));
-        throw new Error(error.detail || 'API Error');
+        throw new Error(formatApiError(res.status, error.detail, 'API Error'));
       }
       return res.json() as Promise<T>;
     });
@@ -86,8 +108,9 @@ export const api = {
       body: body ? JSON.stringify(body) : undefined,
     }).then(async (res) => {
       if (!res.ok) {
+        redirectToLoginIfUnauthorized(res.status)
         const error = await res.json().catch(() => ({ detail: res.statusText }));
-        throw new Error(error.detail || 'API Error');
+        throw new Error(formatApiError(res.status, error.detail, 'API Error'));
       }
       return res.json() as Promise<T>;
     });
@@ -104,8 +127,9 @@ export const api = {
       body: body ? JSON.stringify(body) : undefined,
     }).then(async (res) => {
       if (!res.ok) {
+        redirectToLoginIfUnauthorized(res.status)
         const error = await res.json().catch(() => ({ detail: res.statusText }));
-        throw new Error(error.detail || 'API Error');
+        throw new Error(formatApiError(res.status, error.detail, 'API Error'));
       }
       return res.json() as Promise<T>;
     });
@@ -121,8 +145,9 @@ export const api = {
       credentials: 'include',
     }).then(async (res) => {
       if (!res.ok) {
+        redirectToLoginIfUnauthorized(res.status)
         const error = await res.json().catch(() => ({ detail: res.statusText }));
-        throw new Error(error.detail || 'API Error');
+        throw new Error(formatApiError(res.status, error.detail, 'API Error'));
       }
       return res.json() as Promise<T>;
     });

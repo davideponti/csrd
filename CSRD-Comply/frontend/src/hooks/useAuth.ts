@@ -35,6 +35,11 @@ export function useAuth() {
         })
         return true
       }
+      if (res.status === 401 && typeof window !== 'undefined') {
+        // Cookie presente ma token scaduto/revocato — pulisci sessione locale
+        setState({ user: null, loading: false })
+        return false
+      }
     } catch {
       // Not authenticated
     }

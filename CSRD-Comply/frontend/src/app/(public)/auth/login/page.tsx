@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import Link from 'next/link'
 import { Leaf, Eye, EyeOff, Loader2 } from 'lucide-react'
@@ -20,7 +20,14 @@ export default function LoginPage() {
   const [otpSent, setOtpSent] = useState(false)
   const { login } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { t } = useLanguage()
+
+  useEffect(() => {
+    if (searchParams.get('reason') === 'session_expired') {
+      setError('Sessione scaduta. Accedi di nuovo per continuare.')
+    }
+  }, [searchParams])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

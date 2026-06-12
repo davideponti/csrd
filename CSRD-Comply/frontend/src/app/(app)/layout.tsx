@@ -1,6 +1,7 @@
 'use client'
 
-import { LayoutDashboard, ClipboardCheck, Leaf, FileText, Settings, Bell, User, LogOut } from 'lucide-react'
+import { useEffect } from 'react'
+import { LayoutDashboard, ClipboardCheck, Leaf, FileText, Settings, Bell, User, LogOut, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
@@ -18,12 +19,30 @@ const navItems = [
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
-  const { logout } = useAuth()
+  const { logout, isAuthenticated, loading } = useAuth()
   const { showOnboarding, setShowOnboarding } = useOnboarding()
 
+  useEffect(() => {
+    if (!loading && !isAuthenticated) {
+      router.replace('/auth/login')
+    }
+  }, [loading, isAuthenticated, router])
+
   const handleLogout = async () => {
-    logout()
+    await logout()
     router.push('/auth/login')
+  }
+
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
+  }
+
+  if (!isAuthenticated) {
+    return null
   }
 
   return (

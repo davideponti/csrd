@@ -79,20 +79,28 @@ CREATE TABLE IF NOT EXISTS esrs_datapoints (
 );
 CREATE INDEX IF NOT EXISTS ix_esrs_datapoints_standard_ref ON esrs_datapoints (standard_ref);
 
--- 6. Reports (with table_data column)
+-- 6. Reports (schema completo)
 CREATE TABLE IF NOT EXISTS reports (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     company_id UUID NOT NULL REFERENCES companies(company_id),
     reporting_year INTEGER NOT NULL,
     title VARCHAR(255) NOT NULL,
     status reportstatus NOT NULL DEFAULT 'draft',
+    table_data JSONB,
     xhtml_content TEXT,
     xbrl_validation_passed BOOLEAN,
     filed_at TIMESTAMP,
     filed_to VARCHAR(100),
-    table_data JSONB,
+    review_comments JSONB,
+    gap_analysis_results JSONB,
+    narrative_content JSONB,
+    ixbrl_tags_applied BOOLEAN NOT NULL DEFAULT FALSE,
+    ixbrl_metadata JSONB,
+    approved_at TIMESTAMP,
+    approved_by UUID,
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_report_company_title_year UNIQUE (company_id, title, reporting_year)
 );
 
 -- 7. Emissions Data
@@ -259,9 +267,9 @@ CREATE TABLE IF NOT EXISTS company_context_settings (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS ix_company_context_settings_company_id ON company_context_settings (company_id);
 
--- 16. Create and set Alembic version
+-- 16. Alembic version (non distruttivo)
 CREATE TABLE IF NOT EXISTS alembic_version (
     version_num VARCHAR(32) NOT NULL PRIMARY KEY
 );
-DELETE FROM alembic_version;
-INSERT INTO alembic_version (version_num) VALUES ('d2d4919460f8');
+INSERT INTO alembic_version (version_num) VALUES ('d2d4919460f10')
+ON CONFLICT (version_num) DO UPDATE SET version_num = EXCLUDED.version_num;

@@ -231,6 +231,7 @@ async def run_migrations():
 
         #    la migration d2d4919460f10 è stata eseguita.
         for col, col_type in [
+            ("table_data", "JSON"),
             ("review_comments", "JSON"),
             ("gap_analysis_results", "JSON"),
             ("narrative_content", "JSON"),
