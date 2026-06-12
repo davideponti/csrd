@@ -408,6 +408,12 @@ def _compile_esrs_data(report, db):
     template.cover_page.employee_count = company.employee_count or 0
 
     # ── Load Company Context Settings and inject into template ────
+    ctx = db.query(CompanyContextSettings).filter(
+        CompanyContextSettings.company_id == report.company_id,
+    ).first()
+    if ctx and ctx.company_name:
+        company_name = ctx.company_name
+        template.cover_page.company_name = ctx.company_name
     if ctx:
         context_data = {
             # Company Profile
