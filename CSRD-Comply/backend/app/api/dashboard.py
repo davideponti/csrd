@@ -4,8 +4,9 @@ Aggrega dati reali da DB per la dashboard principale.
 Niente fallback hardcoded — se non ci sono dati, restituisce 0 / array vuoti.
 """
 import logging
+import traceback
 from datetime import datetime
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.deps import get_current_user
@@ -13,7 +14,6 @@ from app.models import (
     User, Company, EmissionsData, MaterialityAssessment,
     MaterialityScore, EsrsDatapoint, Report
 )
-from ai_engine.esrs_parser.gap_analyzer import GapAnalyzer
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +26,21 @@ def get_dashboard_data(
     db: Session = Depends(get_db),
 ):
     """Aggrega dati reali per la dashboard dal DB. Nessun fallback fittizio."""
+    try:
+        return _get_dashboard_data_impl(current_user, db)
+    except HTTPException:
+        # Rilancia HTTPException così com'è (es. 401 da get_current_user)
+        raise
+    except Exception as e:
+        logger.exception("Dashboard load error: %s", str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Dashboard load error: {str(e)}",
+        )
+
+
+def _get_dashboard_data_impl(current_user: User, db: Session) -> dict:
+    """Implementazione interna della dashboard con gestione errori robusta."""
     company = db.query(Company).filter(
         Company.company_id == current_user.company_id
     ).first()
@@ -35,21 +50,27 @@ def get_dashboard_data(
     # ── 1. Readiness Score ────────────────────────────────────
     total_datapoints = db.query(EsrsDatapoint).count()
 
-    scored_datapoints = db.query(MaterialityScore).join(
-        MaterialityAssessment,
-        MaterialityScore.assessment_id == MaterialityAssessment.id
-    ).filter(
-        MaterialityAssessment.company_id == company.company_id
-    ).count()
+    scored_datapoints = _safe_count(
+        db.query(MaterialityScore).join(
+            MaterialityAssessment,
+            MaterialityScore.assessment_id == MaterialityAssessment.id
+        ).filter(
+            MaterialityAssessment.company_id == company.company_id
+        )
+    )
 
-    emissions_count = db.query(EmissionsData).filter(
-        EmissionsData.company_id == company.company_id
-    ).count()
+    emissions_count = _safe_count(
+        db.query(EmissionsData).filter(
+            EmissionsData.company_id == company.company_id
+        )
+    )
 
-    reports_with_content = db.query(Report).filter(
-        Report.company_id == company.company_id,
-        Report.xhtml_content.isnot(None)
-    ).count()
+    reports_with_content = _safe_count(
+        db.query(Report).filter(
+            Report.company_id == company.company_id,
+            Report.xhtml_content.isnot(None)
+        )
+    )
 
     # Readiness = weighted average of completeness
     if total_datapoints > 0:
@@ -65,20 +86,31 @@ def get_dashboard_data(
     readiness_color = 'red' if readiness_score < 30 else 'yellow' if readiness_score < 70 else 'green'
 
     # ── 2. Emissions Summary ──────────────────────────────────
-    emissions = db.query(EmissionsData).filter(
-        EmissionsData.company_id == company.company_id
-    ).all()
+    try:
+        emissions = db.query(EmissionsData).filter(
+            EmissionsData.company_id == company.company_id
+        ).all()
+    except Exception as e:
+        logger.warning("Emissions query failed: %s", e)
+        emissions = []
 
-    scope1_total = sum(e.value for e in emissions if e.scope == "1")
-    scope2_total = sum(e.value for e in emissions if e.scope == "2")
-    scope3_total = sum(e.value for e in emissions if e.scope == "3")
+    scope1_total = sum(e.value for e in emissions if hasattr(e, 'scope') and e.scope == "1")
+    scope2_total = sum(e.value for e in emissions if hasattr(e, 'scope') and e.scope == "2")
+    scope3_total = sum(e.value for e in emissions if hasattr(e, 'scope') and e.scope == "3")
     total = scope1_total + scope2_total + scope3_total
 
-    prev_year = datetime.now().year - 1
-    prev_emissions = db.query(EmissionsData).filter(
-        EmissionsData.company_id == company.company_id,
-        EmissionsData.reporting_year == prev_year,
-    ).all()
+    current_year = datetime.now().year
+    prev_year = current_year - 1
+
+    prev_emissions = []
+    try:
+        prev_emissions = db.query(EmissionsData).filter(
+            EmissionsData.company_id == company.company_id,
+            EmissionsData.reporting_year == prev_year,
+        ).all()
+    except Exception as e:
+        logger.warning("Previous year emissions query failed: %s", e)
+
     prev_total = sum(e.value for e in prev_emissions)
     yoy_change = round(((total - prev_total) / max(prev_total, 1)) * 100, 1) if prev_total > 0 else 0
 
@@ -91,46 +123,54 @@ def get_dashboard_data(
 
     # Last years — solo dati reali
     last_years = []
-    for y in range(prev_year - 1, datetime.now().year + 1):
-        ye = db.query(EmissionsData).filter(
-            EmissionsData.company_id == company.company_id,
-            EmissionsData.reporting_year == y,
-        ).all()
-        total_y = sum(e.value for e in ye)
-        if total_y > 0:
-            last_years.append(round(total_y, 1))
+    for y in range(prev_year - 1, current_year + 1):
+        try:
+            ye = db.query(EmissionsData).filter(
+                EmissionsData.company_id == company.company_id,
+                EmissionsData.reporting_year == y,
+            ).all()
+            total_y = sum(e.value for e in ye)
+            if total_y > 0:
+                last_years.append(round(total_y, 1))
+        except Exception as e:
+            logger.warning("Year %d emissions query failed: %s", y, e)
 
     # ── 3. Deadlines — dinamiche basate sui dati reali ────────
-    today = datetime.now()
     deadlines = []
 
-    assessment_count = db.query(MaterialityAssessment).filter(
-        MaterialityAssessment.company_id == company.company_id,
-        MaterialityAssessment.status != 'completed'
-    ).count()
-    if assessment_count > 0:
-        deadlines.append({
-            "id": "d1",
-            "title": "Completamento Assessment Materialità",
-            "date": "2026-06-15",
-            "daysRemaining": 23,
-            "severity": "critical",
-            "category": "Assessment",
-        })
+    try:
+        assessment_count = db.query(MaterialityAssessment).filter(
+            MaterialityAssessment.company_id == company.company_id,
+            MaterialityAssessment.status != 'completed'
+        ).count()
+        if assessment_count > 0:
+            deadlines.append({
+                "id": "d1",
+                "title": "Completamento Assessment Materialità",
+                "date": "2026-06-15",
+                "daysRemaining": 23,
+                "severity": "critical",
+                "category": "Assessment",
+            })
+    except Exception as e:
+        logger.warning("Assessment count query failed: %s", e)
 
-    scope3_count = db.query(EmissionsData).filter(
-        EmissionsData.company_id == company.company_id,
-        EmissionsData.scope == "3",
-    ).count()
-    if scope3_count == 0:
-        deadlines.append({
-            "id": "d2",
-            "title": "Raccolta Dati Emissioni Scope 3",
-            "date": "2026-07-31",
-            "daysRemaining": 69,
-            "severity": "warning",
-            "category": "Emissions",
-        })
+    try:
+        scope3_count = db.query(EmissionsData).filter(
+            EmissionsData.company_id == company.company_id,
+            EmissionsData.scope == "3",
+        ).count()
+        if scope3_count == 0:
+            deadlines.append({
+                "id": "d2",
+                "title": "Raccolta Dati Emissioni Scope 3",
+                "date": "2026-07-31",
+                "daysRemaining": 69,
+                "severity": "warning",
+                "category": "Emissions",
+            })
+    except Exception as e:
+        logger.warning("Scope3 count query failed: %s", e)
 
     deadlines.append({
         "id": "d3",
@@ -150,38 +190,61 @@ def get_dashboard_data(
     })
 
     # ── 4. Materiality Matrix — solo dati reali ──────────────
-    latest_assessment = db.query(MaterialityAssessment).filter(
-        MaterialityAssessment.company_id == company.company_id
-    ).order_by(MaterialityAssessment.created_at.desc()).first()
-
     matrix_data = []
-    if latest_assessment:
-        scores = db.query(MaterialityScore).filter(
-            MaterialityScore.assessment_id == latest_assessment.id
-        ).all()
-        for score in scores:
-            dp = db.query(EsrsDatapoint).filter(
-                EsrsDatapoint.id == score.datapoint_id
-            ).first()
-            matrix_data.append({
-                "impactScore": round((score.total_impact_score or (
-                    (score.impact_scale or 3) * (score.impact_likelihood or 3)
-                )) / 5, 1) if score.total_impact_score or (score.impact_scale and score.impact_likelihood) else 1,
-                "financialScore": round((score.total_financial_score or (
-                    (score.financial_magnitude or 2) * (score.financial_likelihood or 2)
-                )) / 5, 1) if score.total_financial_score or (score.financial_magnitude and score.financial_likelihood) else 1,
-                "isMaterial": score.is_material,
-                "topic": dp.standard_ref.split("-")[0] if dp else "ESRS E1",
-                "count": 1,
-            })
+    try:
+        latest_assessment = db.query(MaterialityAssessment).filter(
+            MaterialityAssessment.company_id == company.company_id
+        ).order_by(MaterialityAssessment.created_at.desc()).first()
+
+        if latest_assessment:
+            scores = db.query(MaterialityScore).filter(
+                MaterialityScore.assessment_id == latest_assessment.id
+            ).all()
+            for score in scores:
+                dp = db.query(EsrsDatapoint).filter(
+                    EsrsDatapoint.id == score.datapoint_id
+                ).first()
+                impact_val = 1
+                financial_val = 1
+
+                if score.total_impact_score is not None:
+                    impact_val = round(score.total_impact_score / 5, 1)
+                elif score.impact_scale is not None and score.impact_likelihood is not None:
+                    impact_val = round((score.impact_scale * score.impact_likelihood) / 5, 1)
+
+                if score.total_financial_score is not None:
+                    financial_val = round(score.total_financial_score / 5, 1)
+                elif score.financial_magnitude is not None and score.financial_likelihood is not None:
+                    financial_val = round((score.financial_magnitude * score.financial_likelihood) / 5, 1)
+
+                topic = "ESRS E1"
+                if dp and dp.standard_ref:
+                    topic = dp.standard_ref.split("-")[0].strip()
+
+                matrix_data.append({
+                    "impactScore": impact_val,
+                    "financialScore": financial_val,
+                    "isMaterial": score.is_material if score.is_material is not None else False,
+                    "topic": topic,
+                    "count": 1,
+                })
+    except Exception as e:
+        logger.warning("Materiality matrix query failed: %s", e)
 
     # ── 5. Quick Actions — basate sui dati reali ─────────────
-    has_no_gap_analysis = scored_datapoints == 0
-    has_no_emissions = emissions_count == 0
-    has_no_assessment = latest_assessment is None
-
     quick_actions = []
-    if has_no_emissions or has_no_gap_analysis:
+    has_no_emissions = emissions_count == 0
+    has_no_assessment = False
+
+    try:
+        latest_assessment_check = db.query(MaterialityAssessment).filter(
+            MaterialityAssessment.company_id == company.company_id
+        ).order_by(MaterialityAssessment.created_at.desc()).first()
+        has_no_assessment = latest_assessment_check is None
+    except Exception:
+        has_no_assessment = True
+
+    if has_no_emissions or scored_datapoints == 0:
         quick_actions.append({
             "id": "qa1",
             "label": "Completa Gap Analysis",
@@ -209,7 +272,7 @@ def get_dashboard_data(
         "href": "/assessment",
         "icon": "ClipboardCheck",
         "priority": "medium",
-        "completed": latest_assessment is not None,
+        "completed": not has_no_assessment,
     })
 
     quick_actions.append({
@@ -222,20 +285,24 @@ def get_dashboard_data(
         "completed": reports_with_content > 0,
     })
 
-    # ── 6. Gap Analysis Status — dal GapAnalyzer ─────────────
+    # ── 6. Gap Analysis Status — dal GapAnalyzer (con fallback) ─
+    complete = 0
+    partial_count = 0
+    missing = 0
+    total_gap = 0
+
     try:
+        from ai_engine.esrs_parser.gap_analyzer import GapAnalyzer
         gap_analyzer = GapAnalyzer(db)
         gap_result = gap_analyzer.get_summary(str(company.company_id))
         complete = gap_result.get('complete', 0)
         partial_count = gap_result.get('partial', 0)
         missing = gap_result.get('missing', 0)
         total_gap = gap_result.get('total_required', 0)
-    except Exception:
-        # Se il GapAnalyzer fallisce, restituiamo 0 — niente hardcoded
-        complete = 0
-        partial_count = 0
-        missing = 0
-        total_gap = 0
+    except ImportError as e:
+        logger.warning("GapAnalyzer not available (ai_engine not installed): %s", e)
+    except Exception as e:
+        logger.warning("GapAnalyzer failed: %s", e)
 
     completion_pct = round((complete / max(total_gap, 1)) * 100) if total_gap > 0 else 0
 
@@ -254,7 +321,7 @@ def get_dashboard_data(
         "deadlines": deadlines,
         "materialityMatrix": matrix_data,
         "quickActions": quick_actions,
-        "regulatoryUpdates": [],  # Rimosso hardcoded, va implementato con scraper reale
+        "regulatoryUpdates": [],
         "gapAnalysisStatus": {
             "total": total_gap,
             "complete": complete,
@@ -263,3 +330,12 @@ def get_dashboard_data(
             "completionPercentage": completion_pct,
         },
     }
+
+
+def _safe_count(query) -> int:
+    """Esegue query.count() con fallback a 0 se la tabella/colonna non esiste."""
+    try:
+        return query.count()
+    except Exception as e:
+        logger.warning("Database count query failed: %s", e)
+        return 0

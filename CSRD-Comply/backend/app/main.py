@@ -3,7 +3,7 @@ import logging
 import time
 import uuid
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -35,7 +35,38 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+# ── HTTPException handler ─────────────────────────────────────
+# IMPORTANTE: Questo handler DEVE stare PRIMA del global 500 handler.
+# FastAPI esegue gli exception handler nell'ordine inverso di registrazione,
+# quindi HTTPException viene registrato dopo Exception (prima in risoluzione).
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    """Rilancia HTTPException con lo status code originale (401, 403, 404, 409, 422, ecc.)
+    invece di essere catturato e trasformato in 500 dal global handler.
+    
+    Fix per: dashboard che restituiva 500 invece di 401 quando il token è scaduto.
+    """
+    # Non loggare come errore le 401/403/404 — sono comportamenti normali
+    if exc.status_code >= 500:
+        logger.error("HTTP %d on %s: %s", exc.status_code, request.url.path, exc.detail)
+    else:
+        logger.info("HTTP %d on %s: %s", exc.status_code, request.url.path, exc.detail)
+    
+    origin = request.headers.get("origin", "")
+    allowed = settings._parse_origins()
+    response = JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+    )
+    if origin in allowed or "*" in allowed:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+    return response
+
+
 # ── Global 500 exception handler (con header CORS) ──────────────
+# Questo handler cattura SOLO eccezioni NON-HTTP (es. errore DB, ValueError, ecc.)
+# Le HTTPException (401, 403, 404) sono gestite dal handler sopra.
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     """Catch unhandled exceptions to return a safe JSON response with CORS headers."""
