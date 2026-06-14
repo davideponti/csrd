@@ -5,7 +5,7 @@ Niente fallback hardcoded — se non ci sono dati, restituisce 0 / array vuoti.
 """
 import logging
 import traceback
-from datetime import datetime
+from datetime import datetime, date
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.core.database import get_db
@@ -135,7 +135,8 @@ def _get_dashboard_data_impl(current_user: User, db: Session) -> dict:
         except Exception as e:
             logger.warning("Year %d emissions query failed: %s", y, e)
 
-    # ── 3. Deadlines — dinamiche basate sui dati reali ────────
+    # ── 3. Deadlines — calcolate giorno per giorno ────────────
+    today = date.today()
     deadlines = []
 
     try:
@@ -144,11 +145,12 @@ def _get_dashboard_data_impl(current_user: User, db: Session) -> dict:
             MaterialityAssessment.status != 'completed'
         ).count()
         if assessment_count > 0:
+            target = date(2026, 6, 15)
             deadlines.append({
                 "id": "d1",
                 "title": "Completamento Assessment Materialità",
-                "date": "2026-06-15",
-                "daysRemaining": 23,
+                "date": target.isoformat(),
+                "daysRemaining": (target - today).days,
                 "severity": "critical",
                 "category": "Assessment",
             })
@@ -161,30 +163,33 @@ def _get_dashboard_data_impl(current_user: User, db: Session) -> dict:
             EmissionsData.scope == "3",
         ).count()
         if scope3_count == 0:
+            target = date(2026, 7, 31)
             deadlines.append({
                 "id": "d2",
                 "title": "Raccolta Dati Emissioni Scope 3",
-                "date": "2026-07-31",
-                "daysRemaining": 69,
+                "date": target.isoformat(),
+                "daysRemaining": (target - today).days,
                 "severity": "warning",
                 "category": "Emissions",
             })
     except Exception as e:
         logger.warning("Scope3 count query failed: %s", e)
 
+    target = date(2026, 9, 30)
     deadlines.append({
         "id": "d3",
         "title": "Generazione Report CSRD Annuale",
-        "date": "2026-09-30",
-        "daysRemaining": 130,
+        "date": target.isoformat(),
+        "daysRemaining": (target - today).days,
         "severity": "info",
         "category": "Reporting",
     })
+    target = date(2027, 4, 30)
     deadlines.append({
         "id": "d4",
         "title": "Filing Report a ESAP",
-        "date": "2027-04-30",
-        "daysRemaining": 342,
+        "date": target.isoformat(),
+        "daysRemaining": (target - today).days,
         "severity": "info",
         "category": "Filing",
     })
